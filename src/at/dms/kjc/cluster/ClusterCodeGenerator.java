@@ -32,7 +32,7 @@ class ClusterCodeGenerator {
     private int initCredit = 0;
 
     private boolean sendsCredits;
-    private HashSet sendsCreditsTo;
+    private HashSet<LatencyConstraint> sendsCreditsTo;
 
     private FlatNode node;
     private boolean isEliminated; // true if eliminated by ClusterFusion
@@ -62,7 +62,7 @@ class ClusterCodeGenerator {
         Integer init_int = (Integer)ClusterBackend.initExecutionCounts.get(node);
         if (init_int == null) { init_counts = 0; } else { init_counts = init_int.intValue(); }
 
-        steady_counts = ((Integer)ClusterBackend.steadyExecutionCounts.get(node)).intValue();
+        steady_counts = (ClusterBackend.steadyExecutionCounts.get(node)).intValue();
 
         if (oper instanceof SIRFilter) {
             work_function = ClusterUtils.getWorkName(((SIRFilter)oper), id);
@@ -94,7 +94,7 @@ class ClusterCodeGenerator {
         msg_to = new Vector<SIRStream>();
 
         restrictedExecution = false;
-        sendsCreditsTo = new HashSet();
+        sendsCreditsTo = new HashSet<LatencyConstraint>();
         sendsCredits = false;
 
         if (oper instanceof SIRFilter) {
@@ -223,13 +223,13 @@ class ClusterCodeGenerator {
         p.println("thread_info *__thread_"+id+" = NULL;");
 
         if (restrictedExecution) {
-            for (Iterator i = msg_from.iterator(); i.hasNext();) {
+            for (Iterator<SIRStream> i = msg_from.iterator(); i.hasNext();) {
                 int src = NodeEnumerator.getSIROperatorId((SIRStream)i.next());
                 p.println("int __credit_"+src+"_"+id+" = "+initCredit+";");
             }
         }
     
-        for (Iterator i = msg_to.iterator(); i.hasNext();) {
+        for (Iterator<SIRStream> i = msg_to.iterator(); i.hasNext();) {
             SIRStream str = (SIRStream)i.next();
             p.println("sdep *sdep_"+id+"_"+NodeEnumerator.getSIROperatorId(str)+";");
         }
@@ -248,11 +248,11 @@ class ClusterCodeGenerator {
                         && ((SIRFeedbackLoop)oper.getParent()).getDelayInt() > 0
                         && NodeEnumerator.getFlatNode(in.getSource()) ==
                             node.incoming[1]) {
-                    p.println("consumer2p<"+ClusterUtils.CTypeToString(in.getType())+"> "+((TapeCluster)in).getConsumerName()+";");
+                    p.println("consumer2p<"+CommonUtils.CTypeToStringA(in.getType(), true)+"> "+((TapeCluster)in).getConsumerName()+";");
                 } else {
-                    p.println("consumer2<"+ClusterUtils.CTypeToString(in.getType())+"> "+((TapeCluster)in).getConsumerName()+";");
+                    p.println("consumer2<"+CommonUtils.CTypeToStringA(in.getType(), true)+"> "+((TapeCluster)in).getConsumerName()+";");
                 }
-                p.println("extern "+ClusterUtils.CTypeToString(in.getType())+" "+((TapeCluster)in).getPopName()+"();");
+                p.println("extern "+CommonUtils.CTypeToStringA(in.getType(), true)+" "+((TapeCluster)in).getPopName()+"();");
             /*
               if (oper instanceof SIRFilter) {
               String type = ((SIRFilter)oper).getInputType().toString();
@@ -266,19 +266,19 @@ class ClusterCodeGenerator {
         for (Tape out : data_out) {
           if (out != null && out instanceof TapeCluster) {
             if (! FixedBufferTape.isFixedBuffer(out.getSource(),out.getDest())) {
-                p.println("producer2<"+ClusterUtils.CTypeToString(out.getType())+"> "+((TapeCluster)out).getProducerName()+";");
-                p.println("extern void "+((TapeCluster)out).getPushName()+"("+ClusterUtils.CTypeToString(out.getType())+");");
+                p.println("producer2<"+CommonUtils.CTypeToStringA(out.getType(), true)+"> "+((TapeCluster)out).getProducerName()+";");
+                p.println("extern void "+((TapeCluster)out).getPushName()+"("+CommonUtils.CTypeToStringA(out.getType(), true)+");");
                 p.println("    // this-part:"+ClusterFusion.getPartition(node)+" dst-part:"+ClusterFusion.getPartition(NodeEnumerator.getFlatNode(out.getDest()))+"");
             }
           }
         }   
     
-        for (Iterator i = msg_from.iterator(); i.hasNext();) {
+        for (Iterator<SIRStream> i = msg_from.iterator(); i.hasNext();) {
             int src = NodeEnumerator.getSIROperatorId((SIRStream)i.next());
             p.println("netsocket *__msg_sock_"+src+"_"+id+"in;");   
         }
 
-        for (Iterator i = msg_to.iterator(); i.hasNext();) {
+        for (Iterator<SIRStream> i = msg_to.iterator(); i.hasNext();) {
             SIRStream str = (SIRStream)i.next();
             int dst = NodeEnumerator.getSIROperatorId(str);
             p.println("netsocket *__msg_sock_"+id+"_"+dst+"out; // to " + str);
@@ -367,9 +367,9 @@ class ClusterCodeGenerator {
                 } catch (NumberFormatException ex) {
                     System.out.println("Warning! Could not estimate size of an array: "+ident);
                 }
-                p.println("  buf->write("+ident+"__"+id+", "+size+" * sizeof("+ClusterUtils.CTypeToString(base)+"));");
+                p.println("  buf->write("+ident+"__"+id+", "+size+" * sizeof("+CommonUtils.CTypeToStringA(base, true)+"));");
             } else {
-                p.println("  buf->write(&"+ident+"__"+id+", sizeof("+ClusterUtils.CTypeToString(type)+"));");
+                p.println("  buf->write(&"+ident+"__"+id+", sizeof("+CommonUtils.CTypeToStringA(type, true)+"));");
             }
         }
 
@@ -421,9 +421,9 @@ class ClusterCodeGenerator {
                 } catch (NumberFormatException ex) {
                     System.out.println("Warning! Could not estimate size of an array: "+ident);
                 }
-                p.println("  buf->read("+ident+"__"+id+", "+size+" *  sizeof("+ClusterUtils.CTypeToString(base)+"));");
+                p.println("  buf->read("+ident+"__"+id+", "+size+" *  sizeof("+CommonUtils.CTypeToStringA(base, true)+"));");
             } else {
-                p.println("  buf->read(&"+ident+"__"+id+", sizeof("+ClusterUtils.CTypeToString(type)+"));");
+                p.println("  buf->read(&"+ident+"__"+id+", sizeof("+CommonUtils.CTypeToStringA(type, true)+"));");
             }
         }
 
@@ -776,7 +776,7 @@ class ClusterCodeGenerator {
         }
         r.add("  if (_steady == 0) {\n");
 
-        if (oper instanceof SIRJoiner && ClusterCode.feedbackJoineersNeedingPrep.contains(oper)) {
+        if (oper instanceof SIRJoiner && ClusterCode.feedbackJoinersNeedingPrep.contains(oper)) {
             r.add ("  __feedbackjoiner_"+ id +"_prep();\n");
         }
 
@@ -872,7 +872,7 @@ class ClusterCodeGenerator {
         if (msg_to.size() > 0) {
         r.add("void __init_sdep_"+id+"() {\n");
 	
-	for (Iterator i = msg_to.iterator(); i.hasNext(); ) {
+	for (Iterator<SIRStream> i = msg_to.iterator(); i.hasNext(); ) {
     
             SIRFilter sender = (SIRFilter)oper;
             SIRFilter receiver = (SIRFilter)i.next();
@@ -884,8 +884,13 @@ class ClusterCodeGenerator {
 
             r.add("\n  //SDEP from: "+fromID+" to: "+toID+";\n");
         
+
+            SIRStream commonAncestor = (SIRStream)SIRNavigationUtils.commonSIRAncestor(sender, receiver); 	
+            streamit.scheduler2.iriter.Iterator commonAncestorIterator =
+            	IterFactory.createFactory().createIter(commonAncestor);
+            
             streamit.scheduler2.constrained.Scheduler cscheduler =
-                streamit.scheduler2.constrained.Scheduler.createForSDEP(ClusterBackend.topStreamIter);
+                streamit.scheduler2.constrained.Scheduler.createForSDEP(commonAncestorIterator);
         
             streamit.scheduler2.iriter.Iterator firstIter = 
                 IterFactory.createFactory().createIter(sender);
