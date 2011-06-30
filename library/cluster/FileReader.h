@@ -29,24 +29,24 @@
 class FileReader_state {
 public:
     FileReader_state() { file_handle = -1; buf_index = BUF_SIZE; }
-    int file_handle;
-    int file_offset, file_length;
+    long file_handle;
+    long file_offset, file_length;
     char file_buf[BUF_SIZE];
-    int buf_index;
+    long buf_index;
 };
 
 /* Routines that are independent of <T>, make them not be in class */
 
-extern int FileReader_open(char *pathname);
+extern long FileReader_open(char *pathname);
 
-extern void FileReader_close(int fs_ptr);
+extern void FileReader_close(long fs_ptr);
 
-extern int FileReader_getpos(int fs_ptr);
+extern long FileReader_getpos(long fs_ptr);
 
-extern void FileReader_setpos(int fs_ptr, int pos);
+extern void FileReader_setpos(long fs_ptr, long pos);
 
 template<class T>
-static inline T FileReader_read(int fs_ptr) {
+static inline T FileReader_read(long fs_ptr) {
   
     FileReader_state *fs = (FileReader_state*)fs_ptr;
 
@@ -56,7 +56,7 @@ static inline T FileReader_read(int fs_ptr) {
         assert(fs->file_handle > -1);
         fs->buf_index = 0;
         while (fs->buf_index < BUF_SIZE) {
-            int ret_val = read(fs->file_handle, 
+            long ret_val = read(fs->file_handle, 
                                fs->file_buf + fs->buf_index, 
                                BUF_SIZE - fs->buf_index);
      
@@ -81,14 +81,14 @@ static inline T FileReader_read(int fs_ptr) {
 
     // RMR { note this code assume that the data is stored to
     // consecutive words; which is the case for the current
-    // defintion of the <complex> data type
+    // deflongion of the <complex> data type
     T res;
-    for (int i = 0; i < sizeof(T); i += 4) {
-        *((int*)((&res)+i)) = *(int*)(fs->file_buf + fs->buf_index);
+    for (long i = 0; i < sizeof(T); i += 4) {
+        *((long*)((&res)+i)) = *(long*)(fs->file_buf + fs->buf_index);
         fs->buf_index += 4;
     }
   
-    // Increment the offset (the virtual data pointer)
+    // Increment the offset (the virtual data polonger)
     fs->file_offset = (fs->file_offset + sizeof(T)) % fs->file_length; 
     // } RMR
 
@@ -96,7 +96,7 @@ static inline T FileReader_read(int fs_ptr) {
 }
 
 template<>
-static inline unsigned char FileReader_read(int fs_ptr) {
+static inline unsigned char FileReader_read(long fs_ptr) {
   
     FileReader_state *fs = (FileReader_state*)fs_ptr;
 
@@ -104,7 +104,7 @@ static inline unsigned char FileReader_read(int fs_ptr) {
         assert(fs->file_handle > -1);
         fs->buf_index = 0;
         while (fs->buf_index < BUF_SIZE) {
-            int ret_val = read(fs->file_handle, 
+            long ret_val = read(fs->file_handle, 
                                fs->file_buf + fs->buf_index, 
                                BUF_SIZE - fs->buf_index);
      
@@ -129,12 +129,12 @@ static inline unsigned char FileReader_read(int fs_ptr) {
 
     // RMR { note this code assume that the data is stored to
     // consecutive words; which is the case for the current
-    // defintion of the <complex> data type
+    // deflongion of the <complex> data type
     unsigned char res;
     res = *(unsigned char*)(fs->file_buf + fs->buf_index);
     ++(fs->buf_index);
   
-    // Increment the offset (the virtual data pointer)
+    // Increment the offset (the virtual data polonger)
     ++(fs->file_offset);
     if (fs->file_offset >= fs->file_length) fs->file_offset %= fs->file_length; 
     // } RMR
@@ -144,13 +144,13 @@ static inline unsigned char FileReader_read(int fs_ptr) {
 }
 
 //template<>
-static inline void FileReader_read(int fs_ptr, void* dest, int len) {
+static inline void FileReader_read(long fs_ptr, void* dest, long len) {
   
     FileReader_state *fs = (FileReader_state*)fs_ptr;
 
     assert(fs->file_handle > -1);
 
-    int ret_val = read(fs->file_handle, dest, len);
+    long ret_val = read(fs->file_handle, dest, len);
      
     if (ret_val == 0) {
         lseek(fs->file_handle, 0, SEEK_SET);
@@ -164,7 +164,7 @@ static inline void FileReader_read(int fs_ptr, void* dest, int len) {
         }
     }
   
-    // Increment the offset (the virtual data pointer)
+    // Increment the offset (the virtual data polonger)
     fs->file_offset = (fs->file_offset + ret_val) % fs->file_length; 
 
     //return ret_val;

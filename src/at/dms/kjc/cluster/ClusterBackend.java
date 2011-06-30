@@ -11,7 +11,6 @@ import at.dms.util.Utils;
 import at.dms.kjc.*;
 import at.dms.kjc.common.*;
 import at.dms.kjc.iterator.*;
-import at.dms.kjc.simulator.FilterInformationVisitor;
 import at.dms.kjc.sir.*;
 import at.dms.kjc.sir.stats.StatisticsGathering;
 import at.dms.kjc.sir.lowering.*;
