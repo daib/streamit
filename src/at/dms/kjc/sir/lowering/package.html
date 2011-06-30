@@ -1,0 +1,126 @@
+<!--
+  Copyright 2003 by the Massachusetts Institute of Technology.
+
+  Permission to use, copy, modify, and distribute this
+  software and its documentation for any purpose and without
+  fee is hereby granted, provided that the above copyright
+  notice appear in all copies and that both that copyright
+  notice and this permission notice appear in supporting
+  documentation, and that the name of M.I.T. not be used in
+  advertising or publicity pertaining to distribution of the
+  software without specific, written prior permission.
+  M.I.T. makes no representations about the suitability of
+  this software for any purpose.  It is provided "as is"
+  without express or implied warranty.
+-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" [
+<!ELEMENT code - - (#PCDATA)>
+]>
+<html>
+<head>
+<title>Overview of at.dms.kjc.sir.lowering</title>
+</head>
+<body>
+
+<p>
+Provides compiler passes that analyze or optimize the SIR, primarily
+within the code of each filter.  
+
+<p>Also contains {@link at.dms.kjc.sir.lowering.Flattener}, the entry
+point for the original (and mostly obsolete) uniprocessor backend.
+Other files in this directory that are used solely by this backend
+include {@link at.dms.kjc.sir.lowering.Structurer}, {@link
+at.dms.kjc.sir.lowering.LowerInitFunctions}, and {@link
+at.dms.kjc.sir.lowering.LowerWorkFunctions}.  They can be ignored for
+the sake of most compiler development.
+
+<p>This package also provides the primary interface from the compiler
+to the scheduler (in {@link at.dms.kjc.sir.lowering.SIRScheduler}).
+While some other parts of the compiler call the scheduler as well (for
+example, to calculate messaging constraints), this class provides the
+fundamental operation of calculating execution multiplicities for a
+set of filters.
+
+<p>The remaining files in this package perform various node-level
+transformations on the IR.  They can be broadly categorized into
+passes that are often necessary for correctness, vs. passes that
+affect only performance or readability.
+
+<p>Passes that are needed (at least in part) due to <b>correctness</b>:
+
+<ul>
+<li> {@link at.dms.kjc.sir.lowering.ArrayInitExpander} Support reading initial values for arrays from files at compile time.
+<li> {@link at.dms.kjc.sir.lowering.ConstantProp} Constant Propagation and algebraic simplification.
+<li> {@link at.dms.kjc.sir.lowering.ConstructSIRTree} Removes SITInitStatement, creating SIR tree representation.
+<li> {@link at.dms.kjc.sir.lowering.EnqueueToInitPath} Sets up "initPath" functions to translate the enqueue statements in FeedbackLoops.
+<li> {@link at.dms.kjc.sir.lowering.FieldInitMover}  Moves field initialization from field declaration into the beginning of init().
+<li> {@link at.dms.kjc.sir.lowering.FieldProp} Sometimes called from ConstantProp, but also separately. Why?
+<li> {@link at.dms.kjc.sir.lowering.InlinePhases}
+<li> {@link at.dms.kjc.sir.lowering.Propagator} Lower level of ConstantProp, also performs some algebraic and boolean simplification.  Normally called from ConstantProp.
+<li> {@link at.dms.kjc.sir.lowering.RemoveMultiPops} changes pop(N) into N pop() instructions for back ends that do not generate code for pop(N).
+<li> {@link at.dms.kjc.sir.lowering.RenameAll}  Makes all variable names unique.  Prerequisite for most other passes.
+<li> {@link at.dms.kjc.sir.lowering.RoundToFloor}  Converts round(x) to floor(x+0.5) so that C and Java code produce the same results.
+<li> {@link at.dms.kjc.sir.lowering.StaticsProp}  Propagates values of fields defined in static{...} into filters that use them.
+<li> {@link at.dms.kjc.sir.lowering.Unroller} Sometimes called from ConstantProp to find more constants by unrolling loops.  Sometimes called separately.
+<li> {@link at.dms.kjc.sir.lowering.VarDeclRaiser}
+</ul>
+
+Several of these passes are run in all backends to prepare the program
+for processing by the compiler.  For example, the first step in
+building the stream graph is to use {@link
+at.dms.kjc.sir.lowering.ConstantProp}, {@link
+at.dms.kjc.sir.lowering.FieldProp} and {@link
+at.dms.kjc.sir.lowering.Unroller} to statically evaluate the contents
+of the <tt>init</tt> function.  The {@link
+at.dms.kjc.sir.lowering.ConstructSIRTree} pass verifies that this
+process is complete and cements the graph structure.  Note that {@link
+at.dms.kjc.sir.lowering.Unroller} is also used to further optimize the
+<tt>work</tt> function if unrolling is enabled.
+
+<p>In contrast, passes that are used strictly for <b>performance</b>
+or <b>readability</b> include:
+
+<ul>
+<li> {@link at.dms.kjc.sir.lowering.ArrayDestroyer} Convert arrays that are only referenced at constant offsets into individual variables.
+<li> {@link at.dms.kjc.sir.lowering.BranchAnalyzer}
+<li> {@link at.dms.kjc.sir.lowering.CollapseDataParallelism} Collapse split-joins with user-specified data parallelism if the result can be re-expanded with {@link at.dms.kjc.sir.lowering.fission.StatelessDuplicate}.  May result in substantially smaller graph during compilation.
+<li> {@link at.dms.kjc.sir.lowering.DeadCodeElimination} (Beware! hashes on Kopi constructs that generally have identity-based hashes.  Make sure you share all JVariableDefinition's.)
+<li> {@link at.dms.kjc.sir.lowering.FindTapeOps} Utility to determine if a compilation uint references an input or output tape.
+<li> {@link at.dms.kjc.sir.lowering.IntroduceMultiPops} Combines adjacent pop() and pop(N) instructions.
+<li> {@link at.dms.kjc.sir.lowering.MarkFilterBoundaries} Inserts special marker instructions allowing a filter's code to be found after fusion.
+<li> {@link at.dms.kjc.sir.lowering.PopToPeek} Convert pop() to peek(index++).  Must be followed with call to ConstantProp.
+<li> {@link at.dms.kjc.sir.lowering.RenameDestroyedVars} Adjust live ranges.  Used after ArrayDestroyer (and StructDestroyer?).
+<li> {@link at.dms.kjc.sir.lowering.SimplifyArguments} Use ThreeAddressCode to ensure that function arguments have no side effects.  Useful for implementing functions as macros.
+<li> {@link at.dms.kjc.sir.lowering.SimplifyPopPeekPush} Use ThreeAddressCode to ensure that all pushes, pops, peeks occur as separate statements.  Required for {@link at.dms.kjc.sir.lowering.VectorizeEnable}.  Since works in left-to-right manner, has some semantic effect in ordering multiple pops within a single expression.
+<li> {@link at.dms.kjc.sir.lowering.StructDestroyer} Convert structures into individual variables as much as possible.
+<li> {@link at.dms.kjc.sir.lowering.ThreeAddressCode} Convert specified constructs to three-address code.
+<li> {@link at.dms.kjc.sir.lowering.VectorizeEnable} Run sequences of 4 steady states at once using vector registers for (fused) filters that are {@link at.dms.kjc.sir.lowering.Vectorizable}
+</ul>
+
+<p>The {@link at.dms.kjc.sir.lowering.FilterPhaser} and {@link
+at.dms.kjc.sir.lowering.DataFlow} classes do not appear in either of
+the previous lists because they are not currently utilized by the
+compiler.
+
+<p> {@link at.dms.kjc.sir.lowering.RemoveDynamicRates} was an unsafe transormation converting all dynamic rates to rate 1.  It is superceded by use of {@link at.dms.kjc.sir.SIRDynamicRateManager}.
+
+
+<p> Some classes in this package are usually invoked from other passes.
+
+<ul>
+<li> {@link at.dms.kjc.sir.lowering.Propagator} which performs constant propagation, copy propagation, and algebraic and boolean simplification is called from {@link at.dms.kjc.sir.lowering.ConstantProp}
+<li> {@link at.dms.kjc.sir.lowering.FieldProp} and {@link at.dms.kjc.sir.lowering.Unroller} are called as needed from {@link at.dms.kjc.sir.lowering.ConstantProp} for propagating parameters through the stream graph.
+</ul>
+
+<p> Some classes in this package are only used by the obsolete C library (uni) backend.  These include:
+<ul>
+<li>{@link Flattener}</li>
+<li>{@link Structurer}</li>
+<li>{@link SIRSchedule}</li>
+<li>{@link SIRScheduler}</li>
+<li>{@link LowerInitFunctions}</li>
+<li>{@link LowerWorkFunctions}</li>
+</ul>
+{@link LoweringConstants} contains some constants unly used by the obsolete C library (uni) backend, and some constants used by other backends.
+</body>
+</html>

@@ -1,0 +1,755 @@
+/*
+ * Copyright (C) 1990-2001 DMS Decision Management Systems Ges.m.b.H.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ * $Id: KjcOptions.opt,v 1.105 2007/08/31 18:09:15 thies Exp $
+ */
+
+prefix Kjc
+
+parent at.dms.util.Options
+
+usage		"usage: at.dms.kjc.Main [option]* [--help] <java-files>"
+
+package at.dms.kjc
+
+longname		"beautify"
+	type		boolean
+	default		"false"
+	help		"Beautifies the source code"
+
+longname		"help"
+	type		boolean
+	default		"false"
+	help		"Provides help on using compiler"
+
+longname		"verbose"
+	type		boolean
+	default		"false"
+	help		"Prints out information during compilation"
+
+longname		"java"
+	type		boolean
+	default		"false"
+	help		"Generates java source code instead of class"
+
+longname		"encoding"
+	type		String
+	default		"null"
+	requireArgument
+	help		"Sets the character encoding for the source file(s)."
+
+longname		"nowrite"
+	type		boolean
+	default		"false"
+	help		"Only checks files, doesn't generate code"
+
+longname		"warning"
+	type		int
+	default		"1"
+	optionalDefault	"2"
+  //	enum		"0", "1", "2", "3", "4"
+	help		"Maximal level of warnings to be displayed"
+
+longname		"nowarn"
+	type		boolean
+	default		"false"
+	help		"Not used, for compatibility purpose"
+
+longname		"multi"
+	type		boolean
+	default		"false"
+	help		"Compiles in multi threads mode"
+
+longname		"deprecation"
+	type		boolean
+	default		"false"
+	help		"Tests for deprecated members"
+
+longname		"proc"
+	type		int
+	default		"2"
+	requireArgument
+	help		"Maximal number of threads to use"
+
+longname		"destination"
+	type		String
+	default		"null"
+	requireArgument
+	help		"Writes files to destination"
+
+longname		"classpath"
+	type		String
+	default		"null"
+	requireArgument
+	help		"Changes class path to classpath"
+
+longname		"lang"
+	type		String
+	default		"1.1"
+	requireArgument
+	help		"Sets the source language (1.1, 1.2, kopi)"
+
+longname		"filter"
+	type		String
+	default		"at.dms.kjc.DefaultFilter"
+	requireArgument
+	help		"Warning filter"
+
+// Begin StreamIt Options ----------------------------------------------
+
+longname		"output"
+	type		String
+	default		"null"
+	requireArgument
+	help		"Name of output (executable) file."
+// if null should default to "a.out" if producing an executable (in a Makefile)
+// if producing a single c or cpp file, name at your discretion if null. 
+
+longname		"havefftw"
+	type		boolean
+	default		"false"
+	help		"Assume existence of sfftw and srfftw libries"
+
+longname		"countops"
+	type		boolean
+	default		"false"
+	help		"Output instrumentation hooks for counting each arith op."
+
+longname		"profile"
+	type		boolean
+	default		"false"
+	help		"Output timers for timing execution in each filter."
+
+// changed from "manual"
+longname		"optfile"
+	type		String
+	default		"null"
+	requireArgument
+	help		"Specify Java class that performs manual optimizations."
+
+longname		"stats"
+	type		boolean
+	default		"false"
+	help		"Gathers statistics for application characterization."
+
+longname		"print_partitioned_source"
+	type		boolean
+	default		"false"
+	help		"Dumps StreamIt program that has same communication pattern as graph AFTER partitioning (for scheduler debugging)."
+
+longname		"debug"
+	type		boolean
+	default		"false"
+	help		"Produces debug information (does nothing yet)"
+
+/* remove: we are dependent on FieldProp */
+/* longname		"nofieldprop" */
+/* 	type		boolean */
+/* 	default		"false" */
+/* 	help		"Turns off StreamIt Field Prop" */
+
+longname		"fusion"
+	type		boolean
+	default		"false"
+	help		"Perform maximal filter fusion"
+
+longname		"blender"
+	type		boolean
+	default		"false"
+	help		"Hook into Blender"
+	
+longname		"mencoder"
+	type		boolean
+	default		"false"
+	help		"Hook into MEncoder"
+
+longname		"compressed"
+	type		boolean
+	default		"false"
+	help		"Operate directly on Apple Animation-compressed data"
+	
+longname		"frameheight"
+	type		int
+	default		"720"
+	requireArgument
+	help		"Uncompressed frame height (when operating directly on Apple Animation-compressed data)"
+
+longname		"framewidth"
+	type		int
+	default		"480"
+	requireArgument
+	help		"Uncompressed frame width (when operating directly on Apple Animation-compressed data)"
+
+
+longname		"unroll"
+	shortcut	"u"
+	type		int
+	default		"0"
+	requireArgument
+	help		"Maximum number of loop iterations to unroll"
+
+longname		"partition_dp"
+	shortcut	"p"
+	type		boolean
+	default		"false"
+	help		"Use dynamic programming partitioner to fit stream graph to target"
+
+longname		"partition_ilp"
+	type		boolean
+	default		"false"
+	help		"Use ILP partitioner to fit stream graph to target."
+
+longname		"partition_greedy"
+	type		boolean
+	default		"false"
+	help		"Use greedy partitioner to fit stream graph to target."
+
+longname		"partition_greedier"
+	type		boolean
+	default		"false"
+	help		"Use greedier partitioner to fit stream graph to target."
+
+longname		"linearpartition"
+	shortcut	"L"
+	type		boolean
+	default		"false"
+	help		"Use the dynamic programming partitioner for guiding linear transforms."
+
+longname		"dpscaling"
+	type		boolean
+	default		"false"
+	help		"Collect theoretical scaling statistics for dynamic programming partitioner."
+
+longname		"forceunroll"
+	type		boolean
+	default		"false"
+	help		"Force unroll to -u amount (even if overflows IMEM)."
+
+/* remove: only used in ras space, shoulf be the default, replacing other codegen */
+/* longname		"altcodegen" */
+/* 	type		boolean */
+/* 	default		"false" */
+/* 	help		"Alternate raw communication code generation for Sam." */
+
+longname		"decoupled"
+	type		boolean
+	default		"false"
+	help		"Generated dummy communcation code for raw."
+
+longname		"sync"
+	type		boolean
+	default		"false"
+	help		"Turn on sync removal"
+
+longname		"ratematch"
+	type		boolean
+	default		"false"
+	help		"Turn on rate matching for Raw"
+
+/* no longer used so removed to keep down maintenance headaches */
+/* longname		"simplesjfusion" */
+/* 	type		boolean */
+/* 	default		"false" */
+/* 	help		"Revert to the old, simple SplitJoin fusion algorithm" */
+
+// chaned from "noanneal"
+longname		"manuallayout"
+	type		boolean
+	default		"false"
+	help		"Do not run simulated annealing for layout"
+
+longname		"linearanalysis"
+	type		boolean
+	default		"false"
+	help		"Perform linear analysis"
+
+longname		"statespace"
+	type		boolean
+	default		"false"
+	help		"Perform linear state-space analysis"
+
+longname		"nodatacollapse"
+	type		boolean
+	default		"false"
+	help		"Do not collapse splitjoins of data-parallel components at beginning of compilation."
+
+longname		"nolinearcollapse"
+	type		boolean
+	default		"false"
+	help		"If linear analysis is on, do NOT collapse adjacent linear nodes into one.  Just replace individual filters."
+
+longname		"linearreplacement"
+	type		boolean
+	default		"false"
+	help		"Perform linear transformations based on linear analysis."
+
+longname		"linearreplacement2"
+	type		boolean
+	default		"false"
+	help		"Perform linear transformation using a level of indirection."
+
+longname		"linearreplacement3"
+	type		boolean
+	default		"false"
+	help		"Perform linear transformation using diagonal replacement (for contiguous non-zero regions of matrix.)"
+
+longname		"atlas"
+	type		boolean
+	default		"false"
+	help		"Perform linear transformation using ATLAS library for matrix multiplies."
+
+longname		"frequencyreplacement"
+	shortcut	"F"
+	type		boolean
+	default		"false"
+	help		"Convert linear filters to a frequency implementation."
+
+longname		"redundantreplacement"
+	type		boolean
+	default		"false"
+	help		"Replace linear filters with linear filters that have no redundan_t_ computation.."
+
+longname 		"removeglobals"
+	type		boolean
+	default		"false"
+	help		"While building the Raw main function inline all function calls, if possible, and convert all fields of a filter to locals"
+
+longname		"poptopeek"
+	type		boolean
+	default		"false"
+	help		"Convert all Pop expressions into Peek expressions (for uniprocessor only, does nothing for raw)."
+
+/* removed */
+/* longname		"ptraccess" */
+/* 	type		boolean */
+/* 	default		"false" */
+/* 	help		"For filters needing a buffer on Raw, access the buffer thru a pointer (needed for some GCC optimization." */
+
+/* removed: backend never submitted. */
+/* longname		"viram" */
+/* 	type		boolean */
+/* 	default		"false" */
+/* 	help		"Compile for VIRAM, a vector uniprocessor" */
+
+
+longname		"cluster"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Compile for a network cluster with <n> nodes."
+
+longname		"newSimple"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"New uni-processor / shared-memory multicore backend"
+
+longname		"vectorize"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Naive vectorization for a machine with <n>-byte vector registers."
+
+longname		"cell_vector_library"
+	type		boolean
+	default		"false"
+	help		"Vectorize math operations using IBMs vector versions"
+
+longname		"cacheopt"
+	type		boolean
+	default		"false"
+	help		"Perform cache optimization"
+
+
+longname		"l1i"
+	type		int
+	default		"8"
+	requireArgument
+	help		"Level 1 i-cache size in K for cache optimizations"
+
+
+longname		"l1d"
+	type		int
+	default		"8"
+	requireArgument
+	help		"Level 1 d-cache size in K for cache optmizations"
+
+
+longname		"l2"
+	type		int
+	default		"256"
+	requireArgument
+	help		"Level 2 cache size in K for cache optimizations"
+
+
+
+longname		"peekratio"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Increases multiplicity of peeking filters to make sure that (pop * ratio) >= (peek - pop)"
+
+longname		"nomult"
+	type		boolean
+	default		"false"
+	help		"Do not increase multiplicity of partitions"
+
+longname		"dynamicRatesEverywhere"
+	type		boolean
+	default		"false"
+	help		"For testing performance of dynamic rates"
+
+
+/* removed, used in testing on cluster */
+/* longname		"rename1" */
+/* 	type		boolean */
+/* 	default		"false" */
+/* 	help		"Rename local vars of operators during fusion" */
+
+/* removed, used in testing on cluster */
+/* longname		"rename2" */
+/* 	type		boolean */
+/* 	default		"false" */
+/* 	help		"Rename local vars of destroyed arrays" */
+
+longname		"raw"
+	shortcut	"r"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Compile for RAW with a square layout, with <n> tiles per side"
+
+longname		"rawcol"
+	shortcut	"c"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Sets the number of column of tiles. With this set raw specifies the number of rows."
+
+longname		"streamit"
+	type		boolean
+	default		"false"
+	help		"Compile StreamIt code."
+
+longname		"numbers"
+	shortcut	"N"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Attempt Generate Raw code that gathers performance numbers, with <n> steady state cycles."
+
+longname		"standalone"
+	shortcut	"S"
+	type		boolean
+	default		"false"
+	help		"Use the Raw backend to generate C file for uniprocessor."
+
+longname		"fixseed"
+	type		boolean
+	default		"false"
+	help		"Fix all Random seeds to known values for repeatable testing"
+
+longname		"magic_net"
+	shortcut	"M"
+	type		boolean
+	default		"false"
+	help		"Generate Magic Network Code."
+
+longname		"sjtopipe"
+	type		boolean
+	default		"false"
+	help		"Convert splitjoins to pipelines."
+
+longname		"simulatework"
+	shortcut	"s"
+	type		boolean
+	default		"false"
+	help		"Uses simulator to measure work required by filters."
+
+longname		"clone_with_serialization"
+	type		boolean
+	default		"false"
+	help		"Uses the OLD cloning method that relies on serialization."
+
+longname		"graph"
+	type		boolean
+	default		"false"
+	help		"Outputs graph representation for eclipse plugin"
+
+longname		"wbs"
+	type		boolean
+	default 	"false"
+	help 		"Uses the work based simulator for laying out the communication instructions."
+
+longname		"spacetime"
+	type		boolean
+	default		"false"
+	help		"Uses the spacetime partitioner."
+
+longname		"cell"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Compile for Cell with <n> SPUs."
+	
+longname		"celldyn"
+	type		boolean
+	default		"false"
+	help		"Compile to Cell for use with dynamic scheduler."
+
+longname		"fission"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Perform vertical fission wherever possible, with maximum of <n>-way fiss per filter."
+
+longname		"destroyfieldarray"
+	type		boolean
+	default		"false"
+	help		"Destroy field arrays"
+
+longname 		"outputs"
+	type		int
+	default 	"-1"
+	requireArgument
+	help		"Run the application until it produces <n> outputs (RAW only)."
+
+/* Not yet used, but intended for backends that build a number of iterations to run into */
+/* the code or into a value in a Makefile */ 
+longname 		"iterations"
+        shortcut        "i"
+	type		int
+	default 	"-1"
+	requireArgument
+	help		"Run the application for <n> steady-state iterations.."
+
+longname		"struct"
+	type		boolean
+	default		"false"
+	help		"Handle Structures. Experimental feature."
+
+/* remove: (real dram functional?) */
+/* longname		"magicdram" */
+/* 	type 		boolean */
+/* 	default		"false" */
+/* 	help		"For the SpaceTime RAW backend, use magic dram devices" */
+
+/* Not a strc switch but produced by strc */
+longname		"backend"
+	type		String
+	default		"null"
+	requireArgument
+	help		"Class name of the StreamIt compiler backend to run."
+
+longname		"steadymult"
+	type 		int
+	default		"1"
+	requireArgument
+	help		"For the SpaceTime RAW backend, multiply the steady-state multiplicities by i"
+
+/* removed */
+/* longname		"forceplacement" */
+/* 	type 		boolean */
+/* 	default		"false" */
+/* 	help		"For the SpaceTime RAW backend, use try to minimize communication in layout" */
+
+/* removed: only a single scheduler now */
+/* longname		"scheduler" */
+/* 	type 		String */
+/* 	default		"work" */
+/* 	requireArgument */
+/* 	help		"For the SpaceTime RAW backend, either work, dep, or comm." */
+
+longname 		"rstream"
+	shortcut	"R"
+	type 		boolean
+	default		"false"
+	help		"Generate code for the RStream front-end."
+
+longname 		"doloops"
+	type		boolean
+	default		"false"
+	help		"Generate doloops for for loops where possible in the rstream backend."
+
+longname 		"absarray"
+	type		boolean
+	default		"false"
+	help		"Use abstract array syntax and semantics instead of C arrays."
+
+longname 		"modfusion"
+	type		boolean
+	default		"false"
+	help		"Use circular buffer with mod operations when fusing pipelines."
+
+// removed as per MGordon's request: no longer used
+// longname		"dynamicnet"
+// 	type 		boolean
+// 	default		"false"
+// 	help		"Use general dynamic network for space multiplexing raw backend."
+
+longname 		"spacedynamic"
+	type		boolean
+	default		"false"
+	help		"Use the space multiplexing Raw backend with dynamic rate support."
+
+longname 		"space"
+	type		boolean
+	default		"false"
+	help		"Use the space Raw backend (without dynamic rate support)."
+
+
+longname		"malloczeros"
+	type		boolean
+	default		"false"
+	help 		"Use mallocs instead of callocs to initial memory (malloc will zero memory)."
+
+longname		"macros"
+	type		boolean
+	default		"false"
+	help 		"Convert small functions to macros, effectively inlining them."
+
+longname 		"nopartition"
+	type		boolean
+	default		"false"
+	help		"For the space-dynamic backend, do not attempt to partition each static subgraph."
+
+longname 		"layoutfile"
+	type		String
+	default		"null"
+	requireArgument
+	help		"For the space-dynamic backend, specify a layout file (a new-line separated list of tiles)."
+	
+longname 		"devassignfile"
+	type		String
+	default		"null"
+	requireArgument
+	help		"For the space-dynamic backend, specify a file that assigns devices to ports (a new-line separated list of tiles)."
+		
+longname 		"backendvalues"
+	type		String
+	default		"null"
+	requireArgument
+	help		"For debugging, specify class with package:value for static variable"
+	
+
+longname 		"slicethresh"
+	type 		int
+	default		"101"
+	requireArgument
+	help 		"For the spacetime backend, set the slice threshold to be <int> percent."
+
+longname 		"asciifileio"
+	type 		boolean
+	default		"false"
+	help		"Use ascii format for file input and output."
+
+longname		"ssoutputs"
+	type 		int
+	default		"-1"
+	requireArgument		
+	help		"When using --numbers on a dynamic-rate app, specify outputs per steady state."
+
+longname		"noswpipe"
+	type		boolean
+	default		"false"
+	help		"For spacetime, do not software pipeline the steady state."
+
+longname 		"st_cyc_per_wd"
+	type 		int
+	default		"1"	
+	requireArgument
+	help		"For spacetime, define the bandwidth in cycles per word for the streaming memories attached to the raw chip."
+
+longname 		"hwic"
+	type 		boolean 
+	default		"false"
+	help		"When targeting the raw simulator, enable H/W icaching."
+
+longname 		"dup"
+	type 		int
+	default		"-1"
+	requireArgument
+	help 		"For the SpaceTime Backend, duplicate all stateless filters n times."
+
+longname 		"noswitchcomp"
+	type 		boolean
+	default		"false"
+	help		"For the SpaceTime Backend, turn off switch instruction compression."
+	
+longname 		"autoparams"
+	type		boolean
+	default		"false"
+	help		"For the SpaceTime Backend, automatically calculate parameters."
+
+longname 		"greedysched"
+	type 		boolean
+	default		"false"
+	help		"For the SpaceTime Backend, use a greedy bin packing algorithm to calculate the schedule."
+
+longname		"workestunroll"
+	type 		boolean
+	default		"false"
+	help		"For the SpaceTime Backend, perform unrolling on filters for work estimation."
+
+/* Note "icachesize" makes the existing -i switch ambiguous so prefix w "raw"*/
+longname		"rawdcachesize"
+	type		int
+	default		"32768"
+	requireArgument
+	help		"For Raw, set the dcache size for each tile (use a power of 2)."
+
+longname		"rawicachesize"
+	type		int
+	default		"32768"
+	requireArgument
+	help		"For Raw, set the dcache size for each tile (use a power of 2)."
+
+longname		"localstoglobals"
+	type		boolean
+	default		"false"
+	help		"Convert local variables to global variables (can avoid stack overflow)."
+
+
+/* remove: now default */
+/* longname 		"noverbose" */
+/* 	type		boolean */
+/* 	default		"false" */
+/* 	help		"For cluster, do not print out code in ifdefs that are not true for the compiled configuration." */
+
+/* RMR { */
+longname 		"checkpointSIR"
+	type 		boolean
+	default	"false"
+	help		"Generate STR code from SIR."
+
+longname 		"nompops"
+	type 		boolean
+	default	"false"
+	help		"Do not convert existing loops that simply pop() to pop(n) statements."
+
+longname 		"lime"
+	type 		boolean
+	default	"false"
+	help		"Generate code for Lime compiler."
+/* } RMR */
+
+/* Amir << */
+longname		"simulator"
+	type		boolean
+	default		"false"
+	help		"Compile for simulator"
+/* >> */

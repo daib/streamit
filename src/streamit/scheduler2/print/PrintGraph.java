@@ -1,0 +1,473 @@
+/*
+ * Copyright 2003 by the Massachusetts Institute of Technology.
+ *
+ * Permission to use, copy, modify, and distribute this
+ * software and its documentation for any purpose and without
+ * fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright
+ * notice and this permission notice appear in supporting
+ * documentation, and that the name of M.I.T. not be used in
+ * advertising or publicity pertaining to distribution of the
+ * software without specific, written prior permission.
+ * M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is"
+ * without express or implied warranty.
+ */
+
+package streamit.scheduler2.print;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.DataOutputStream;
+import streamit.library.Filter;
+import streamit.scheduler2.iriter.FilterIter;
+import streamit.scheduler2.iriter.PipelineIter;
+import streamit.scheduler2.iriter.SplitJoinIter;
+import streamit.scheduler2.iriter.FeedbackLoopIter;
+import streamit.scheduler2.iriter.IteratorBase;
+import streamit.scheduler2.iriter.SplitterIter;
+import streamit.scheduler2.iriter.JoinerIter;
+import streamit.scheduler2.iriter.Iterator;
+
+public class PrintGraph extends streamit.misc.AssertedClass
+{
+    /**
+     * The maximum number of phases to show (for split/join).
+     */
+    private static final int MAX_PHASES_TO_SHOW = 16;
+    /**
+     * Whether or not we are printing I/O rates.
+     */
+    private static boolean PRINTING_IO_RATES = true;
+
+
+    public void printProgram(Iterator iter)
+    {
+        // commented out following assertion A.D.
+        // it is false for a number of programs since the outermost
+        // level is NOT guaranteed to be a pipeine and we have examples
+        // of outer levels that are SplitJoins or FeedbackLoops.
+        //assert iter.isPipeline() != null;
+
+        File outputFile;
+        FileOutputStream fileOutputStream;
+        DataOutputStream outputStream;
+
+        // print a graph both with and without I/O rates
+        String[] filenames = { getName(iter) + ".dot",
+                               getName(iter) + "-rates.dot" };
+        boolean[] printingIORates = { false, true };
+        for (int i=0; i<2; i++) {
+
+            try
+                {
+                    outputFile = new File(filenames[i]);
+                    PRINTING_IO_RATES = printingIORates[i];
+                    fileOutputStream = new FileOutputStream(outputFile);
+                    outputStream = new DataOutputStream(fileOutputStream);
+                    
+                    outputStream.writeBytes("digraph streamit {\nsize=\"7.5,10\";");
+                    printStream(iter, outputStream);
+                    outputStream.writeBytes("}\n");
+                }
+            catch (Throwable e)
+                {
+                    ERROR(e);
+                }
+        }
+    }
+
+    void printStream(Iterator iter, DataOutputStream outputStream)
+    {
+
+        try
+            {
+                if (iter.isFilter() != null)
+                    {
+                        printFilter(iter.isFilter(), outputStream);
+                    }
+                if (iter.isPipeline() != null)
+                    {
+                        printPipe(iter.isPipeline(), outputStream);
+                    }
+                if (iter.isSplitJoin() != null)
+                    {
+                        printSJ(iter.isSplitJoin(), outputStream);
+                    }
+                if (iter.isFeedbackLoop() != null)
+                    {
+                        printFL(iter.isFeedbackLoop(), outputStream);
+                    }
+            }
+        catch (Throwable e)
+            {
+                ERROR(e);
+            }
+
+    }
+
+    String getName(Object obj)
+    {
+        String name = obj.toString();
+        // if there is a dollar sign in the returned name, then this
+        // indicates an anonymous class in the library.  We don't want
+        // to label the anonymous nodes, so just return empty in this
+        // case.
+        if (name.indexOf("$")>-1) {
+            name = "";
+        } else {
+            name = name
+                .replace('@', '_')
+                .replace('.', '_')
+                .replace(' ', '_')
+                .replace('=', '_')
+                .replace(',', '_');
+        }
+
+        // add the I/O rates
+        if (PRINTING_IO_RATES && obj instanceof Filter) {
+            Filter filter = (Filter)obj;
+
+            // add init rates
+            if (filter.getNumInitPhases() > 0) {
+                int initPop = filter.getInitPopSummary();
+                int initPeek = filter.getInitPeekSummary();
+                int initPush = filter.getInitPushSummary();
+                name += ("_" + 
+                         "initPop_" + initPop + "_" +
+                         (initPop==initPeek ? "" : "initPeek_" + initPeek + "_") +
+                         "initPush_" + initPush);
+            }
+
+            // add steady rates
+            int pop = filter.getSteadyPopSummary();
+            int peek = filter.getSteadyPeekSummary();
+            int push = filter.getSteadyPushSummary();
+            name += ("_" + 
+                     "pop_" + pop + "_" +
+                     (pop==peek ? "" : "peek_" + peek + "_") +
+                     "push_" + push);
+        }
+
+        return name;
+    }
+
+    String getName(IteratorBase iter)
+    {
+        return getName(iter.getObject());
+    }
+
+    String getUniqueName(IteratorBase iter)
+    {
+        return getName(iter.getObject()) + "_" + iter.getObject().hashCode();
+    }
+
+    String getNameForSplit(SplitterIter iter) {
+        if (iter.getSplitterNumWork()>1) {
+            StringBuffer result = new StringBuffer("splitter with " + iter.getSplitterNumWork() + " phases:\\n");
+            int numPhasesToShow = Math.min(MAX_PHASES_TO_SHOW, iter.getSplitterNumWork());
+            for (int j=0; j<numPhasesToShow; j++) {
+                int[] weights = iter.getSplitPushWeights(j);
+                result.append("p" + j + ": (");
+                for (int i=0; i<weights.length; i++) { 
+                    result.append(weights[i]);
+                    if (i!=weights.length-1) {
+                        result.append(", ");
+                    } else {
+                        result.append(")");
+                        if (j!=numPhasesToShow-1) {
+                            result.append("\\n");
+                        } else if (numPhasesToShow<iter.getSplitterNumWork()) {
+                            result.append("\\n(last " + (iter.getSplitterNumWork()-numPhasesToShow) + " phases not shown)\\n");
+                        }
+                    }
+                }
+            }
+            return result.toString();
+        } else {
+            // detect duplicate if pop is unary
+            if (iter.getSplitPop(0)==1) {
+                // duplicate splitter
+                return "duplicate";
+            } else if (iter.getSplitPop(0)==0) {
+                // null splitter
+                return "roundrobin(0)";
+            } else {
+                // roundrobin splitter... enumerate weights
+                int weights[] = iter.getSplitPushWeights(0);
+                StringBuffer result = new StringBuffer("roundrobin(");
+                for (int i=0; i<weights.length; i++) { 
+                    result.append(weights[i]);
+                    if (i!=weights.length-1) {
+                        result.append(", ");
+                    } else {
+                        result.append(")");
+                    }
+                }
+                return result.toString();
+            }
+        }
+    }
+
+    String getNameForJoin(JoinerIter iter) {
+        if (iter.getJoinerNumWork()>1) {
+            StringBuffer result = new StringBuffer("joiner with " + iter.getJoinerNumWork() + " phases:\\n");
+            int numPhasesToShow = Math.min(MAX_PHASES_TO_SHOW, iter.getJoinerNumWork());
+            for (int j=0; j<numPhasesToShow; j++) {
+                int[] weights = iter.getJoinPopWeights(j);
+                result.append("p" + j + ": (");
+                for (int i=0; i<weights.length; i++) { 
+                    result.append(weights[i]);
+                    if (i!=weights.length-1) {
+                        result.append(", ");
+                    } else {
+                        result.append(")");
+                        if (j!=numPhasesToShow-1) {
+                            result.append("\\n");
+                        } else if (numPhasesToShow<iter.getJoinerNumWork()) {
+                            result.append("\\n(last " + (iter.getJoinerNumWork()-numPhasesToShow) + " phases not shown)\\n");
+                        }
+                    }
+                }
+            }
+            return result.toString();
+        } else if (iter.getJoinPush(0)==0) {
+            // null joiner
+            return "roundrobin(0)";
+        } else {
+            int weights[] = iter.getJoinPopWeights(0);
+            StringBuffer result = new StringBuffer("roundrobin(");
+            for (int i=0; i<weights.length; i++) { 
+                result.append(weights[i]);
+                if (i!=weights.length-1) {
+                    result.append(", ");
+                } else {
+                    result.append(")");
+                }
+            }
+            return result.toString();
+        }
+    }
+
+    void printFilter(FilterIter filter, DataOutputStream outputStream)
+    {
+        try
+            {
+                outputStream.writeBytes(
+                                        getUniqueName(filter)
+                                        + " [ label=\""
+                                        + getName(filter)
+                                        + "\" ]\n");
+            }
+        catch (Throwable e)
+            {
+                ERROR(e);
+            }
+    }
+
+    void printPipe(PipelineIter pipeline, DataOutputStream outputStream)
+    {
+        try
+            {
+                String lastPrinted = null;
+
+                // Print this within a subgraph.
+                outputStream.writeBytes(
+                                        "subgraph cluster_" + getUniqueName(pipeline) + " {\n");
+                outputStream.writeBytes("label = \"" + getName(pipeline) + "\";\n");
+
+                // Walk through each of the elements in the pipeline.
+                for (int nChild = 0; nChild < pipeline.getNumChildren(); nChild++)
+                    {
+                        Iterator child = pipeline.getChild(nChild);
+                        assert child != null;
+
+                        String topChild = getUniqueTopStreamName(child);
+                        String bottomChild = getUniqueBottomStreamName(child);
+
+                        printEdge(lastPrinted, topChild, outputStream);
+
+                        // Update the known edges.
+                        lastPrinted = bottomChild;
+                    }
+
+                for (int nChild = 0; nChild < pipeline.getNumChildren(); nChild++)
+                    {
+                        printStream(pipeline.getChild(nChild), outputStream);
+                    }
+
+                outputStream.writeBytes("}\n");
+            }
+        catch (Throwable e)
+            {
+                ERROR(e);
+            }
+    }
+
+    void printSJ(SplitJoinIter sj, DataOutputStream outputStream)
+    {
+        try
+            {
+                // Create a subgraph again...
+                outputStream.writeBytes(
+                                        "subgraph cluster_" + getUniqueName(sj) + " {\n");
+                outputStream.writeBytes("label = \"" + getName(sj) + "\";\n");
+
+                // Visit the splitter and joiner to get their node names...
+                outputStream.writeBytes(
+                                        getUniqueTopStreamName(sj.getUnspecializedIter())
+                                        + " [ label=\""
+                                        + getNameForSplit(sj)
+                                        + "\" ]\n");
+                outputStream.writeBytes(
+                                        getUniqueBottomStreamName(sj.getUnspecializedIter())
+                                        + " [ label=\""
+                                        + getNameForJoin(sj)
+                                        + "\" ]\n");
+
+                String splitName =
+                    getUniqueTopStreamName(sj.getUnspecializedIter());
+                String joinName =
+                    getUniqueBottomStreamName(sj.getUnspecializedIter());
+
+                // ...and walk through the body.
+                int nChild;
+                for (nChild = 0; nChild < sj.getNumChildren(); nChild++)
+                    {
+                        Iterator child = sj.getChild(nChild);
+                        printStream(child, outputStream);
+
+                        printEdge(
+                                  splitName,
+                                  getUniqueTopStreamName(child),
+                                  outputStream);
+                        printEdge(
+                                  getUniqueBottomStreamName(child),
+                                  joinName,
+                                  outputStream);
+                    }
+
+                outputStream.writeBytes("}\n");
+            }
+        catch (Throwable e)
+            {
+                ERROR(e);
+            }
+    }
+
+    void printFL(FeedbackLoopIter fl, DataOutputStream outputStream)
+    {
+        try
+            {
+                // Create a subgraph again...
+                outputStream.writeBytes(
+                                        "subgraph cluster_" + getUniqueName(fl) + " {\n");
+                outputStream.writeBytes("label = \"" + getName(fl) + "\";\n");
+
+                // Visit the splitter and joiner.
+                outputStream.writeBytes(
+                                        getUniqueTopStreamName(fl.getUnspecializedIter())
+                                        + " [ label=\""
+                                        + getNameForJoin(fl)
+                                        + "\" ]\n");
+                outputStream.writeBytes(
+                                        getUniqueBottomStreamName(fl.getUnspecializedIter())
+                                        + " [ label=\""
+                                        + getNameForSplit(fl)
+                                        + "\" ]\n");
+
+                // Visit the body and the loop part.
+                printStream(fl.getBodyChild(), outputStream);
+                printStream(fl.getLoopChild(), outputStream);
+
+                printEdge(
+                          getUniqueTopStreamName(fl.getUnspecializedIter()),
+                          getUniqueTopStreamName(fl.getBodyChild()),
+                          outputStream);
+                printEdge(
+                          getUniqueBottomStreamName(fl.getBodyChild()),
+                          getUniqueBottomStreamName(fl.getUnspecializedIter()),
+                          outputStream);
+                printEdge(
+                          getUniqueBottomStreamName(fl.getUnspecializedIter()),
+                          getUniqueTopStreamName(fl.getLoopChild()),
+                          outputStream);
+                printEdge(
+                          getUniqueBottomStreamName(fl.getLoopChild()),
+                          getUniqueTopStreamName(fl.getUnspecializedIter()),
+                          outputStream);
+
+                outputStream.writeBytes("}\n");
+            }
+        catch (Throwable e)
+            {
+                ERROR(e);
+            }
+    }
+
+    void printEdge(
+                   String from,
+                   String to,
+                   DataOutputStream outputStream)
+    {
+        if (from == null || to == null)
+            return;
+        try
+            {
+                outputStream.writeBytes(from + " -> " + to + "\n");
+            }
+        catch (Throwable e)
+            {
+                ERROR(e);
+            }
+    }
+
+    String getUniqueTopStreamName(Iterator iter)
+    {
+        if (iter.isFilter() != null)
+            {
+                return getUniqueName(iter);
+            }
+        if (iter.isPipeline() != null)
+            {
+                return getUniqueTopStreamName(iter.isPipeline().getChild(0));
+            }
+        if (iter.isSplitJoin() != null)
+            {
+                return getUniqueName(iter) + "_split";
+            }
+        if (iter.isFeedbackLoop() != null)
+            {
+                return getUniqueName(iter) + "_join";
+            }
+
+        assert false;
+        return null;
+    }
+
+    String getUniqueBottomStreamName(Iterator iter)
+    {
+        if (iter.isFilter() != null)
+            {
+                return getUniqueName(iter);
+            }
+        if (iter.isPipeline() != null)
+            {
+                return getUniqueBottomStreamName(
+                                                 iter.isPipeline().getChild(
+                                                                            iter.isPipeline().getNumChildren() - 1));
+            }
+        if (iter.isSplitJoin() != null)
+            {
+                return getUniqueName(iter) + "_join";
+            }
+        if (iter.isFeedbackLoop() != null)
+            {
+                return getUniqueName(iter) + "_split";
+            }
+
+        assert false;
+        return null;
+    }
+
+}

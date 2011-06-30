@@ -1,0 +1,142 @@
+<!--
+  Copyright 2003 by the Massachusetts Institute of Technology.
+
+  Permission to use, copy, modify, and distribute this
+  software and its documentation for any purpose and without
+  fee is hereby granted, provided that the above copyright
+  notice appear in all copies and that both that copyright
+  notice and this permission notice appear in supporting
+  documentation, and that the name of M.I.T. not be used in
+  advertising or publicity pertaining to distribution of the
+  software without specific, written prior permission.
+  M.I.T. makes no representations about the suitability of
+  this software for any purpose.  It is provided "as is"
+  without express or implied warranty.
+-->
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" [
+<!ELEMENT code - - (#PCDATA)>
+]>
+<html>
+<head>
+<title>Overview of at.dms.kjc.slicegraph</title>
+</head>
+<body>
+<p>
+This package aims to supersede the SIR and flatgraph representations
+of the stream graph with a single representation that maintains all
+relevant information as well as slice information. 
+The package contains the slice data structures, but omits manipulation
+of the data structures in ways that are not general: in particular,
+software pipelining algorithms from ASPLOS'06 are not in this package,
+</p>
+<p>Class notes for my edification:
+<ul>
+<li>
+{@link Slice} defines a collection of SliceNodes, started with an
+InputSliceNode.
+For people used to the SIR representation, a slice can be thought of
+as a joiner (InputSliceNode), followed by a pipeline of filters
+(FilterSliceNode), followed by a splitter (OutputSliceNode).
+</li><li>
+{@link SliceNode} abstract class with previous and next SliceNode's
+(internal connections within a slice) and with a parent Slice. 
+  <ul>
+  <li> 
+  {@link InputSliceNode} manages an array of Edge's: "sources"
+  </li><li>
+  {@link OutputSliceNode} manages an array of arrays of Edge's: "dests"
+  </li><li>
+  {@link FilterSliceNode} contains FilterContent.
+  </li>
+  </ul>
+</li><li>
+{@link Edge} class gives connection between slices (actually between an
+InputSliceNode and an OutputSliceNode), and may be queried for type,
+number of items sent on edge at init, at priming, and steady state
+times.  SliceNode's within a slice are connected as a simple
+doubly-linked list.  (Note that the priming information for an edge is
+not calculated in the slicegraph package).
+
+</li><li>
+{@link FilterContent} keeps information about a filter, including init
+and steady scheduling multiplicities, and information about linear
+(but not linear statespace) filters.  You can construct a
+FilterContent from a {@link at.dms.kjc.sir.SIRPhasedFilter}, from a
+{@link UnflatFilter} (including a linear one), or by shallow copy from
+another {@link FilterContent}.  The subclass {@link PredefinedContent}
+seems to exist only for "instanceof" 
+  <ul>
+  <li>
+  {@link InputContent} has a single subclass {@link FileInputContent}
+  which remembers a file name, can be constructed from a
+  SIRFileReader. 
+  </li><li>
+  {@link OutputContent} has a single subclass {@link
+  FileOutputContent} which remembers a file name, can be constructed
+  from a SIRFileWriter, and allows a value to be set for expected
+  number of outputs. 
+  </li>
+  </ul>
+</li><li>
+{@link FlattenGraph} takes a SIRStream, a linear analyzer, and what
+appears to be init and steady state execution counts.  It performs the
+linear analysis and synchronization removal.  It can be queried to get
+top level {@link UnflatFilter}s.
+<ul><li>
+I have been told that FlattenGraph is soon to be obsoleted in favor of 
+{@link SynchRemover}
+</li></ul>
+</li><li>
+{@link SynchRemover} is not currently called from anywhere. Should be soon.
+</li><li>
+{@link Partitioner} is an abstract class defining the partitioning of
+a graph to be an array of Slice's. It requires UnflatFilter's from
+{@link FlattenGraph}, a schedule, linear analyzer, work estimate, and
+a bound on the number of partitions to be created (which may be
+ignored by any particular implementation).
+A Partitioner can be queried for an array of {@link at.dms.kjc.spacetime.Slice} nodes. 
+  <ul>
+  <li>
+  {@link FlattenAndPartition} is used by spacetime for 
+  {@link at.dms.kjc.KjcOptions#nopartition}.  
+  It uses old {at.dms.kjc.flatgraph.GraphFlattener} to flatten the
+  graph, does not attempt synch removal, and partitions as one filter
+  per slice.
+  </li><li>
+  {@link AdaptivePartitioner} is used by spacetime for {@link
+  at.dms.kjc.KjcOptions#autoparams}.  It is undocumented, but
+  apparently only works for 16-tile raw.  Mike says: probably obsolete
+  after being used for some testing for the ASPLOS'06 paper.
+  </li><li>
+  {@link SimplePartitioner} is used by spacetime as the default partitioner.
+  Each slice should be a pipeline of FilterSliceNode's stared with one
+  InputSliceNode and ending with one OutputSliceNode. 
+  </li>
+  </ul>
+</li><li>
+{@link EdgeList} and {@link EdgeArray}, deal with structures of 
+{@link UnflatEdge} which, along with {@link UnflatFilter} are used by 
+{@link FlattenGraph}.  
+The {@link UnflatFilter} contains a 
+{@link at.dms.kjc.sir.SIRFilter}, which is presumably why it is "Unflat"
+</li><li>
+{@link PeekPopPushInHelper} determines whether any functions other
+than the work function access the tape.  It operates on both
+FilterContent and on SIRFilter. 
+</li><li>
+{@link DataFlowOrder} produces a list of Slices (Slices) in reverse
+depth-first order.  It is referred to from a number of places in
+spacetime, but not from elsewhere in slicegraph.  However, slicegraph
+is a good place for this general utility on slices.
+</li><li>
+{@link IntList} primitive list implementation used in {@link
+FlattenGraph}.
+</li><li>
+<!-- {@link IntArrayList} is unused and should be removed.</li><li> -->
+{@link Util} contains utility routines for the slice graph.
+</li>
+</ul>
+</p>
+TODO: update when SynchRemover in place!
+</body>
+</html>
