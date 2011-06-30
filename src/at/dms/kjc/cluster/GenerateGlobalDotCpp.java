@@ -1,4 +1,4 @@
-// $Header: /n/tiamat/y/repository/StreamItNew/streams/src/at/dms/kjc/cluster/GenerateGlobalDotCpp.java,v 1.1 2009/02/24 18:14:54 hormati Exp $
+// $Header: /projects/raw/cvsroot/streams/src/at/dms/kjc/cluster/GenerateGlobalDotCpp.java,v 1.1 2006/07/07 17:40:01 dimock Exp $
 package at.dms.kjc.cluster;
 
 import java.io.FileWriter;
@@ -46,7 +46,7 @@ public class GenerateGlobalDotCpp {
         // ================================
 
         str += "#include <stdlib.h>\n";
-        str += "#include <unistd.h>\n";
+        //str += "#include <unistd.h>\n";
         str += "#include <math.h>\n";
         str += "#include \"global.h\"\n";
         str += "\n";
