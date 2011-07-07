@@ -351,6 +351,12 @@ longname		"cluster"
 	default		"-1"
 	requireArgument
 	help		"Compile for a network cluster with <n> nodes."
+	
+longname		"e2"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Compile for a e2 cluster with <n> nodes."
 
 longname		"newSimple"
 	type		int

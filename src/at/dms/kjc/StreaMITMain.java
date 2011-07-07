@@ -102,6 +102,8 @@ public class StreaMITMain {
             backendClass = "at.dms.kjc.cell.CellBackend";
         } else if (KjcOptions.cluster != -1) {
             backendClass = "at.dms.kjc.cluster.ClusterBackend";
+        } else if (KjcOptions.e2 != -1) {
+            backendClass = "at.dms.kjc.cluster.E2Backend";
         } else if (KjcOptions.newSimple != -1) {
             backendClass = "at.dms.kjc.vanillaSlice.UniBackEnd";
         } /* RMR { */ else if (KjcOptions.lime) {
