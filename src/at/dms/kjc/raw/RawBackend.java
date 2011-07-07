@@ -187,6 +187,7 @@ public class RawBackend {
                 System.err.println("Running Partitioning...");
                 str = Partitioner.doit(str, count, numTiles, true, false, true);
                 System.err.println("Done Partitioning...");
+				System.err.println("Num filters after partitioning " + at.dms.kjc.sir.lowering.partition.Partitioner.countFilters(str));
                 RemoveMultiPops.doit(str);
             }
 
