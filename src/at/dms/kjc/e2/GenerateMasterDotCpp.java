@@ -161,14 +161,14 @@ public class GenerateMasterDotCpp {
 
             p.print("    pthread_create(&__pthread_" + i + ", &__pthread_attr_" 
                     + i + ", run_thread_" + i + ", (void*)\"thread" + i
-                    + "\");\n");
+                    + "\");\n\n");
             //p.print("    info->set_pthread(__pthread_" + i + ");\n");
             //p.print("    info->set_active(true);\n");
             //p.print("  }\n");
         }
 
 		//last cluster is run on this thread
-		p.print("  run_thread_" + (threadNumber - 1) + "(NULL);\n");
+		p.print("  run_thread_" + (threadNumber - 1) + "(thread" +  (threadNumber - 1) + ");\n");
 
 		p.print("  run_join();\n");
 

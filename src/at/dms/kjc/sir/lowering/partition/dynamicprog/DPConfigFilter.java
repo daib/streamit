@@ -41,7 +41,7 @@ class DPConfigFilter extends DPConfig {
             // don't currently support fission on cluster backend
             // because it requires mix of transforming and no
             // transforming -- wouldn't be too hard to add.
-            && KjcOptions.cluster==-1) {
+            && (KjcOptions.cluster==-1 || KjcOptions.e2==-1)) {
             cost = workCount / tilesForFission(tileLimit, nextToJoiner) + DynamicProgPartitioner.FISSION_OVERHEAD;
         } else {
             cost = workCount;
@@ -112,7 +112,7 @@ class DPConfigFilter extends DPConfig {
             // don't currently support fission on cluster backend
             // because it requires mix of transforming and no
             // transforming -- wouldn't be too hard to add.
-            && KjcOptions.cluster==-1) {
+            && (KjcOptions.cluster==-1 || KjcOptions.e2==-1)) {
             // record fission tiles
             for (int i=0; i<tff; i++) {
                 curPartition.add(filter, 

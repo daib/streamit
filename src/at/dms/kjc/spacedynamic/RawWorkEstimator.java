@@ -64,7 +64,7 @@ public class RawWorkEstimator extends EmptyStreamVisitor
         SpdStaticStreamGraph ssg = (SpdStaticStreamGraph)streamGraph.getStaticSubGraphs()[0];
         ssg.scheduleAndCreateMults();
         //make a new directory and change the current working dir
-        String dir = File.separator + "tmp" + File.separator + 
+        String dir = "." + File.separator + "tmp" + File.separator + 
             filter.getName();
     
         File file = new File(dir);
@@ -77,7 +77,7 @@ public class RawWorkEstimator extends EmptyStreamVisitor
         //turn off output limiting
         KjcOptions.outputs = -1;
 	//turn off hardware icaching
-	KjcOptions.hwic = false;
+		KjcOptions.hwic = false;
 
         //VarDecl Raise to move array assignments up
         new VarDeclRaiser().raiseVars(filter);
@@ -130,7 +130,7 @@ public class RawWorkEstimator extends EmptyStreamVisitor
         try {
             //copy the files 
             {
-                System.out.println("Moving files to /tmp...");
+                System.out.println("Moving files to ./tmp...");
                 String[] cmdArray = new String[6];
                 cmdArray[0] = "cp";
                 cmdArray[1] = "tile" + tileNumber + ".c";
@@ -212,7 +212,7 @@ public class RawWorkEstimator extends EmptyStreamVisitor
         
             //open the results file and return the stats
             work = readCycleCount(dir);
-        
+       /* 
             //remove the directory
             {
                 String[] cmdArray = new String[3];
@@ -226,6 +226,7 @@ public class RawWorkEstimator extends EmptyStreamVisitor
                 jProcess.getOutputStream().close();
                 jProcess.getErrorStream().close();
             }
+*/
         
         }
         catch (Exception e) {

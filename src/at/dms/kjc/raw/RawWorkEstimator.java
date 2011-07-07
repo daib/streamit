@@ -61,7 +61,7 @@ public class RawWorkEstimator extends EmptyStreamVisitor
         pipe.setChildren(list);
 
         //make a new directory and change the current working dir
-        String dir = File.separator + "tmp" + File.separator + 
+        String dir = "." + File.separator + "tmp" + File.separator + 
             filter.getName();
     
         File file = new File(dir);
@@ -125,7 +125,7 @@ public class RawWorkEstimator extends EmptyStreamVisitor
         try {
             //copy the files 
             {
-                System.out.println("Moving files to /tmp...");
+                System.out.println("Moving files to ./tmp...");
                 String[] cmdArray = new String[5];
                 cmdArray[0] = "cp";
                 cmdArray[1] = "tile" + tileNumber + ".c";
@@ -159,7 +159,7 @@ public class RawWorkEstimator extends EmptyStreamVisitor
 
                 String[] cmdArray = 
                     {
-                        "/bin/bash",
+                        "/usr/bin/bash",
                         "-c",
                         "make -C " + dir + " -f Makefile.streamit run &> /dev/null"
                     };

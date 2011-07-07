@@ -194,7 +194,7 @@ public class GenerateMakefile {
 
 
         try {
-            FileWriter fw = new FileWriter("Makefile.cluster");
+            FileWriter fw = new FileWriter("Makefile.e2");
             fw.write(p.getString());
             fw.close();
         }
