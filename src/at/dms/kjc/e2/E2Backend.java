@@ -109,13 +109,8 @@ public class E2Backend {
         // if (debugPrint)
         //    System.out.println("Cluster Backend SIRGlobal: "+global);
 
-        System.out.println("Entry to Cluster Backend"
+        System.out.println("Entry to E2 Backend"
                            + ((KjcOptions.standalone && KjcOptions.e2 == 1) ? " (uniprocessor)": ""));
-        // System.out.println("  --cluster parameter is: "+KjcOptions.e2);
-        // if (debugPrint)
-        //     System.out.println("  peekratio is: "+KjcOptions.peekratio);
-        // System.out.println("  rename1 is: "+KjcOptions.rename1);
-        // System.out.println("  rename2 is: "+KjcOptions.rename2);
 
         if (debugging) 
         {
