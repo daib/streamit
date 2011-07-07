@@ -23,7 +23,7 @@
 #include <assert.h>
 #include <FileWriter.h>
 
-int FileWriter_open(char *pathname) {
+long FileWriter_open(char *pathname) {
     FileWriter_state *fs = new FileWriter_state();
     fs->file_handle = open(pathname, 
                            O_RDWR | O_CREAT, 
@@ -39,20 +39,20 @@ int FileWriter_open(char *pathname) {
     // RMR { comment out printf
     // printf("FileWriter.cpp: length of file [%s] is %d bytes.\n", pathname, fs->file_length); 
     // } RMR
-    return (int)fs;
+    return (long)fs;
 }
 
-void FileWriter_close(int fs_ptr) {
+void FileWriter_close(long fs_ptr) {
     FileWriter_state *fs = (FileWriter_state*)fs_ptr;
     close(fs->file_handle);
 }
 
-int FileWriter_getpos(int fs_ptr) {
+long FileWriter_getpos(long fs_ptr) {
     FileWriter_state *fs = (FileWriter_state*)fs_ptr;
     return fs->file_offset + fs->buf_index;
 }
 
-void FileWriter_setpos(int fs_ptr, int pos) {
+void FileWriter_setpos(long fs_ptr, long pos) {
     FileWriter_state *fs = (FileWriter_state*)fs_ptr;
     FileWriter_flush(fs_ptr); // Flush so that cached data is saved
 
@@ -62,18 +62,18 @@ void FileWriter_setpos(int fs_ptr, int pos) {
     fs->file_length = buf.st_size;
     assert(pos >= 0 && pos <= fs->file_length);
 
-    int seek_pos = lseek(fs->file_handle, pos, SEEK_SET);
+    long seek_pos = lseek(fs->file_handle, pos, SEEK_SET);
     assert(seek_pos == pos);
     fs->file_offset = pos;
 }
 
-int FileWriter_flush(int fs_ptr) {
+long FileWriter_flush(long fs_ptr) {
     FileWriter_state *fs = (FileWriter_state*)fs_ptr;
 
-    int pos = 0;
+    long pos = 0;
 
     while (pos < fs->buf_index) {
-        int ret_val = write(fs->file_handle, 
+        long ret_val = write(fs->file_handle, 
                             fs->file_buf + pos, 
                             fs->buf_index - pos);
      
