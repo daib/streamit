@@ -111,8 +111,8 @@ public class E2Backend {
         //    System.out.println("Cluster Backend SIRGlobal: "+global);
 
         System.out.println("Entry to Cluster Backend"
-                           + ((KjcOptions.standalone && KjcOptions.cluster == 1) ? " (uniprocessor)": ""));
-        // System.out.println("  --cluster parameter is: "+KjcOptions.cluster);
+                           + ((KjcOptions.standalone && KjcOptions.e2 == 1) ? " (uniprocessor)": ""));
+        // System.out.println("  --cluster parameter is: "+KjcOptions.e2);
         // if (debugPrint)
         //     System.out.println("  peekratio is: "+KjcOptions.peekratio);
         // System.out.println("  rename1 is: "+KjcOptions.rename1);
@@ -241,7 +241,7 @@ public class E2Backend {
         }
  
         // estimate code and local variable size for each filter (and store where???)
-        Estimator.estimate(str);
+        E2Estimator.estimate(str);
 
         StreamItDot.printGraph(str, "canonical-graph.dot");
 
@@ -278,11 +278,11 @@ public class E2Backend {
         Optimizer.optimize(str);
 
         // set up for future estimateCode / estimateLocals calls.
-        Estimator.estimate(str);
+        E2Estimator.estimate(str);
 
         
         // How many systems will be running this code.
-        int hosts = KjcOptions.cluster;
+        int hosts = KjcOptions.e2;
         
         // put markers on operator boundaries before we mung the names
         // too much.
@@ -640,7 +640,7 @@ public class E2Backend {
 
         StructureIncludeFile.doit(structures, streamGraph); // structs.h
 
-        ClusterCode.generateCode(strTop);   // thread*.cpp
+        E2Code.generateCode(strTop);   // thread*.cpp
 
         FusionCode.generateFusionHeader(str, doCacheOptimization); // fusion.h
         GenerateGlobalDotH.generateGlobalDotH(global, helpers); // global.h

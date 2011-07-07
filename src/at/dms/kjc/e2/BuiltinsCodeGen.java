@@ -28,7 +28,7 @@ class BuiltinsCodeGen {
         // Caller has printed function name and an iteration parameter ____n
         // Generate loop to execute body of this function ____n times,
         // In loop generate specialized code for function.
-        p.print("void " + ClusterUtils.getWorkName(filter, selfID)
+        p.print("void " + E2Utils.getWorkName(filter, selfID)
                 + "(int ____n) {");
         p.indent();
         p.newLine();
@@ -433,7 +433,7 @@ class BuiltinsCodeGen {
 
 	endFunction(p);
 
-        String closeName = ClusterUtils.getWorkName(fr, selfID)
+        String closeName = E2Utils.getWorkName(fr, selfID)
             + "__close"; 
                                   
         startParameterlessFunction("void", closeName, p);
@@ -613,7 +613,7 @@ class BuiltinsCodeGen {
 
         endFunction(p);
 
-        String closeName = ClusterUtils.getWorkName(fw, selfID)
+        String closeName = E2Utils.getWorkName(fw, selfID)
             + "__close"; 
                
         startParameterlessFunction("void", closeName, p);

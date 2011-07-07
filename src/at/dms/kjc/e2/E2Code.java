@@ -389,7 +389,7 @@ public class E2Code {
             System.exit(1);
         }
 
-        ClusterCodeGenerator gen = new ClusterCodeGenerator(splitter, new JFieldDeclaration[0]);
+        E2CodeGenerator gen = new E2CodeGenerator(splitter, new JFieldDeclaration[0]);
 
 //        // debugging only
 //        System.err.print("(Splitter");
@@ -584,7 +584,7 @@ public class E2Code {
             System.exit(1);
         }
         
-        ClusterCodeGenerator gen = new ClusterCodeGenerator(joiner, new JFieldDeclaration[0]);
+        E2CodeGenerator gen = new E2CodeGenerator(joiner, new JFieldDeclaration[0]);
 
 //        // debugging only
 //        System.err.print("(Joiner");
@@ -1243,7 +1243,7 @@ public class E2Code {
             System.exit(1);
         }
         
-        ClusterCodeGenerator gen = new ClusterCodeGenerator(filter, new JFieldDeclaration[0]);
+        E2CodeGenerator gen = new E2CodeGenerator(filter, new JFieldDeclaration[0]);
          
         p.print("// init counts: "+init_counts+" steady counts: "+steady_counts+"\n"); 
         p.newLine();

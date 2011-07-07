@@ -77,7 +77,7 @@ public class GenerateGlobalDotH {
             if (type.toString().endsWith("Portal")) continue;
 
             String ident = fields[f].getVariable().getIdent();
-            str += "extern " + ClusterUtils.declToString(type, "__global__" + ident) + ";\n";
+            str += "extern " + E2Utils.declToString(type, "__global__" + ident) + ";\n";
         }
 
         str += "#endif // __GLOBAL_H\n";

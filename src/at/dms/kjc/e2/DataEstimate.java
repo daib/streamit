@@ -99,7 +99,7 @@ public class DataEstimate {
 
             SIRFilter filter = (SIRFilter)oper;
             globals = DataEstimate.filterGlobalsSize(filter);
-            locals = CodeEstimate.estimateLocals(filter);
+            locals = E2CodeEstimate.estimateLocals(filter);
             return globals + locals;
         }
     
@@ -132,7 +132,7 @@ public class DataEstimate {
     public static int estimateIOSize(SIROperator oper) {
         int id = NodeEnumerator.getSIROperatorId(oper);
         FlatNode node = NodeEnumerator.getFlatNode(id);
-        Integer steady = ClusterBackend.steadyExecutionCounts.get(node);
+        Integer steady = E2Backend.steadyExecutionCounts.get(node);
         int steady_int = 0;
         if (steady != null) steady_int = (steady).intValue();
 
