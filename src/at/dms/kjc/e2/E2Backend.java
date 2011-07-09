@@ -278,6 +278,9 @@ public class E2Backend {
         // How many systems will be running this code.
         int hosts = KjcOptions.e2;
         
+        //put timers for each filters
+        InsertFilterPerfCounters.doit(str);
+        
         // put markers on operator boundaries before we mung the names
         // too much.
         MarkFilterBoundaries.doit(str);

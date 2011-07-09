@@ -236,7 +236,7 @@ public class WorkEstimate {
         }
     }
 
-    static class WorkVisitor extends SLIREmptyVisitor implements WorkConstants {
+    static public class WorkVisitor extends SLIREmptyVisitor implements WorkConstants {
         private Set<JMethodDeclaration> methodsBeingProcessed;
         
         /**
