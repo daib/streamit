@@ -140,6 +140,7 @@ public class E2Backend {
         // generating C code, and is best done here while type info is still available
         // for tmps.
         SimplifyPopPeekPush.simplify(str);
+
         
         // Perform propagation on fields from 'static' sections.
         Set<SIRGlobal> statics = new HashSet<SIRGlobal>();
@@ -244,6 +245,7 @@ public class E2Backend {
             StatisticsGathering.doit(str);
         }
 
+
         // Flattener is a misnomer here.
         // Rewrite str for linearreplacement, frequencyreplacement,
         // or redundantreplacement
@@ -278,9 +280,10 @@ public class E2Backend {
         // How many systems will be running this code.
         int hosts = KjcOptions.e2;
         
+        
         //put timers for each filters
         InsertFilterPerfCounters.doit(str);
-        
+
         // put markers on operator boundaries before we mung the names
         // too much.
         MarkFilterBoundaries.doit(str);

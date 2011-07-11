@@ -1,11 +1,8 @@
 package at.dms.kjc.sir.lowering;
 
-import java.util.List;
+import java.util.*;
 
-import at.dms.kjc.JEmittedTextExpression;
-import at.dms.kjc.JExpressionStatement;
-import at.dms.kjc.JMethodDeclaration;
-import at.dms.kjc.JStatement;
+import at.dms.kjc.*;
 import at.dms.kjc.iterator.IterFactory;
 import at.dms.kjc.iterator.SIRFilterIter;
 import at.dms.kjc.sir.EmptyStreamVisitor;
@@ -62,7 +59,7 @@ public class InsertFilterPerfCounters extends EmptyStreamVisitor {
 		}
 
 		// for example: "SIRFilter DCT"
-		return shortClass + " " + shortIdent;
+		return shortIdent;
 	}
 
 	/* visit a filter */
@@ -70,22 +67,36 @@ public class InsertFilterPerfCounters extends EmptyStreamVisitor {
 		JMethodDeclaration work = self.getWork();
 		work.addStatementFirst(makeInitCounter(self));
 		List<JStatement> statements = work.getStatements();
-		if (((JExpressionStatement) statements.get(statements.size() - 1))
-				.getExpression() instanceof SIRPushExpression) {
-			statements.add(statements.size() - 1, makeEndCounter(self));
+		int i;
+		for (i  = statements.size() - 1; i >= 0; i--) {
+			System.out.println(statements.get(i));
+			if((statements.get(i) instanceof JExpressionStatement) &&
+				(((JExpressionStatement)(statements.get(i))).getExpression() instanceof SIRPushExpression))
+				break;
 		}
-		// work.addStatement(makeEndCounter(self));
+
+		if(i >= 0)
+		{
+			JStatement lastStatement = statements.get(i);
+			if ((lastStatement instanceof JExpressionStatement) &&
+				(((JExpressionStatement)lastStatement).getExpression() instanceof SIRPushExpression)) {
+				statements.add(i, makeEndCounter(self));
+		
+			} else
+		 		work.addStatement(makeEndCounter(self));
+		} else
+		 	work.addStatement(makeEndCounter(self));
 	}
 
 	private JExpressionStatement makeInitCounter(SIRFilter self) {
 		return new JExpressionStatement(new JEmittedTextExpression(
-				"global_counter = GET_CUR_CYCLE();"));
+				"global_counter = GET_CUR_CYCLE()"));
 	}
 
 	private JExpressionStatement makeEndCounter(SIRFilter self) {
 		return new JExpressionStatement(
 				new JEmittedTextExpression(
 						getName(self)
-								+ "_perf_counter += GET_CUR_CYCLE() - global_perf_counter;"));
+								+ "_perf_counter += GET_CUR_CYCLE() - global_perf_counter"));
 	}
 }

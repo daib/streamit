@@ -1291,6 +1291,7 @@ public class FlatIRToCluster extends InsertTimers implements
      */
     public void visitCompoundStatement(JStatement[] body) {
         for (int i = 0; i < body.length; i++) {
+			//System.out.println(body[i].toString());
             if (body[i] instanceof JIfStatement && i < body.length - 1
                 && !(body[i + 1] instanceof JReturnStatement)) {
                 p.newLine();
