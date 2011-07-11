@@ -676,7 +676,7 @@ public class JMethodDeclaration extends JMemberDeclaration {
     /**
      * Returns list of statements in this.  
      */
-    public List getStatements() {
+    public List<JStatement> getStatements() {
         return body.getStatements();
     }
 
