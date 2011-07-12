@@ -105,7 +105,6 @@ public class GenerateMasterDotCpp {
         }
         //p.print("  sleep(1);\n");
         //p.print("  if (__ccp_ip != 0) for(;;) sleep(1);\n");
-        p.print("  exit(0);\n");
 
         p.print("}\n");
 
@@ -168,7 +167,7 @@ public class GenerateMasterDotCpp {
         }
 
 		//last cluster is run on this thread
-		p.print("  run_thread_" + (threadNumber - 1) + "(thread" +  (threadNumber - 1) + ");\n");
+		p.print("  run_thread_" + (threadNumber - 1) + "(\"thread" +  (threadNumber - 1) + "\");\n");
 
 		p.print("  run_join();\n");
 
@@ -201,7 +200,7 @@ public class GenerateMasterDotCpp {
         p.print("  __out_data_buffer = read_setup::out_data_buffer;\n");
         p.print("  __max_iteration = read_setup::max_iteration;\n");
 
-        p.print("  master_pid = getpid();\n");
+        //p.print("  master_pid = getpid();\n");
 
         p.print("  for (int a = 1; a < argc; a++) {\n");
 
