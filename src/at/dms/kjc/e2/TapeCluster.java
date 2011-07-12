@@ -438,7 +438,7 @@ public class TapeCluster extends TapeBase implements Tape {
 			//body of push
 			s.append("\twhile(" + push_name + "_queue.size() > 0) {\n");
 				s.append("\t\t" + pushPrefix() + push_name + "_queue.front()" + pushSuffix()+ ";\n");
-				s.append("\t\t" + push_name + "queue.pop();\n");
+				s.append("\t\t" + push_name + "_queue.pop();\n");
 			s.append("\t}\n");
             s.append("}\n");
 

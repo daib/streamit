@@ -910,9 +910,14 @@ class E2CodeGenerator {
 							&& node.inputs > 0
 							&& node.incoming[0] != null
 							&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
-						r.add("      __update_push_buf__" + id + "();\n");
 						r.add("      __update_pop_buf__" + id + "();\n");
 					}
+
+					if (node.isFilter() && 
+						(RegisterStreams.getFilterOutStream(node.contents) != null)){
+						r.add("      __update_push_buf__" + id + "();\n");
+					}
+
 				}
 				r.add("      " + work_function + "(1);\n");
 				if (oper instanceof SIRFilter) {
@@ -950,9 +955,14 @@ class E2CodeGenerator {
 						&& node.inputs > 0
 						&& node.incoming[0] != null
 						&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
-					r.add("      __update_push_buf__" + id + "();\n");
 					r.add("      __update_pop_buf__" + id + "();\n");
 				}
+
+				if (node.isFilter() && 
+					(RegisterStreams.getFilterOutStream(node.contents) != null)){
+					r.add("      __update_push_buf__" + id + "();\n");
+				}
+
 			}
 			r.add("      " + work_function + "(1);\n");
 			if (oper instanceof SIRFilter) {
@@ -1091,8 +1101,9 @@ class E2CodeGenerator {
 			//estimate the number of cores first
 			//generate specification code
 			//only filters need more cores, spliter and joiner does not
+			//fix me
 			if (node.contents instanceof SIRFilter) { 
-				r.add("\tcompose(" + E2CoreEstimation.estimateNumberCore((SIRFilter) node.contents) + ");");
+				//r.add("\tcompose(" + E2CoreEstimation.estimateNumberCore((SIRFilter) node.contents) + ");");
 				
 			} 	
 

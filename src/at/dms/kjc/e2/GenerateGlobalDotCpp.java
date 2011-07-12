@@ -114,7 +114,7 @@ public class GenerateGlobalDotCpp {
         str += "void printPerfCounters() {\n";
         
         for(String perCounter:InsertFilterPerfCounters.getPerfCounters()) {
-        	str += "\tprintf(\"\tPerf counter: " + perCounter + " = %s\"," + perCounter + ");\n";
+        	str += "\tprintf(\"\tPerf counter: " + perCounter + " = %ld\\n\"," + perCounter + ");\n";
         }
         
         str += "}";
