@@ -65,27 +65,10 @@ public class InsertFilterPerfCounters extends EmptyStreamVisitor {
 	/* visit a filter */
 	public void visitFilter(SIRFilter self, SIRFilterIter iter) {
 		JMethodDeclaration work = self.getWork();
+		//cannot look for push operators as 
+		//they could be any where of the code
 		work.addStatementFirst(makeInitCounter(self));
-		List<JStatement> statements = work.getStatements();
-		int i;
-		for (i  = statements.size() - 1; i >= 0; i--) {
-			System.out.println(statements.get(i));
-			if((statements.get(i) instanceof JExpressionStatement) &&
-				(((JExpressionStatement)(statements.get(i))).getExpression() instanceof SIRPushExpression))
-				break;
-		}
-
-		if(i >= 0)
-		{
-			JStatement lastStatement = statements.get(i);
-			if ((lastStatement instanceof JExpressionStatement) &&
-				(((JExpressionStatement)lastStatement).getExpression() instanceof SIRPushExpression)) {
-				statements.add(i, makeEndCounter(self));
-		
-			} else
-		 		work.addStatement(makeEndCounter(self));
-		} else
-		 	work.addStatement(makeEndCounter(self));
+		work.addStatement(makeEndCounter(self));
 	}
 
 	private JExpressionStatement makeInitCounter(SIRFilter self) {
