@@ -910,6 +910,7 @@ class E2CodeGenerator {
 							&& node.inputs > 0
 							&& node.incoming[0] != null
 							&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
+						r.add("      __update_push_buf__" + id + "();\n");
 						r.add("      __update_pop_buf__" + id + "();\n");
 					}
 				}
@@ -949,6 +950,7 @@ class E2CodeGenerator {
 						&& node.inputs > 0
 						&& node.incoming[0] != null
 						&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
+					r.add("      __update_push_buf__" + id + "();\n");
 					r.add("      __update_pop_buf__" + id + "();\n");
 				}
 			}

@@ -421,7 +421,28 @@ public class TapeCluster extends TapeBase implements Tape {
               + pop_buffer + "[" + out_pop_buffer_size + "];\n"
               + "int " + pop_index + " = "
               + (out_pop_num_iters * push_n) + ";\n");
-            
+
+			//convert to non-blocking push
+			s.append("#include<queue>\n");
+			s.append("std::queue<" + CommonUtils.declToString(type, "", true) +
+					"> " + push_name + "_queue;\n");
+            s.append("inline void " + push_name + "("
+                    + CommonUtils.declToString(type, "data", true)
+                    + ") {\n");
+			//body of push
+			s.append("\t" + push_name + "_queue.push(data);\n");
+            s.append("}\n");
+
+			//update push buffer
+			 s.append("inline void __update_push_buf__" + src + "() {\n");
+			//body of push
+			s.append("\twhile(" + push_name + "_queue.size() > 0) {\n");
+				s.append("\t\t" + pushPrefix() + push_name + "_queue.front()" + pushSuffix()+ ";\n");
+				s.append("\t\t" + push_name + "queue.pop();\n");
+			s.append("\t}\n");
+            s.append("}\n");
+
+/*            
             s.append("inline void " + push_name + "("
                     + CommonUtils.declToString(type, "data", true)
                     + ") {\n");
@@ -431,6 +452,7 @@ public class TapeCluster extends TapeBase implements Tape {
             createPushRoutineBody(s, "data");
             //p.outdent();
             s.append("}\n");
+*/
 
 // (1) WTF. (2) can not use pop_name if pop routine at downstream end uses pop_name
 //            // W.T.F: why define a pop routine at the 
