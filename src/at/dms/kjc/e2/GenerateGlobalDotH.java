@@ -11,6 +11,7 @@ import at.dms.kjc.JIntLiteral;
 import at.dms.kjc.JMethodDeclaration;
 import at.dms.kjc.sir.SIRGlobal;
 import at.dms.kjc.sir.SIRHelper;
+import at.dms.kjc.sir.lowering.InsertFilterPerfCounters;
 
 
 
@@ -80,6 +81,20 @@ public class GenerateGlobalDotH {
             str += "extern " + E2Utils.declToString(type, "__global__" + ident) + ";\n";
         }
 
+        //performance counter
+        str += "extern " + InsertFilterPerfCounters.getPerfCounterType() + " " +
+        	InsertFilterPerfCounters.getGlobalCounter() + ";\n";
+        
+        for(String perCounter:InsertFilterPerfCounters.getPerfCounters()) {
+        	str += "extern " + InsertFilterPerfCounters.getPerfCounterType() + " " +
+        		perCounter + ";\n";
+        }
+        
+        str += "void printPerfCounters();\n";
+        str += "#define " + InsertFilterPerfCounters.getCurrentTimeDeclaration() + " 0 \n";
+        
+        str += "\n";
+        
         str += "#endif // __GLOBAL_H\n";
         
         try {

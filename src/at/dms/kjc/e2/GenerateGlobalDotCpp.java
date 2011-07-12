@@ -11,6 +11,7 @@ import at.dms.kjc.JIntLiteral;
 import at.dms.kjc.JMethodDeclaration;
 import at.dms.kjc.sir.SIRGlobal;
 import at.dms.kjc.sir.SIRHelper;
+import at.dms.kjc.sir.lowering.InsertFilterPerfCounters;
 
 
 
@@ -99,6 +100,25 @@ public class GenerateGlobalDotCpp {
             global.getInit().accept(f2c);
             str += f2c.getPrinter().getString();
         }
+        
+      //declare performance counters
+        str += InsertFilterPerfCounters.getPerfCounterType() + " " +
+        	InsertFilterPerfCounters.getGlobalCounter() + ";\n";
+        
+        for(String perCounter:InsertFilterPerfCounters.getPerfCounters()) {
+        	str += InsertFilterPerfCounters.getPerfCounterType() + " " +
+        		perCounter + ";\n";
+        }
+        
+        //printout performance counters routine
+        str += "void printPerfCounters() {\n";
+        
+        for(String perCounter:InsertFilterPerfCounters.getPerfCounters()) {
+        	str += "\tprintf(\"\tPerf counter: " + perCounter + " = %s\"," + perCounter + ");\n";
+        }
+        
+        str += "}";
+        
         str += "\n";
     
         try {

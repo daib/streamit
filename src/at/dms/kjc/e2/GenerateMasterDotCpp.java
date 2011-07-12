@@ -284,6 +284,9 @@ public class GenerateMasterDotCpp {
         if (KjcOptions.countops) {
             p.print("  profiler::summarize();\n");
         }
+        
+        //print performance counters
+        p.println("  printPerfCounters();");
 
         //p.print("  for (;;) {}\n");   
         //p.print("  init_instance::close_sockets();\n");

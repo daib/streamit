@@ -8,7 +8,6 @@ import at.dms.kjc.iterator.SIRFilterIter;
 import at.dms.kjc.sir.EmptyStreamVisitor;
 import at.dms.kjc.sir.SIRFilter;
 import at.dms.kjc.sir.SIROperator;
-import at.dms.kjc.sir.SIRPushExpression;
 import at.dms.kjc.sir.SIRStream;
 
 /**
@@ -21,6 +20,11 @@ import at.dms.kjc.sir.SIRStream;
 public class InsertFilterPerfCounters extends EmptyStreamVisitor {
 
 	private static final boolean FINE_GRAINED = false;
+	private static final String GLOBAL_COUNTER = "global_counter";
+	private static final String GET_CURRENT_TIME = "GET_CUR_CYCLE()";
+	private static final String PERF_COUNTER_TAG = "_perf_counter";
+	private static Set<String> counterSet = new HashSet<String>();
+	private static final String PERF_COUNTER_TYPE = "long int";
 
 	public static void doit(SIRStream str) {
 		IterFactory.createFactory().createIter(str)
@@ -58,28 +62,50 @@ public class InsertFilterPerfCounters extends EmptyStreamVisitor {
 			}
 		}
 
-		// for example: "SIRFilter DCT"
-		return shortIdent;
+		// for example: "SIRFilter_DCT"
+		return shortClass + "__" + shortIdent;
 	}
 
 	/* visit a filter */
 	public void visitFilter(SIRFilter self, SIRFilterIter iter) {
 		JMethodDeclaration work = self.getWork();
-		//cannot look for push operators as 
-		//they could be any where of the code
+		// cannot look for push operators as
+		// they could be any where of the code
 		work.addStatementFirst(makeInitCounter(self));
 		work.addStatement(makeEndCounter(self));
+		
+		//FIXME: need to check for duplication?
+		counterSet.add(makePerfCounterName(self));
 	}
 
-	private JExpressionStatement makeInitCounter(SIRFilter self) {
+	private static JExpressionStatement makeInitCounter(SIRFilter self) {
 		return new JExpressionStatement(new JEmittedTextExpression(
-				"global_counter = GET_CUR_CYCLE()"));
+				GLOBAL_COUNTER + " = " + GET_CURRENT_TIME));
 	}
 
-	private JExpressionStatement makeEndCounter(SIRFilter self) {
-		return new JExpressionStatement(
-				new JEmittedTextExpression(
-						getName(self)
-								+ "_perf_counter += GET_CUR_CYCLE() - global_perf_counter"));
+	private static JExpressionStatement makeEndCounter(SIRFilter self) {
+		return new JExpressionStatement(new JEmittedTextExpression(
+				makePerfCounterName(self) + " += " + GET_CURRENT_TIME
+						+ "-" + GLOBAL_COUNTER));
+	}
+	
+	private static String makePerfCounterName(SIRFilter self) {
+		return getName(self) + PERF_COUNTER_TAG;
+	}
+	
+	public static Set<String> getPerfCounters() {
+		return counterSet;
+	}
+	
+	public static String getGlobalCounter() {
+		return GLOBAL_COUNTER;
+	}
+	
+	public static String getPerfCounterType() {
+		return PERF_COUNTER_TYPE;
+	}
+	
+	public static String getCurrentTimeDeclaration() {
+		return GET_CURRENT_TIME;
 	}
 }

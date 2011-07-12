@@ -622,6 +622,10 @@ public class FlatIRToCluster extends InsertTimers implements
             BuiltinsCodeGen.predefinedFilterWork((SIRPredefinedFilter) self, selfID, p);
         } else {
 
+        	//work function body
+        	
+        	//enclose a work function body with a for loop
+        	//to execute several iterations
             block.addStatement(new JForStatement(null, init, cond, 
                                                  (outgoing.length + incoming.length == 0 ? decr : list), 
                                                  work.getBody(),
@@ -1117,6 +1121,7 @@ public class FlatIRToCluster extends InsertTimers implements
             isInit = true;
         }
         if (body != null) {
+        	//generate body code inside for (iterate) loop
             body.accept(this);
         } else {
             p.print(";");
