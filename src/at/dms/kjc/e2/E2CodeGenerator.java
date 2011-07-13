@@ -906,6 +906,12 @@ class E2CodeGenerator {
 					if (msg_from.size() > 0) {
 						r.add("      check_messages__" + id + "();\n");
 					}
+
+					if (node.isFilter() && 
+						(RegisterStreams.getFilterOutStream(node.contents) != null)){
+						r.add("      __update_push_buf__" + id + "();\n");
+					}
+
 					if (node.isFilter()
 							&& node.inputs > 0
 							&& node.incoming[0] != null
@@ -913,10 +919,6 @@ class E2CodeGenerator {
 						r.add("      __update_pop_buf__" + id + "();\n");
 					}
 
-					if (node.isFilter() && 
-						(RegisterStreams.getFilterOutStream(node.contents) != null)){
-						r.add("      __update_push_buf__" + id + "();\n");
-					}
 
 				}
 				r.add("      " + work_function + "(1);\n");
@@ -951,18 +953,18 @@ class E2CodeGenerator {
 				if (msg_from.size() > 0) {
 					r.add("      check_messages__" + id + "();\n");
 				}
-				if (node.isFilter()
-						&& node.inputs > 0
-						&& node.incoming[0] != null
-						&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
-					r.add("      __update_pop_buf__" + id + "();\n");
-				}
 
 				if (node.isFilter() && 
 					(RegisterStreams.getFilterOutStream(node.contents) != null)){
 					r.add("      __update_push_buf__" + id + "();\n");
 				}
 
+				if (node.isFilter()
+						&& node.inputs > 0
+						&& node.incoming[0] != null
+						&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
+					r.add("      __update_pop_buf__" + id + "();\n");
+				}
 			}
 			r.add("      " + work_function + "(1);\n");
 			if (oper instanceof SIRFilter) {
