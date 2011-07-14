@@ -945,6 +945,9 @@ class E2CodeGenerator {
 						+ "; _tmp++) {\n");
 			}
 
+			//start communcation counter
+			// # cycles
+
 			if (oper instanceof SIRFilter) {
 				r.add("      //check_status__" + id + "();\n");
 
@@ -954,11 +957,13 @@ class E2CodeGenerator {
 					r.add("      check_messages__" + id + "();\n");
 				}
 
+				//measure blocking write + comm time
 				if (node.isFilter() && 
 					(RegisterStreams.getFilterOutStream(node.contents) != null)){
 					r.add("      __update_push_buf__" + id + "();\n");
 				}
 
+				//measure blocking read + comm time
 				if (node.isFilter()
 						&& node.inputs > 0
 						&& node.incoming[0] != null
@@ -966,7 +971,18 @@ class E2CodeGenerator {
 					r.add("      __update_pop_buf__" + id + "();\n");
 				}
 			}
+			
+			//start computation counter
+			// # flushes, # cycles
+			// # flushes determine how many cores we want to use
+
 			r.add("      " + work_function + "(1);\n");
+
+
+			//check for utilization
+			//compose more core if needed
+			//r.add("\tCHECK_FOR_UTILIZATION();\n");
+
 			if (oper instanceof SIRFilter) {
 				/*
 				 * if (msg_to.size() > 0 || msg_from.size() > 0) {
@@ -980,6 +996,7 @@ class E2CodeGenerator {
 			if (steady_counts > 1) {
 				r.add("    }\n");
 			}
+
 
 			r.add("#ifdef __CHECKPOINT_FREQ\n");
 			r.add("    if (_steady % __CHECKPOINT_FREQ == 0)\n");

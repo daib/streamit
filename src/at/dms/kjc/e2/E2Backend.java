@@ -282,7 +282,7 @@ public class E2Backend {
         
         
         //put timers for each filters
-        InsertFilterPerfCounters.doit(str);
+        //InsertFilterPerfCounters.doit(str);
 
         // put markers on operator boundaries before we mung the names
         // too much.

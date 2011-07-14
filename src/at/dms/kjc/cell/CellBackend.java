@@ -142,7 +142,7 @@ public class CellBackend {
         /*
          * Emit Makefile
          */
-        outputFileName = "Makefile";
+        outputFileName = "Makefile.cell";
         try {
             CodegenPrintWriter p = new CodegenPrintWriter(new BufferedWriter(new FileWriter(outputFileName, false)));
             // write out C code
