@@ -919,7 +919,10 @@ class E2CodeGenerator {
 
 				}
 
+				r.add("      stats_" + id + "_obj.prework_checkpoint();\n");
 				r.add("      " + work_function + "(1);\n");
+				r.add("      stats_" + id + "_obj.postwork_checkpoint();\n");
+				
 				if (oper instanceof SIRFilter &&
 					node.isFilter() && 
 					(RegisterStreams.getFilterOutStream(node.contents) != null)){
@@ -973,8 +976,9 @@ class E2CodeGenerator {
 			//start computation counter
 			// # flushes, # cycles
 			// # flushes determine how many cores we want to use
-
+			r.add("      stats_" + id + "_obj.check_prework_status();\n");
 			r.add("      " + work_function + "(1);\n");
+			r.add("      stats_" + id + "_obj.check_postwork_status();\n");
 
 			//measure blocking write + comm time
 			if (oper instanceof SIRFilter &&
