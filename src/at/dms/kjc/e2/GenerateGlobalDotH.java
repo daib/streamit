@@ -52,9 +52,9 @@ public class GenerateGlobalDotH {
         str += "#include \"structs.h\"\n";
         str += "#include <StreamItVectorLib.h>\n";
         str += "\n";
-
-        str += "#define max(A,B) (((A)>(B))?(A):(B))\n";
-        str += "#define min(A,B) (((A)<(B))?(A):(B))\n";
+	
+        str += "//#define max(A,B) (((A)>(B))?(A):(B))\n";
+        str += "//#define min(A,B) (((A)<(B))?(A):(B))\n";
 
         str += "\n";
     
@@ -89,9 +89,11 @@ public class GenerateGlobalDotH {
         	str += "extern " + InsertFilterPerfCounters.getPerfCounterType() + " " +
         		perCounter + ";\n";
         }
-        
-        str += "void printPerfCounters();\n";
-        str += "#define " + InsertFilterPerfCounters.getCurrentTimeDeclaration() + " 0 \n";
+       
+		if(InsertFilterPerfCounters.getPerfCounters().size() > 0) { 
+        	str += "void printPerfCounters();\n";
+        	str += "#define " + InsertFilterPerfCounters.getCurrentTimeDeclaration() + " 0 \n";
+		}
         
         str += "\n";
         

@@ -201,7 +201,7 @@ public class GenerateMasterDotCpp {
         p.print("  __out_data_buffer = read_setup::out_data_buffer;\n");
         p.print("  __max_iteration = read_setup::max_iteration;\n");
 
-        p.print("  master_pid = getpid();\n");
+        //p.print("  master_pid = getpid();\n");
 
         p.print("  for (int a = 1; a < argc; a++) {\n");
 

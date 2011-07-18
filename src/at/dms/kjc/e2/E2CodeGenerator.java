@@ -193,7 +193,7 @@ class E2CodeGenerator {
 			}
 		}
 		p.println("#include \"cluster.h\"");
-		p.println("#include \"fusion.h\"");
+		//p.println("#include \"fusion.h\"");
 		// p.println("#include \"structs.h\"");
 		p.println("#include \"global.h\"");
 		if (KjcOptions.countops) {
@@ -907,10 +907,7 @@ class E2CodeGenerator {
 						r.add("      check_messages__" + id + "();\n");
 					}
 
-					if (node.isFilter() && 
-						(RegisterStreams.getFilterOutStream(node.contents) != null)){
-						r.add("      __update_push_buf__" + id + "();\n");
-					}
+				
 
 					if (node.isFilter()
 							&& node.inputs > 0
@@ -921,7 +918,14 @@ class E2CodeGenerator {
 
 
 				}
+
 				r.add("      " + work_function + "(1);\n");
+				if (oper instanceof SIRFilter &&
+					node.isFilter() && 
+					(RegisterStreams.getFilterOutStream(node.contents) != null)){
+					r.add("      __update_push_buf__" + id + "();\n");
+				}
+
 				if (oper instanceof SIRFilter) {
 					/*
 					 * if (msg_to.size() > 0 || msg_from.size() > 0) {
@@ -957,12 +961,6 @@ class E2CodeGenerator {
 					r.add("      check_messages__" + id + "();\n");
 				}
 
-				//measure blocking write + comm time
-				if (node.isFilter() && 
-					(RegisterStreams.getFilterOutStream(node.contents) != null)){
-					r.add("      __update_push_buf__" + id + "();\n");
-				}
-
 				//measure blocking read + comm time
 				if (node.isFilter()
 						&& node.inputs > 0
@@ -977,6 +975,14 @@ class E2CodeGenerator {
 			// # flushes determine how many cores we want to use
 
 			r.add("      " + work_function + "(1);\n");
+
+			//measure blocking write + comm time
+			if (oper instanceof SIRFilter &&
+				node.isFilter() && 
+				(RegisterStreams.getFilterOutStream(node.contents) != null)){
+
+				r.add("      __update_push_buf__" + id + "();\n");
+			}
 
 
 			//check for utilization

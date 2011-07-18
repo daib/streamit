@@ -111,13 +111,16 @@ public class GenerateGlobalDotCpp {
         }
         
         //printout performance counters routine
-        str += "void printPerfCounters() {\n";
+		if(InsertFilterPerfCounters.getPerfCounters().size() > 0) {
+		
+        	str += "void printPerfCounters() {\n";
         
-        for(String perCounter:InsertFilterPerfCounters.getPerfCounters()) {
-        	str += "\tprintf(\"\tPerf counter: " + perCounter + " = %ld\\n\"," + perCounter + ");\n";
-        }
+        	for(String perCounter:InsertFilterPerfCounters.getPerfCounters()) {
+        		str += "\tprintf(\"\tPerf counter: " + perCounter + " = %ld\\n\"," + perCounter + ");\n";
+        	}
         
-        str += "}";
+        	str += "}";
+		}
         
         str += "\n";
     

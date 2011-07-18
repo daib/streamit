@@ -167,7 +167,7 @@ public class GenerateMasterDotCpp {
         }
 
 		//last cluster is run on this thread
-		p.print("  run_thread_" + (threadNumber - 1) + "(\"thread" +  (threadNumber - 1) + "\");\n");
+		p.print("  run_thread_" + (threadNumber - 1) + "((void*)\"thread" +  (threadNumber - 1) + "\");\n");
 
 		p.print("  run_join();\n");
 
@@ -285,7 +285,7 @@ public class GenerateMasterDotCpp {
         }
         
         //print performance counters
-        p.println("  printPerfCounters();");
+        //p.println("  printPerfCounters();");
 
         //p.print("  for (;;) {}\n");   
         //p.print("  init_instance::close_sockets();\n");
