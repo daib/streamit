@@ -64,11 +64,16 @@ public class PartitionGroup {
         int pos = 0;
         while (pos<children.size()) {
             int count = 0;
-            int cur = map.get(children.get(pos)).intValue();
+            int cur = -1;
+            if(map.get(children.get(pos)) !=  null) {        
+            	cur = map.get(children.get(pos)).intValue();
+            }
+            
             do {
                 pos++;
                 count++;
             } while (pos<children.size() && 
+                     (map.get(children.get(pos))  != null) &&
                      map.get(children.get(pos)).intValue()==cur && 
                      // don't conglomerate -1 children, as they are
                      // containers with differing tile content

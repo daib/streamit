@@ -84,7 +84,7 @@ class ApplyPartitions extends EmptyAttributeStreamVisitor {
         if (group.size()==1 && result instanceof SIRPipeline) {
             // if the whole thing is a pipeline
             FusePipe.fuse((SIRPipeline)result);
-        } else {
+        } else if (result instanceof SIRSplitJoin){
             // if we might have component pipelines
             for (int i=0; i<group.size(); i++) {
                 if (group.get(i)>1 && ((SIRSplitJoin)result).get(i) instanceof SIRPipeline) {
