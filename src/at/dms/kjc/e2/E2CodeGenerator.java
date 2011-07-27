@@ -169,7 +169,7 @@ class E2CodeGenerator {
 		p.println("#include <init_instance.h>");
 		p.println("#include <mysocket.h>");
 		p.println("#include <object_write_buffer.h>");
-		p.println("#include <save_state.h>");
+		// p.println("#include <save_state.h>");
 		p.println("#include <sdep.h>");
 		p.println("#include <message.h>");
 		p.println("#include <timer.h>");
@@ -193,7 +193,7 @@ class E2CodeGenerator {
 			}
 		}
 		p.println("#include \"cluster.h\"");
-		//p.println("#include \"fusion.h\"");
+		// p.println("#include \"fusion.h\"");
 		// p.println("#include \"structs.h\"");
 		p.println("#include \"global.h\"");
 		if (KjcOptions.countops) {
@@ -287,11 +287,17 @@ class E2CodeGenerator {
 			if (out != null && out instanceof TapeCluster) {
 				if (!FixedBufferTape.isFixedBuffer(out.getSource(),
 						out.getDest())) {
-					p.println("producer2<"
-							+ CommonUtils.CTypeToStringA(out.getType(), true)
-							+ "> " + ((TapeCluster) out).getProducerName()
-							+ ";");
-					p.println("extern void "
+					if (isEliminated && node.contents instanceof SIRJoiner)
+						p.println("std::queue<"
+								+ CommonUtils.CTypeToStringA(out.getType(),
+										true) + "> "
+								+ ((TapeCluster) out).getProducerName() + ";");
+					else
+						p.println("producer2<"
+								+ CommonUtils.CTypeToStringA(out.getType(),
+										true) + "> "
+								+ ((TapeCluster) out).getProducerName() + ";");
+					p.println("\textern void "
 							+ ((TapeCluster) out).getPushName() + "("
 							+ CommonUtils.CTypeToStringA(out.getType(), true)
 							+ ");");
@@ -359,133 +365,140 @@ class E2CodeGenerator {
 
 		if (!KjcOptions.standalone) {
 			// p.println("#ifndef __CLUSTER_STANDALONE\n");
-			p.println("void __write_thread__" + id
-					+ "(object_write_buffer *buf) {");
+			if (!isEliminated) {
+				p.println("void __write_thread__" + id
+						+ "(object_write_buffer *buf) {");
 
-			for (Tape in : data_in) {
-				if (in != null && in instanceof TapeCluster) {
-					TapeCluster inc = (TapeCluster) in;
-					p.println("  " + inc.getConsumerName()
-							+ ".write_object(buf);");
+				for (Tape in : data_in) {
+					if (in != null && in instanceof TapeCluster) {
+						TapeCluster inc = (TapeCluster) in;
+						p.println("  " + inc.getConsumerName()
+								+ ".write_object(buf);");
 
-					/*
-					 * if (oper instanceof SIRFilter) {
-					 * p.println("  "+in.name()+"in.write_object(buf);"); }
-					 */
-				}
-			}
-
-			if (node.isFilter()) {
-				if (node.inputs > 0
-						&& node.incoming[0] != null
-						&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
-					p.println("  save_peek_buffer__" + id + "(buf);");
-				}
-				p.println("  save_file_pointer__" + id + "(buf);");
-			}
-
-			for (int f = 0; f < fields.length; f++) {
-				CType type = fields[f].getType();
-				String ident = fields[f].getVariable().getIdent();
-
-				DetectConst dc = DetectConst.getInstance((SIRFilter) oper);
-				if (dc != null && dc.isConst(ident))
-					continue;
-
-				if (type.isArrayType()) {
-					int size = 0;
-					String dims[] = (new FlatIRToCluster())
-							.makeArrayStrings(((CArrayType) type).getDims());
-					CType base = ((CArrayType) type).getBaseType();
-					try {
-						size = Integer.valueOf(dims[0]).intValue();
-					} catch (NumberFormatException ex) {
-						System.out
-								.println("Warning! Could not estimate size of an array: "
-										+ ident);
+						/*
+						 * if (oper instanceof SIRFilter) {
+						 * p.println("  "+in.name()+"in.write_object(buf);"); }
+						 */
 					}
-					p.println("  buf->write(" + ident + "__" + id + ", " + size
-							+ " * sizeof("
-							+ CommonUtils.CTypeToStringA(base, true) + "));");
-				} else {
-					p.println("  buf->write(&" + ident + "__" + id
-							+ ", sizeof("
-							+ CommonUtils.CTypeToStringA(type, true) + "));");
 				}
-			}
 
-			for (Tape out : data_out) {
-				if (out != null && out instanceof TapeCluster) {
-					p.println("  " + ((TapeCluster) out).getProducerName()
-							+ ".write_object(buf);");
-				}
-			}
-
-			p.println("}");
-
-			p.println("");
-
-			p.println("void __read_thread__" + id
-					+ "(object_write_buffer *buf) {");
-
-			for (Tape in : data_in) {
-				if (in != null && in instanceof TapeCluster) {
-					p.println("  " + ((TapeCluster) in).getConsumerName()
-							+ ".read_object(buf);");
-
-					/*
-					 * if (oper instanceof SIRFilter) {
-					 * p.println("  "+in.name()+"in.read_object(buf);"); }
-					 */
-				}
-			}
-
-			if (node.isFilter()) {
-				if (node.inputs > 0
-						&& node.incoming[0] != null
-						&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
-					p.println("  load_peek_buffer__" + id + "(buf);");
-				}
-				p.println("  load_file_pointer__" + id + "(buf);");
-			}
-
-			for (int f = 0; f < fields.length; f++) {
-				CType type = fields[f].getType();
-				String ident = fields[f].getVariable().getIdent();
-
-				DetectConst dc = DetectConst.getInstance((SIRFilter) oper);
-				if (dc != null && dc.isConst(ident))
-					continue;
-
-				if (type.isArrayType()) {
-					int size = 0;
-					String dims[] = (new FlatIRToCluster())
-							.makeArrayStrings(((CArrayType) type).getDims());
-					CType base = ((CArrayType) type).getBaseType();
-					try {
-						size = Integer.valueOf(dims[0]).intValue();
-					} catch (NumberFormatException ex) {
-						System.out
-								.println("Warning! Could not estimate size of an array: "
-										+ ident);
+				if (node.isFilter()) {
+					if (node.inputs > 0
+							&& node.incoming[0] != null
+							&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
+						p.println("  save_peek_buffer__" + id + "(buf);");
 					}
-					p.println("  buf->read(" + ident + "__" + id + ", " + size
-							+ " *  sizeof("
-							+ CommonUtils.CTypeToStringA(base, true) + "));");
-				} else {
-					p.println("  buf->read(&" + ident + "__" + id + ", sizeof("
-							+ CommonUtils.CTypeToStringA(type, true) + "));");
+					p.println("  save_file_pointer__" + id + "(buf);");
 				}
-			}
 
-			for (Tape out : data_out) {
-				if (out != null && out instanceof TapeCluster) {
-					p.println("  " + ((TapeCluster) out).getProducerName()
-							+ ".read_object(buf);");
+				for (int f = 0; f < fields.length; f++) {
+					CType type = fields[f].getType();
+					String ident = fields[f].getVariable().getIdent();
+
+					DetectConst dc = DetectConst.getInstance((SIRFilter) oper);
+					if (dc != null && dc.isConst(ident))
+						continue;
+
+					if (type.isArrayType()) {
+						int size = 0;
+						String dims[] = (new FlatIRToCluster())
+								.makeArrayStrings(((CArrayType) type).getDims());
+						CType base = ((CArrayType) type).getBaseType();
+						try {
+							size = Integer.valueOf(dims[0]).intValue();
+						} catch (NumberFormatException ex) {
+							System.out
+									.println("Warning! Could not estimate size of an array: "
+											+ ident);
+						}
+						p.println("  buf->write(" + ident + "__" + id + ", "
+								+ size + " * sizeof("
+								+ CommonUtils.CTypeToStringA(base, true)
+								+ "));");
+					} else {
+						p.println("  buf->write(&" + ident + "__" + id
+								+ ", sizeof("
+								+ CommonUtils.CTypeToStringA(type, true)
+								+ "));");
+					}
 				}
-			}
 
-			p.println("}");
+				for (Tape out : data_out) {
+					if (out != null && out instanceof TapeCluster) {
+						p.println("  " + ((TapeCluster) out).getProducerName()
+								+ ".write_object(buf);");
+					}
+				}
+
+				p.println("}");
+
+				p.println("");
+
+				p.println("void __read_thread__" + id
+						+ "(object_write_buffer *buf) {");
+
+				for (Tape in : data_in) {
+					if (in != null && in instanceof TapeCluster) {
+						p.println("  " + ((TapeCluster) in).getConsumerName()
+								+ ".read_object(buf);");
+
+						/*
+						 * if (oper instanceof SIRFilter) {
+						 * p.println("  "+in.name()+"in.read_object(buf);"); }
+						 */
+					}
+				}
+
+				if (node.isFilter()) {
+					if (node.inputs > 0
+							&& node.incoming[0] != null
+							&& CommonUtils.getOutputType(node.incoming[0]) != CStdType.Void) {
+						p.println("  load_peek_buffer__" + id + "(buf);");
+					}
+					p.println("  load_file_pointer__" + id + "(buf);");
+				}
+
+				for (int f = 0; f < fields.length; f++) {
+					CType type = fields[f].getType();
+					String ident = fields[f].getVariable().getIdent();
+
+					DetectConst dc = DetectConst.getInstance((SIRFilter) oper);
+					if (dc != null && dc.isConst(ident))
+						continue;
+
+					if (type.isArrayType()) {
+						int size = 0;
+						String dims[] = (new FlatIRToCluster())
+								.makeArrayStrings(((CArrayType) type).getDims());
+						CType base = ((CArrayType) type).getBaseType();
+						try {
+							size = Integer.valueOf(dims[0]).intValue();
+						} catch (NumberFormatException ex) {
+							System.out
+									.println("Warning! Could not estimate size of an array: "
+											+ ident);
+						}
+						p.println("  buf->read(" + ident + "__" + id + ", "
+								+ size + " *  sizeof("
+								+ CommonUtils.CTypeToStringA(base, true)
+								+ "));");
+					} else {
+						p.println("  buf->read(&" + ident + "__" + id
+								+ ", sizeof("
+								+ CommonUtils.CTypeToStringA(type, true)
+								+ "));");
+					}
+				}
+
+				for (Tape out : data_out) {
+					if (out != null && out instanceof TapeCluster) {
+						p.println("  " + ((TapeCluster) out).getProducerName()
+								+ ".read_object(buf);");
+					}
+				}
+
+				p.println("}");
+			}
 
 			p.println("");
 
@@ -543,7 +556,7 @@ class E2CodeGenerator {
 			}
 
 			for (Tape out : data_out) {
-				if (out != null && out instanceof TapeCluster) {
+				if (out != null && out instanceof TapeCluster && !E2Fusion.isEliminated(node)) {
 					p.println("  info->add_outgoing_data_connection(new connection_info("
 							+ out.getSource()
 							+ ","
@@ -847,9 +860,9 @@ class E2CodeGenerator {
 
 			if (init_f != null)
 				r.add("  " + init_f + "();\n");
-			r.add("  if (save_state::load_state(" + id + ", &__steady_" + id
-					+ ", __read_thread__" + id
-					+ ") == -1) pthread_exit(NULL);\n");
+			// r.add("  if (save_state::load_state(" + id + ", &__steady_" + id
+			// + ", __read_thread__" + id
+			// + ") == -1) pthread_exit(NULL);\n");
 
 			// r.add("  __number_of_iterations_"+id+" = __max_iteration - __steady_"+id+";\n");
 
@@ -858,6 +871,9 @@ class E2CodeGenerator {
 			r.add("\n");
 		}
 
+		if(isEliminated)
+			return r;
+		
 		// +=============================+
 		// | Main Function |
 		// +=============================+
@@ -872,6 +888,38 @@ class E2CodeGenerator {
 				r.add("  send_credits__" + id + "();\n");
 			}
 			r.add("  if (_steady == 0) {\n");
+
+			// a merged joiner is in front of its consumer
+			if (!isEliminated) {
+				Iterator iter2 = fusedWith.iterator();
+				while (iter2.hasNext()) {
+					FlatNode slave = (FlatNode) iter2.next();
+
+					// add work function for slave node if it is a splitter
+					if (slave.contents instanceof SIRJoiner) {
+						int joiner_init_counts;
+
+						if (E2Backend.initExecutionCounts.get(slave) == null)
+							joiner_init_counts = 0;
+						else
+							joiner_init_counts = (E2Backend.initExecutionCounts
+									.get(slave)).intValue();
+
+						int joiner_thread_id = NodeEnumerator
+								.getFlatNodeId(slave);
+						r.add("\t\textern void __joiner_" + joiner_thread_id
+								+ "_work(int);\n");
+
+						if (joiner_init_counts > 1) {
+							r.add("\t\tfor (_tmp = 0; _tmp < "
+									+ joiner_init_counts + "; _tmp++)\n");
+						}
+
+						r.add("\t\t__joiner_" + joiner_thread_id
+								+ "_work(1);\n");
+					}
+				}
+			}
 
 			if (oper instanceof SIRJoiner
 					&& E2Code.feedbackJoinersNeedingPrep.contains(oper)) {
@@ -895,6 +943,7 @@ class E2CodeGenerator {
 			if (init_counts > 0) {
 				r.add("    for (_tmp = 0; _tmp < " + init_counts
 						+ "; _tmp++) {\n");
+
 				if (oper instanceof SIRFilter) {
 
 					// r.add("      printf(\"thread"+id+" %d/"+init_counts+"\\n\", _tmp);\n");
@@ -907,8 +956,6 @@ class E2CodeGenerator {
 						r.add("      check_messages__" + id + "();\n");
 					}
 
-				
-
 					if (node.isFilter()
 							&& node.inputs > 0
 							&& node.incoming[0] != null
@@ -916,16 +963,15 @@ class E2CodeGenerator {
 						r.add("      __update_pop_buf__" + id + "();\n");
 					}
 
-
 				}
 
 				r.add("      stats_" + id + "_obj.prework_checkpoint();\n");
 				r.add("      " + work_function + "(1);\n");
 				r.add("      stats_" + id + "_obj.postwork_checkpoint();\n");
-				
-				if (oper instanceof SIRFilter &&
-					node.isFilter() && 
-					(RegisterStreams.getFilterOutStream(node.contents) != null)){
+
+				if (oper instanceof SIRFilter
+						&& node.isFilter()
+						&& (RegisterStreams.getFilterOutStream(node.contents) != null)) {
 					r.add("      __update_push_buf__" + id + "();\n");
 				}
 
@@ -941,18 +987,77 @@ class E2CodeGenerator {
 				r.add("    }\n");
 			}
 
-			r.add("  }\n");
+			// a merged splitter is behind its producer
+			if (!isEliminated) {
+				Iterator iter2 = fusedWith.iterator();
+				while (iter2.hasNext()) {
+					FlatNode slave = (FlatNode) iter2.next();
+
+					// add work function for slave node if it is a splitter
+					if (slave.contents instanceof SIRSplitter) {
+						int splitter_thread_id = NodeEnumerator
+								.getSIROperatorId(slave.contents);
+						int splitter_init_counts;
+						if (E2Backend.initExecutionCounts.get(slave) == null)
+							splitter_init_counts = 0;
+						else
+							splitter_init_counts = (E2Backend.initExecutionCounts
+									.get(slave)).intValue();
+
+						r.add("\t\textern void __splitter_"
+								+ splitter_thread_id + "_work(int);\n");
+
+						if (splitter_init_counts > 1) {
+							r.add("\t\tfor (_tmp = 0; _tmp < "
+									+ splitter_init_counts + "; _tmp++)\n");
+						}
+
+						r.add("\t\t\t__splitter_" + splitter_thread_id
+								+ "_work(1);\n");
+					}
+				}
+			}
+
+			r.add("  }\n"); // if steady == 0
 
 			r.add("  _steady++;\n");
 			// r.add("// ClusterCodeGenerator_2\n");
 			r.add("  for (; _steady <= _number; _steady++) {\n");
+
+			// a merged joiner is in front of its consumer
+			if (!isEliminated) {
+				Iterator iter2 = fusedWith.iterator();
+				while (iter2.hasNext()) {
+					FlatNode slave = (FlatNode) iter2.next();
+
+					// add work function for slave node if it is a splitter
+					if (slave.contents instanceof SIRJoiner) {
+						int joiner_steady_counts = (E2Backend.steadyExecutionCounts
+								.get(slave)).intValue();
+
+						int joiner_thread_id = NodeEnumerator
+								.getFlatNodeId(slave);
+
+						r.add("\t\textern void __joiner_" + joiner_thread_id
+								+ "_work(int);\n");
+
+						if (joiner_steady_counts > 1) {
+							r.add("\t\tfor (_tmp = 0; _tmp < "
+									+ joiner_steady_counts + "; _tmp++)\n");
+						}
+
+						r.add("\t\t__joiner_" + joiner_thread_id
+								+ "_work(1);\n");
+					}
+				}
+			}
 
 			if (steady_counts > 1) {
 				r.add("    for (_tmp = 0; _tmp < " + steady_counts
 						+ "; _tmp++) {\n");
 			}
 
-			//start communcation counter
+			// start communcation counter
 			// # cycles
 
 			if (oper instanceof SIRFilter) {
@@ -964,7 +1069,7 @@ class E2CodeGenerator {
 					r.add("      check_messages__" + id + "();\n");
 				}
 
-				//measure blocking read + comm time
+				// measure blocking read + comm time
 				if (node.isFilter()
 						&& node.inputs > 0
 						&& node.incoming[0] != null
@@ -972,26 +1077,25 @@ class E2CodeGenerator {
 					r.add("      __update_pop_buf__" + id + "();\n");
 				}
 			}
-			
-			//start computation counter
+
+			// start computation counter
 			// # flushes, # cycles
 			// # flushes determine how many cores we want to use
-			r.add("      stats_" + id + "_obj.check_prework_status();\n");
+			r.add("      stats_" + id + "_obj.prework_checkpoint();\n");
 			r.add("      " + work_function + "(1);\n");
-			r.add("      stats_" + id + "_obj.check_postwork_status();\n");
+			r.add("      stats_" + id + "_obj.postwork_checkpoint();\n");
 
-			//measure blocking write + comm time
-			if (oper instanceof SIRFilter &&
-				node.isFilter() && 
-				(RegisterStreams.getFilterOutStream(node.contents) != null)){
+			// measure blocking write + comm time
+			if (oper instanceof SIRFilter
+					&& node.isFilter()
+					&& (RegisterStreams.getFilterOutStream(node.contents) != null)) {
 
 				r.add("      __update_push_buf__" + id + "();\n");
 			}
 
-
-			//check for utilization
-			//compose more core if needed
-			//r.add("\tCHECK_FOR_UTILIZATION();\n");
+			// check for utilization
+			// compose more core if needed
+			// r.add("\tCHECK_FOR_UTILIZATION();\n");
 
 			if (oper instanceof SIRFilter) {
 				/*
@@ -1007,12 +1111,38 @@ class E2CodeGenerator {
 				r.add("    }\n");
 			}
 
-
 			r.add("#ifdef __CHECKPOINT_FREQ\n");
-			r.add("    if (_steady % __CHECKPOINT_FREQ == 0)\n");
-			r.add("      save_state::save_to_file(__thread_" + id
-					+ ", _steady, __write_thread__" + id + ");\n");
+			// r.add("    if (_steady % __CHECKPOINT_FREQ == 0)\n");
+			// r.add("      save_state::save_to_file(__thread_" + id
+			// + ", _steady, __write_thread__" + id + ");\n");
 			r.add("#endif // __CHECKPOINT_FREQ\n");
+
+			// a merged splitter is behind its producer
+			if (!isEliminated) {
+				Iterator iter2 = fusedWith.iterator();
+				while (iter2.hasNext()) {
+					FlatNode slave = (FlatNode) iter2.next();
+
+					// add work function for slave node if it is a splitter
+					if (slave.contents instanceof SIRSplitter) {
+						int splitter_thread_id = NodeEnumerator
+								.getSIROperatorId(slave.contents);
+						int splitter_steady_counts = (E2Backend.steadyExecutionCounts
+								.get(slave)).intValue();
+
+						r.add("\t\textern void __splitter_"
+								+ splitter_thread_id + "_work(int);\n");
+
+						if (splitter_steady_counts > 1) {
+							r.add("\t\tfor (_tmp = 0; _tmp < "
+									+ splitter_steady_counts + "; _tmp++)\n");
+						}
+
+						r.add("\t\t\t__splitter_" + splitter_thread_id
+								+ "_work(1);\n");
+					}
+				}
+			}
 
 			r.add("  }\n");
 			r.add("}\n");
@@ -1127,14 +1257,16 @@ class E2CodeGenerator {
 
 			// specify the number of cores for this thread
 
-			//estimate the number of cores first
-			//generate specification code
-			//only filters need more cores, spliter and joiner does not
-			//fix me
-			if (node.contents instanceof SIRFilter) { 
-				//r.add("\tcompose(" + E2CoreEstimation.estimateNumberCore((SIRFilter) node.contents) + ");");
-				
-			} 	
+			// estimate the number of cores first
+			// generate specification code
+			// only filters need more cores, spliter and joiner does not
+			// fix me
+			if (node.contents instanceof SIRFilter) {
+				// r.add("\tcompose(" +
+				// E2CoreEstimation.estimateNumberCore((SIRFilter)
+				// node.contents) + ");");
+
+			}
 
 			// r.add("  __init_sockets_"+id+"(check_status_during_io__"+id+");\n");
 			r.add("  __init_sockets_" + id + "();\n");

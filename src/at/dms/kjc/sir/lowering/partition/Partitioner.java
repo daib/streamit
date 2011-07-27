@@ -82,6 +82,7 @@ public class Partitioner {
                 new DynamicProgPartitioner(str2, WorkEstimate.getWorkEstimate(str2), targetCount).calcPartitions();
                 */
                 str = new DynamicProgPartitioner(str, work, targetCount, joinersNeedTiles, limitICode, strict, noHorizFuse).toplevel();
+//            	str = new IterativePartitioner(str, work, targetCount, joinersNeedTiles, limitICode, strict, noHorizFuse).toplevel();
             } else if(KjcOptions.partition_greedier) {
                 str=new GreedierPartitioner(str,work,targetCount,joinersNeedTiles).toplevel();
             } else if (KjcOptions.partition_greedy) {

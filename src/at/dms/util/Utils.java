@@ -1332,25 +1332,26 @@ public abstract class Utils implements Serializable, DeepCloneable {
      * the variable is undefined.
      */
     public static String getEnvironmentVariable(String var) {
-        try {
-            String OS = System.getProperty("os.name").toLowerCase();
-            String command = (OS.indexOf("windows") > -1 ? "set" : "env");
-            Process p = Runtime.getRuntime().exec(command);
-            BufferedReader br = new BufferedReader ( new InputStreamReader( p.getInputStream() ) );
-            String line;
-            while((line = br.readLine()) != null) {
-                int pos = line.indexOf('=');
-                String key = line.substring(0, pos);
-                if (key.equals(var)) {
-                    return line.substring(pos+1);
-                }
-            }
-            return null;
-        } catch (IOException e) {
-            e.printStackTrace();
-            Utils.fail("I/O exception trying to retrieve environment variable \"" + var + "\"");
-            return null;
-        }
+    	return "C:\\streamit";
+//        try {
+//            String OS = System.getProperty("os.name").toLowerCase();
+//            String command = (OS.indexOf("windows") > -1 ? "set" : "env");
+//            Process p = Runtime.getRuntime().exec(command);
+//            BufferedReader br = new BufferedReader ( new InputStreamReader( p.getInputStream() ) );
+//            String line;
+//            while((line = br.readLine()) != null) {
+//                int pos = line.indexOf('=');
+//                String key = line.substring(0, pos);
+//                if (key.equals(var)) {
+//                    return line.substring(pos+1);
+//                }
+//            }
+//            return null;
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//            Utils.fail("I/O exception trying to retrieve environment variable \"" + var + "\"");
+//            return null;
+//        }
     }
 
     /**

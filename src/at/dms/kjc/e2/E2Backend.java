@@ -640,6 +640,9 @@ public class E2Backend {
 
         StructureIncludeFile.doit(structures, streamGraph); // structs.h
 
+        //FlatNode TopBeforeFusion = strTop;
+        strTop.accept(new E2Fusion(), new HashSet<FlatNode>(), true);
+        
         E2Code.generateCode(strTop);   // thread*.cpp
 
         FusionCode.generateFusionHeader(str, doCacheOptimization); // fusion.h
