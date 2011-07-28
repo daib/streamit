@@ -74,8 +74,9 @@ class ApplyPartitions extends EmptyAttributeStreamVisitor {
 		// System.err.println("visiting " + self);
 		// replace children
 		replaceChildren(self);
+		List<SIRStream> children = self.getParallelStreams();
 		PartitionGroup group = PartitionGroup.createFromAssignments(
-				self.getParallelStreams(), partitions);
+				children, partitions);
 		// fuse
 		SIRStream result = FuseSplit.fuse(self, group);
 		// if we got pipelines back, that means we used old fusion,
@@ -93,13 +94,15 @@ class ApplyPartitions extends EmptyAttributeStreamVisitor {
 			}
 		}
 
-		if (result instanceof SIRContainer)
+		if (result instanceof SIRContainer) {
+			int index = 0;
 			for (int i = 0; i < group.size(); i++) {
-
-				partitions.put(((SIRContainer) result).get(i), group.get(i));
+				index += group.get(i);
+				partitions.put(((SIRContainer) result).get(i), partitions.get(children.get(index-1)));
 			}
+		}
 		else
-			partitions.put(result, group.get(0));
+			partitions.put(result, partitions.get(children.get(0)));
 		
 		return result;
 	}
