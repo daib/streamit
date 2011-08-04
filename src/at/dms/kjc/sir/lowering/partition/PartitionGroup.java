@@ -1,5 +1,6 @@
 package at.dms.kjc.sir.lowering.partition;
 
+import at.dms.kjc.sir.SIRSplitJoin;
 import at.dms.kjc.sir.SIRStream;
 import at.dms.util.Utils;
 import java.util.*;
@@ -67,7 +68,7 @@ public class PartitionGroup {
             int cur = -1;
             if(map.get(children.get(pos)) !=  null) {        
             	cur = map.get(children.get(pos)).intValue();
-            }
+            } 
             
             do {
                 pos++;
@@ -78,6 +79,7 @@ public class PartitionGroup {
                      // don't conglomerate -1 children, as they are
                      // containers with differing tile content
                      cur!=-1);
+            	
             resultList.add(new Integer(count));
         }
         // copy results into int array

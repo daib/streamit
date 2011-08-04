@@ -1,6 +1,7 @@
 package at.dms.kjc.sir.lowering.partition;
 
 import java.util.*;
+
 import at.dms.kjc.*;
 import at.dms.kjc.sir.*;
 import at.dms.kjc.sir.lowering.fusion.*;
@@ -60,10 +61,20 @@ class ApplyPartitions extends EmptyAttributeStreamVisitor {
 		// replace children
 		replaceChildren(self);
 		// fuse children internally
-		FusePipe.fuse(
-				self,
-				PartitionGroup.createFromAssignments(
-						self.getSequentialStreams(), partitions));
+		PartitionGroup group = PartitionGroup.createFromAssignments(
+				self.getSequentialStreams(), partitions);
+		Map<Integer, Integer> groupId2Partition = new HashMap<Integer, Integer>();
+		int childIndex = 0;
+		for (int i = 0; i < group.size(); i++) {
+			childIndex += group.get(i);
+			groupId2Partition.put(i, partitions.get(self.get(childIndex - 1)));
+		}
+
+		FusePipe.fuse(self, group);
+
+		for (int i = 0; i < group.size(); i++) {
+			partitions.put(self.get(i), groupId2Partition.get(i));
+		}
 		return self;
 	}
 
@@ -75,8 +86,9 @@ class ApplyPartitions extends EmptyAttributeStreamVisitor {
 		// replace children
 		replaceChildren(self);
 		List<SIRStream> children = self.getParallelStreams();
-		PartitionGroup group = PartitionGroup.createFromAssignments(
-				children, partitions);
+		PartitionGroup group = PartitionGroup.createFromAssignments(children,
+				partitions);
+
 		// fuse
 		SIRStream result = FuseSplit.fuse(self, group);
 		// if we got pipelines back, that means we used old fusion,
@@ -98,12 +110,56 @@ class ApplyPartitions extends EmptyAttributeStreamVisitor {
 			int index = 0;
 			for (int i = 0; i < group.size(); i++) {
 				index += group.get(i);
-				partitions.put(((SIRContainer) result).get(i), partitions.get(children.get(index-1)));
+				// the partition value of fused filters is the partition value
+				// of any fused filters
+				partitions.put(((SIRContainer) result).get(i),
+						partitions.get(children.get(index - 1)));
 			}
-		}
-		else
+
+			// horizontal fuse if possible
+			if (result instanceof SIRSplitJoin) {
+				// check if we could do that
+
+				// add sync points
+				// fuse filters of different children in the split/join
+
+				int part = -1;
+				boolean makeCut = true;
+				for (SIROperator child : ((SIRSplitJoin) result).getChildren()) {
+					if (child instanceof SIRSplitter
+							|| child instanceof SIRJoiner)
+						continue;
+
+					int tmpPart = -1;
+					// child can only be filer or pipelines
+					if (child instanceof SIRPipeline) {
+						// get the first child to see which partition it belongs
+						// to
+						tmpPart = partitions.get(((SIRContainer) child).get(0));
+					} else if (child instanceof SIRFilter) {
+						tmpPart = partitions.get(child);
+					} else
+						break;
+					if (part == -1)
+						part = tmpPart;
+					if (part != tmpPart) {
+						makeCut = false;
+						break;
+					}
+				}
+
+				if (makeCut) {
+					// make horizontal cut
+					HorizontalCutTransform cutter = new HorizontalCutTransform(
+							0);
+					result = cutter.doMyTransform(result);
+					
+					replaceChildren((SIRContainer) result);
+				}
+			}
+		} else
 			partitions.put(result, partitions.get(children.get(0)));
-		
+
 		return result;
 	}
 

@@ -13,6 +13,7 @@ import at.dms.kjc.sir.lowering.fission.*;
 import at.dms.kjc.sir.lowering.partition.*;
 
 public class DynamicProgPartitioner extends ListPartitioner {
+	static int calPartNum = 0;
     /**
      * The overhead of work estimated for each fissed node.
      */
@@ -308,9 +309,11 @@ public class DynamicProgPartitioner extends ListPartitioner {
         result.setParent(null);
 
         // can only print if we didn't transform
-        if (!doTransform) {
+        if (!doTransform) 
+        {
             Lifter.lift(result);
-            PartitionDot.printPartitionGraph(result, "partitions.dot", PartitionRecord.asStringMap(partitions));
+            PartitionDot.printPartitionGraph(result, "partitions_" + calPartNum + ".dot", PartitionRecord.asStringMap(partitions));
+            calPartNum++;
         }
     
         return result;

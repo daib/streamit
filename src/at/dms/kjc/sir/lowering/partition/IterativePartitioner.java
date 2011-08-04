@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 
 import at.dms.kjc.sir.SIRContainer;
 import at.dms.kjc.sir.SIROperator;
@@ -43,7 +44,11 @@ public class IterativePartitioner extends ListPartitioner {
 		}
 		str.setParent(null);
 		
+		work.printGraph(str, "cluster-before-apply-partition.dot");
+		
 		ApplyPartitions.doit(str, partitions);
+		
+		work.printGraph(str, "cluster-after-apply-partition.dot");
 		return str;
 	}
 
@@ -54,7 +59,7 @@ public class IterativePartitioner extends ListPartitioner {
 	private HashMap<Object, Integer> calcPartitions() {
 		Map<SIROperator, Integer> partitionMap = new HashMap<SIROperator, Integer>();
 
-		new DynamicProgPartitioner(str, work, numTiles, false, false, strict,
+		str = new DynamicProgPartitioner(str, work, numTiles, false, false, strict,
 				noHorizFuse).calcPartitions(partitionMap);
 
 		HashMap<Object, Integer> partitions = new HashMap<Object, Integer>();
