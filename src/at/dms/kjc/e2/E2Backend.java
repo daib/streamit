@@ -379,7 +379,7 @@ public class E2Backend {
                 // targeting a multiprocessor
                 // TODO: can we use curcount (param2) and targetCount (param3) to make partitioning
                 // interact with dynamic regions?
-                ssg.setTopLevelSIR(Partitioner.doit(ssg.getTopLevelSIR(), 0, hosts, false, false, false, doNotHorizFuse));
+                ssg.setTopLevelSIR(Partitioner.doit(ssg.getTopLevelSIR(), 0, hosts, false, false, true, doNotHorizFuse));
                 // from now on, 'hosts' is used to count the number of
                 // filters in the graph.  (For if we fused further than
                 // needed?)

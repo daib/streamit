@@ -671,6 +671,17 @@ class E2CodeGenerator {
 								+ ","
 								+ in.getDest()
 								+ ",DATA_SOCKET);");
+						
+						p.println("#ifdef _E2_RUNTIME");
+						int obj_id = id;
+						if(isEliminated) {
+							//get the master node id
+							obj_id = NodeEnumerator.getSIROperatorId(E2Fusion.getMaster(node).contents);
+						}
+						p.println("\textern E2Runtime runtime_"+obj_id+"_obj;");
+						p.println("\tsock->set_runtime_obj(&runtime_"+obj_id+"_obj);");
+						p.println("#endif");
+						
 						// p.println("  sock->set_check_thread_status(cs_fptr);");
 						// p.println("  sock->set_item_size(sizeof("+in.getType()+"));");
 						p.println("  " + ((TapeCluster) in).getConsumerName()
@@ -693,6 +704,17 @@ class E2CodeGenerator {
 								+ ",DATA_SOCKET);");
 						// p.println("  sock->set_check_thread_status(cs_fptr);");
 						// p.println("  sock->set_item_size(sizeof("+out.getType()+"));");
+						
+						p.println("#ifdef _E2_RUNTIME");
+						int obj_id = id;
+						if(isEliminated) {
+							//get the master node id
+							obj_id = NodeEnumerator.getSIROperatorId(E2Fusion.getMaster(node).contents);
+						}
+						p.println("\textern E2Runtime runtime_"+obj_id+"_obj;");
+						p.println("\tsock->set_runtime_obj(&runtime_"+obj_id+"_obj);");
+						p.println("#endif");
+						
 						p.println("  " + ((TapeCluster) out).getProducerName()
 								+ ".set_socket(sock);");
 						p.println("  " + ((TapeCluster) out).getProducerName()
@@ -965,9 +987,12 @@ class E2CodeGenerator {
 
 				}
 
-				r.add("      stats_" + id + "_obj.prework_checkpoint();\n");
+							
+				r.add("#ifdef _E2_RUNTIME\n");
+				r.add("      runtime_" + id + "_obj.prework_checkpoint();\n");
 				r.add("      " + work_function + "(1);\n");
-				r.add("      stats_" + id + "_obj.postwork_checkpoint();\n");
+				r.add("      runtime_" + id + "_obj.postwork_checkpoint();\n");
+				r.add("#endif\n");
 
 				if (oper instanceof SIRFilter
 						&& node.isFilter()
@@ -1081,9 +1106,11 @@ class E2CodeGenerator {
 			// start computation counter
 			// # flushes, # cycles
 			// # flushes determine how many cores we want to use
-			r.add("      stats_" + id + "_obj.prework_checkpoint();\n");
+			r.add("#ifdef _E2_RUNTIME\n");
+			r.add("      runtime_" + id + "_obj.prework_checkpoint();\n");
 			r.add("      " + work_function + "(1);\n");
-			r.add("      stats_" + id + "_obj.postwork_checkpoint();\n");
+			r.add("      runtime_" + id + "_obj.postwork_checkpoint();\n");
+			r.add("#endif\n");
 
 			// measure blocking write + comm time
 			if (oper instanceof SIRFilter

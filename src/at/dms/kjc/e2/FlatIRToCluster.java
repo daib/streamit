@@ -355,8 +355,10 @@ public class FlatIRToCluster extends InsertTimers implements StreamVisitor,
 		p.newLine();
 
 		//stats objects
+		p.println("#ifdef _E2_RUNTIME");
 		p.println("#include \"E2Runtime.h\"");
-		p.println("E2Runtime stats_" + selfID + "_obj;");
+		p.println("E2Runtime runtime_" + selfID + "_obj;");
+		p.println("#endif");
 		
 		int data = DataEstimate.filterGlobalsSize(self);
 
