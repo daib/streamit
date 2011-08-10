@@ -199,7 +199,7 @@ public class FusePipe {
 
             // rename filter contents
             for (int i=0; i<pipe.size(); i++) {
-//                RenameAll.renameFilterContents((SIRFilter)pipe.get(i));
+                RenameAll.renameFilterContents((SIRFilter)pipe.get(i));
             }
         
             // dispatch to the actual fuser that we use
