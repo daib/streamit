@@ -87,7 +87,7 @@ public class UniBackEnd {
         /*
          * Emit code to str.c
          */
-        outputFileName = "str.c";
+        outputFileName = "str.cpp";
         try {
         CodegenPrintWriter p = new CodegenPrintWriter(new BufferedWriter(new FileWriter(outputFileName, false)));
         p.println("#include <pthread.h>\npthread_barrier_t barr;");

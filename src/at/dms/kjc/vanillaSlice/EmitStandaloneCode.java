@@ -68,7 +68,7 @@ public class EmitStandaloneCode extends EmitCode {
         
         p.println("void* run_threads(void* ptr) {");
         p.println("long int i = (long int)ptr;");
-        for(int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+        for(int i = 0; i < backendbits.getComputeNodes().size() - 1; i++) {
         	p.println("\tif(i == " + i + ") {\n\t\t_MAIN__" + i + "();\n\t}");
         }
         p.println("}");
@@ -90,19 +90,26 @@ public class EmitStandaloneCode extends EmitCode {
 //"\n");
         p.println("int main(int argc, char** argv) {");
         p.indent();
-        p.println(UniBackEndFactory.iterationBound + "   = 10;// __getIterationCounter(argc, argv);\n");
+        p.println("\tif(argc > 1)");
+        p.println("\t\t" + UniBackEndFactory.iterationBound + " = argv[1];" );
+        p.println("\telse");
+        p.println("\t\t" + UniBackEndFactory.iterationBound + "   = 10;// __getIterationCounter(argc, argv);\n");
 //        p.println(
 //                backendbits.getComputeNodes().getNthComputeNode(0).getComputeCode().getMainFunction().getName()
 //                + "();");
-        p.println("\tif(pthread_barrier_init(&barr, NULL, 3))\n" +
+        p.println("\tif(pthread_barrier_init(&barr, NULL, "+ backendbits.getComputeNodes().size() + "))\n" +
         "\t{\n\t\tprintf(\"Could not create a barrier...\");\n\t\treturn -1;\n" +
         "\t}\n");
-        p.println("\tpthread_t threads["+ backendbits.getComputeNodes().size() + "];");
-        for(int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+        
+        p.println("\tpthread_t threads["+ (backendbits.getComputeNodes().size() - 1) + "];");
+        for(int i = 0; i < backendbits.getComputeNodes().size() - 1; i++) {
         	p.println("\tpthread_create(&threads[" + i + "], NULL, &run_threads, (void*)" + i + ");");
         }
-        for(int i = 0; i < backendbits.getComputeNodes().size(); i++) {
-        	p.println("\tpthread_join(threads[0], NULL);");
+        
+        p.println("\t_MAIN__" + (backendbits.getComputeNodes().size() - 1) + "();");
+        
+        for(int i = 0; i < backendbits.getComputeNodes().size() - 1; i++) {
+        	p.println("\tpthread_join(threads[" + i + "], NULL);");
         }
 
         p.println("return 0;");
