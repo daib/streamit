@@ -10,6 +10,8 @@ import java.io.*;
  * The entry to the back end for a uniprocesor or cluster.
  */
 public class UniBackEnd {
+    
+    static SpaceTimeScheduleAndPartitioner _schedule = null;
     /** holds pointer to BackEndFactory instance during back end portion of this compiler. */
     public static BackEndFactory<UniProcessors, UniProcessor, UniComputeCodeStore, Integer> backEndBits = null;
     
@@ -62,6 +64,7 @@ public class UniBackEnd {
         
         // now convert to Kopi code plus channels.  (Javac gives error if folowing two lines are combined)
         BackEndScaffold top_call = backEndBits.getBackEndMain();
+        _schedule = schedule;
         top_call.run(schedule, backEndBits);
 
         // Dump graphical representation
@@ -87,6 +90,7 @@ public class UniBackEnd {
         outputFileName = "str.c";
         try {
         CodegenPrintWriter p = new CodegenPrintWriter(new BufferedWriter(new FileWriter(outputFileName, false)));
+        p.println("#include <pthread.h>\npthread_barrier_t barr;");
         // write out C code
         EmitStandaloneCode codeEmitter = new EmitStandaloneCode(uniBackEndBits);
         codeEmitter.generateCHeader(p);

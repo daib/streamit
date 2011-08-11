@@ -87,6 +87,8 @@ public class BackEndScaffold  {
         // schedule the prime pump phase.
         // (schedule should be empty if not spacetime)
         slices = schedule.getPrimePumpScheduleFlat();
+        
+        betweenScheduling(schedule, resources);
         iterateInorder(slices, SchedulingPhase.PRIMEPUMP, computeNodes);
         // schedule the steady-state phase.
         slices = schedule.getSchedule();

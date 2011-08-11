@@ -24,6 +24,8 @@ public class UniComputeCodeStore extends ComputeCodeStore<UniProcessor> {
      */
     @Override
     protected void addSteadyLoop() {
+        steadyLoop.addStatement(new JExpressionStatement(
+              new JEmittedTextExpression("\tpthread_barrier_wait(&barr)")));
         ALocalVariable bound = ALocalVariable.makeVar(CStdType.Integer, UniBackEndFactory.iterationBound);
         super.addSteadyLoop(bound);
     }

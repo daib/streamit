@@ -65,26 +65,46 @@ public class EmitStandaloneCode extends EmitCode {
      */
     public void generateMain(CodegenPrintWriter p) {
         p.println();
+        
+        p.println("void* run_threads(void* ptr) {");
+        p.println("long int i = (long int)ptr;");
+        for(int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+        	p.println("\tif(i == " + i + ") {\n\t\t_MAIN__" + i + "();\n\t}");
+        }
+        p.println("}");
+
+        
         p.println();
         p.println("// main() Function Here");
-        p.println(
-"/* helper routines to parse command line arguments */\n"+
-"#include <unistd.h>\n" +
-"\n"+
-"/* retrieve iteration count for top level driver */\n"+
-"static int __getIterationCounter(int argc, char** argv) {\n"+
-"    int flag;\n"+
-"    while ((flag = getopt(argc, argv, \"i:\")) != -1)\n"+
-"       if (flag == 'i') return atoi(optarg);\n"+
-"    return -1; /* default iteration count (run indefinitely) */\n"+
-"}"+
-"\n");
+//        p.println(
+//"/* helper routines to parse command line arguments */\n"+
+//"#include <unistd.h>\n" +
+//"\n"+
+//"/* retrieve iteration count for top level driver */\n"+
+//"static int __getIterationCounter(int argc, char** argv) {\n"+
+//"    int flag;\n"+
+//"    while ((flag = getopt(argc, argv, \"i:\")) != -1)\n"+
+//"       if (flag == 'i') return atoi(optarg);\n"+
+//"    return -1; /* default iteration count (run indefinitely) */\n"+
+//"}"+
+//"\n");
         p.println("int main(int argc, char** argv) {");
         p.indent();
-        p.println(UniBackEndFactory.iterationBound + "   = __getIterationCounter(argc, argv);\n");
-        p.println(
-                backendbits.getComputeNodes().getNthComputeNode(0).getComputeCode().getMainFunction().getName()
-                + "();");
+        p.println(UniBackEndFactory.iterationBound + "   = 10;// __getIterationCounter(argc, argv);\n");
+//        p.println(
+//                backendbits.getComputeNodes().getNthComputeNode(0).getComputeCode().getMainFunction().getName()
+//                + "();");
+        p.println("\tif(pthread_barrier_init(&barr, NULL, 3))\n" +
+        "\t{\n\t\tprintf(\"Could not create a barrier...\");\n\t\treturn -1;\n" +
+        "\t}\n");
+        p.println("\tpthread_t threads["+ backendbits.getComputeNodes().size() + "];");
+        for(int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+        	p.println("\tpthread_create(&threads[" + i + "], NULL, &run_threads, (void*)" + i + ");");
+        }
+        for(int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+        	p.println("\tpthread_join(threads[0], NULL);");
+        }
+
         p.println("return 0;");
         p.outdent();
         p.println("}");

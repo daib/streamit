@@ -144,8 +144,8 @@ public class GetOrMakeChannel  {
                     // no items remain in channel between steady states.
                     c = ChannelAsArray.getChannel(e);
                 } else {
-                    // items remain in channel, need circular buffer (or
-                    // copy-down, but circular is what we have)
+                     //items remain in channel, need circular buffer (or
+                     //copy-down, but circular is what we have)
                     c = ChannelAsCircularArray.getChannel(e);
                 }
             }
@@ -193,13 +193,13 @@ public class GetOrMakeChannel  {
     
     protected Channel makeInterSliceChannel(InterSliceEdge e) {
         Channel c;
-        if (e.initItems() > e.steadyItems()) {
+//        if (e.initItems() > e.steadyItems()) {
             // items left on channel between steady states
             c = ChannelAsCircularArray.getChannel(e);
-        } else {
+//        } else {
             // no items left on channel between steady states
-            c = ChannelAsArray.getChannel(e);
-        }
+//            c = ChannelAsArray.getChannel(e);
+//        }
         return c;
     }
 }

@@ -59,7 +59,7 @@ public class UniBackEndFactory extends BackEndFactory<
     @Override
     public  BackEndScaffold getBackEndMain() {
         if (scaffolding == null) {
-            scaffolding  = new BackEndScaffold();
+            scaffolding  = new ShareMemBackEndScaffold();
         }
         return scaffolding;
     }
@@ -92,7 +92,7 @@ public class UniBackEndFactory extends BackEndFactory<
     @Override
     public void processInputSliceNode(InputSliceNode input,
             SchedulingPhase whichPhase, UniProcessors computeNodes) {
-        new ProcessInputSliceNode(input,whichPhase,this).processInputSliceNode();
+        new SharedMemProcessInputSliceNode(input,whichPhase,this).processInputSliceNode();
 
     }
     
@@ -120,7 +120,7 @@ public class UniBackEndFactory extends BackEndFactory<
 
     public void processFilterSliceNode(FilterSliceNode filter,
             SchedulingPhase whichPhase, UniProcessors computeNodes) {
-        new ProcessFilterSliceNode(filter,whichPhase,this).processFilterSliceNode();
+        new ShareMemProcessFilterSliceNode(filter,whichPhase,this).processFilterSliceNode();
     }
 
     /**
