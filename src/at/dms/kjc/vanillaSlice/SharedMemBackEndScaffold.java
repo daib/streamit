@@ -19,7 +19,7 @@ import at.dms.kjc.slicegraph.OutputSliceNode;
 import at.dms.kjc.slicegraph.Slice;
 import at.dms.kjc.spacetime.BasicSpaceTimeSchedule;
 
-public class ShareMemBackEndScaffold extends BackEndScaffold {
+public class SharedMemBackEndScaffold extends BackEndScaffold {
 
 	static HashMap<Slice, Integer> sliceInitLevel = null;
 	static int currentIndex;
@@ -115,7 +115,7 @@ public class ShareMemBackEndScaffold extends BackEndScaffold {
 		}
 
 		if (lastSyncLevel < sliceGroup) {
-			ShareMemBackEndScaffold.lastSyncLevelMap.put(codeStore, sliceGroup);
+			lastSyncLevelMap.put(codeStore, sliceGroup);
 		}
 
 		return sliceGroup;
@@ -123,11 +123,11 @@ public class ShareMemBackEndScaffold extends BackEndScaffold {
 
 	public static int addInitBarriers(ComputeCodeStore codeStore, Slice slice) {
 		// get slice level
-		int level = ShareMemBackEndScaffold.sliceInitLevel.get(slice);
+		int level = sliceInitLevel.get(slice);
 
 		int lastSyncLevel = 0;
-		if (ShareMemBackEndScaffold.lastSyncLevelMap.get(codeStore) != null) {
-			lastSyncLevel = ShareMemBackEndScaffold.lastSyncLevelMap
+		if (lastSyncLevelMap.get(codeStore) != null) {
+			lastSyncLevel = lastSyncLevelMap
 					.get(codeStore);
 		}
 
@@ -140,7 +140,7 @@ public class ShareMemBackEndScaffold extends BackEndScaffold {
 		}
 
 		if (lastSyncLevel <= level) {
-			ShareMemBackEndScaffold.lastSyncLevelMap.put(codeStore, level);
+			lastSyncLevelMap.put(codeStore, level);
 		}
 
 		return level;

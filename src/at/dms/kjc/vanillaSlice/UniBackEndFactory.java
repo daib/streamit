@@ -59,7 +59,7 @@ public class UniBackEndFactory extends BackEndFactory<
     @Override
     public  BackEndScaffold getBackEndMain() {
         if (scaffolding == null) {
-            scaffolding  = new ShareMemBackEndScaffold();
+            scaffolding  = new SharedMemBackEndScaffold();
         }
         return scaffolding;
     }
@@ -120,7 +120,7 @@ public class UniBackEndFactory extends BackEndFactory<
 
     public void processFilterSliceNode(FilterSliceNode filter,
             SchedulingPhase whichPhase, UniProcessors computeNodes) {
-        new ShareMemProcessFilterSliceNode(filter,whichPhase,this).processFilterSliceNode();
+        new SharedMemProcessFilterSliceNode(filter,whichPhase,this).processFilterSliceNode();
     }
 
     /**

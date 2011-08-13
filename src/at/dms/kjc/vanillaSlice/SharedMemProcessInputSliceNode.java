@@ -31,7 +31,7 @@ public class SharedMemProcessInputSliceNode extends ProcessInputSliceNode {
 			// add barrier if needed
 			Slice slice = inputNode.getParent();
 
-			ShareMemBackEndScaffold.addInitBarriers(codeStore, slice);
+			SharedMemBackEndScaffold.addInitBarriers(codeStore, slice);
 
 			// and add call to list of calls made at init time.
 			// Note: these calls must execute in the order of the
@@ -52,7 +52,7 @@ public class SharedMemProcessInputSliceNode extends ProcessInputSliceNode {
 			codeStore.addMethod(primePump);
 		}
 		if (primePump != null) {
-			int sliceGroup = ShareMemBackEndScaffold
+			int sliceGroup = SharedMemBackEndScaffold
 					.addPrimePumpBarriers(codeStore);
 			// for each time this method is called, it adds another call
 			// to the primePump routine to the initialization.
