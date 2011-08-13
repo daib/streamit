@@ -5,6 +5,8 @@ import at.dms.kjc.*;
 import at.dms.kjc.backendSupport.*;
 import at.dms.kjc.slicegraph.*;
 import at.dms.kjc.common.CodegenPrintWriter;
+import at.dms.kjc.common.CommonUtils;
+
 import java.io.*;
 /**
  * The entry to the back end for a uniprocesor or cluster.
@@ -12,6 +14,7 @@ import java.io.*;
 public class UniBackEnd {
     
     static SpaceTimeScheduleAndPartitioner _schedule = null;
+//    static int _numCores = 0;
     /** holds pointer to BackEndFactory instance during back end portion of this compiler. */
     public static BackEndFactory<UniProcessors, UniProcessor, UniComputeCodeStore, Integer> backEndBits = null;
     
@@ -47,7 +50,7 @@ public class UniBackEnd {
 
         // create a collection of (very uninformative) processor descriptions.
         UniProcessors processors = new UniProcessors(numCores);
-
+        
         // assign SliceNodes to processors
         Layout<UniProcessor> layout;
         if (KjcOptions.spacetime && !KjcOptions.noswpipe) {
@@ -55,6 +58,7 @@ public class UniBackEnd {
         } else {
             layout = new NoSWPipeLayout<UniProcessor,UniProcessors>(schedule, processors);
         }
+        
         layout.run();
  
         // create other info needed to convert Slice graphs to Kopi code + Channels

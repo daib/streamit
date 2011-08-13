@@ -67,10 +67,11 @@ public class EmitStandaloneCode extends EmitCode {
         p.println();
         
         p.println("void* run_threads(void* ptr) {");
-        p.println("long int i = (long int)ptr;");
+        p.println("\tlong int i = (long int)ptr;");
         for(int i = 0; i < backendbits.getComputeNodes().size() - 1; i++) {
         	p.println("\tif(i == " + i + ") {\n\t\t_MAIN__" + i + "();\n\t}");
         }
+        p.println("\treturn NULL;");
         p.println("}");
 
         
@@ -91,19 +92,42 @@ public class EmitStandaloneCode extends EmitCode {
         p.println("int main(int argc, char** argv) {");
         p.indent();
         p.println("\tif(argc > 1)");
-        p.println("\t\t" + UniBackEndFactory.iterationBound + " = argv[1];" );
+        p.println("\t\t" + UniBackEndFactory.iterationBound + " = atoi(argv[1]);" );
         p.println("\telse");
         p.println("\t\t" + UniBackEndFactory.iterationBound + "   = 10;// __getIterationCounter(argc, argv);\n");
-//        p.println(
-//                backendbits.getComputeNodes().getNthComputeNode(0).getComputeCode().getMainFunction().getName()
-//                + "();");
+        
         p.println("\tif(pthread_barrier_init(&barr, NULL, "+ backendbits.getComputeNodes().size() + "))\n" +
         "\t{\n\t\tprintf(\"Could not create a barrier...\");\n\t\treturn -1;\n" +
         "\t}\n");
         
         p.println("\tpthread_t threads["+ (backendbits.getComputeNodes().size() - 1) + "];");
+        
+        // compute width and length of the logical core
+        int numCores = 2 * CommonUtils.nextPow2(backendbits.getComputeNodes().size());
+		int log2 = (int) Math.ceil((Math.log10(numCores) / Math.log10(2)));
+		int w = (int) Math.pow(2,log2 / 2);
+		int l = numCores/w;
+		
+		System.out.println("x = " + w + " y = " + l);
+		
+		p.println("\tint attr;");
+        //estimate the number of cores
         for(int i = 0; i < backendbits.getComputeNodes().size() - 1; i++) {
-        	p.println("\tpthread_create(&threads[" + i + "], NULL, &run_threads, (void*)" + i + ");");
+        	long attr = 0x0020;
+        	int firstCore = (i + 1) * 2;
+        	
+        	int x = firstCore%w;
+        	int y = firstCore/w;
+        	
+        	for(int j = 0; j < 2; j++) {
+        		for(int k = 0; k < 1; k++) {
+        			int index = (y + k) * w + j + x;
+        			attr |= (1 << index) << 16;
+        		}
+        	}
+        	
+        	p.println("\tattr = " + attr + ";");
+        	p.println("\tpthread_create(&threads[" + i + "], (void*)&attr, &run_threads, (void*)" + i + ");");
         }
         
         p.println("\t_MAIN__" + (backendbits.getComputeNodes().size() - 1) + "();");
