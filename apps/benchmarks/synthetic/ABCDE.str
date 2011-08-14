@@ -1,0 +1,72 @@
+float->float filter B(int k) {
+    work pop 1 push k {
+        push(pop());
+        for(int i = 1; i < k; i++)
+            push(0);
+    } 
+}
+
+float->float filter D(int k) {
+    work pop k push 1 {
+        push(pop());
+        for(int i = 1; i < k; i++) {
+            pop();
+            pop();
+        }
+    } 
+}
+
+float->float pipeline BD {
+    add B(2);
+    add D(3);
+}
+
+float->float filter C(int n, int m) {
+   work push n pop m {
+        if(n < m) {
+            for(int i = 0; i < n; i++) {
+                push(pop());
+            } 
+            for(int j = n; j < m; j++) {
+                pop();
+            }
+        } else {
+            for(int i = 0; i < m; i++) {
+                push(pop());
+            } 
+            for(int j = m; j < n; j++) {
+                push(0);
+            }
+
+        }
+   } 
+}
+
+float->float splitjoin BCD {
+    split roundrobin(2,1);
+    add C(4,3);
+    add BD();
+    join roundrobin(4,1);
+}
+
+void->float filter A(int k) {
+    work push k {
+        for(int i = 0; i < k; i++) {
+            push(i);
+        }
+    }
+}
+
+float->void filter E(int k) {
+    work pop k {
+        for(int i = 0; i < k; i++) {
+            pop();
+        }
+    }
+}
+
+void->void pipeline ABCDE {
+    add A(3);
+    add BCD();
+    add E(2);
+}
