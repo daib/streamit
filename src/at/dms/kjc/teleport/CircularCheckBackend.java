@@ -9,6 +9,7 @@ import at.dms.kjc.flatgraph.GraphFlattener;
 //import at.dms.util.SIRPrinter;
 import at.dms.util.Utils;
 import at.dms.kjc.*;
+import at.dms.kjc.cluster.DoSchedules;
 import at.dms.kjc.cluster.LatencyConstraints;
 import at.dms.kjc.common.*;
 import at.dms.kjc.iterator.*;
@@ -25,7 +26,12 @@ import java.util.*;
 //import streamit.scheduler2.*;
 //import streamit.scheduler2.constrained.*;
 
+import streamit.misc.DLListIterator;
+import streamit.misc.DLList_const;
 import streamit.scheduler2.Schedule;
+import streamit.scheduler2.constrained.Filter;
+import streamit.scheduler2.constrained.LatencyEdge;
+import streamit.scheduler2.constrained.LatencyNode;
 
 /**
  * Top level of back ends for cluster and uniprocessor based on cluster. For a
@@ -37,150 +43,441 @@ import streamit.scheduler2.Schedule;
  */
 public class CircularCheckBackend {
 
-	// public static Simulator simulator;
-	// get the execution counts from the scheduler
+    // public static Simulator simulator;
+    // get the execution counts from the scheduler
 
-	/**
-	 * Print out some debugging info if true.
-	 */
-	public static boolean debugging = false;
+    /**
+     * Print out some debugging info if true.
+     */
+    public static boolean debugging = false;
 
-	/**
-	 * If true have each filter print out each value it is pushing onto its
-	 * output tape.
-	 */
-	public static final boolean FILTER_DEBUG_MODE = false;
+    /**
+     * Given a flatnode, map to the init execution count.
+     */
+    static HashMap<FlatNode, Integer> initExecutionCounts;
+    /**
+     * Given a flatnode, map to steady-state execution count.
+     * 
+     * <br/>
+     * Also read in several other modules.
+     */
+    static HashMap<FlatNode, Integer> steadyExecutionCounts;
 
-	/**
-	 * Given a flatnode, map to the init execution count.
-	 */
-	static HashMap<FlatNode, Integer> initExecutionCounts;
-	/**
-	 * Given a flatnode, map to steady-state execution count.
-	 * 
-	 * <br/>
-	 * Also read in several other modules.
-	 */
-	static HashMap<FlatNode, Integer> steadyExecutionCounts;
+    /**
+     * Given a filter, map to original push/pop/peek rates
+     */
+    static HashMap<SIRFilter, Integer[]> originalRates;
 
-	/**
-	 * Given a filter, map to original push/pop/peek rates
-	 */
-	static HashMap<SIRFilter, Integer[]> originalRates;
+    /**
+     * Given a joiner, map to following filter
+     */
+    static HashMap<SIRJoiner, SIRFilter> joinerWork;
 
-	/**
-	 * Given a joiner, map to following filter
-	 */
-	static HashMap<SIRJoiner, SIRFilter> joinerWork;
+    /**
+     * Holds passed structures until they can be handeed off to
+     * {@link StructureIncludeFile}.
+     */
+    private static SIRStructure[] structures;
 
-	/**
-	 * Holds passed structures until they can be handeed off to
-	 * {@link StructureIncludeFile}.
-	 */
-	private static SIRStructure[] structures;
+    // /**
+    // * Used to iterate over str structure ignoring flattening.
+    // * <br/> Also used in {@link ClusterCodeGenerator} and {@link
+    // FlatIrToCluster2}
+    // */
+    static streamit.scheduler2.iriter.Iterator topStreamIter;
 
-	// /**
-	// * Used to iterate over str structure ignoring flattening.
-	// * <br/> Also used in {@link ClusterCodeGenerator} and {@link
-	// FlatIrToCluster2}
-	// */
-	// static streamit.scheduler2.iriter.Iterator topStreamIter;
+    /**
+     * The cluster backend. Called via reflection.
+     */
+    public static void run(SIRStream str, JInterfaceDeclaration[] interfaces,
+            SIRInterfaceTable[] interfaceTables, SIRStructure[] structs,
+            SIRHelper[] helpers, SIRGlobal global) {
 
-	/**
-	 * The cluster backend. Called via reflection.
-	 */
-	public static void run(SIRStream str, JInterfaceDeclaration[] interfaces,
-			SIRInterfaceTable[] interfaceTables, SIRStructure[] structs,
-			SIRHelper[] helpers, SIRGlobal global) {
+        System.out.println("Entry to CircularCheckBacken");
 
-		System.out.println("Entry to E2 CircularCheckBacken");
+        structures = structs;
 
-		structures = structs;
+        // Pull pop, push, peek into own statements (must be done eventually
+        // before
+        // generating C code, and is best done here while type info is still
+        // available
+        // for tmps.
+        SimplifyPopPeekPush.simplify(str);
 
-		// Pull pop, push, peek into own statements (must be done eventually
-		// before
-		// generating C code, and is best done here while type info is still
-		// available
-		// for tmps.
-		SimplifyPopPeekPush.simplify(str);
+        // Perform propagation on fields from 'static' sections.
+        Set<SIRGlobal> statics = new HashSet<SIRGlobal>();
+        if (global != null)
+            statics.add(global);
+        //        StaticsProp.propagate/* IntoContainers */(str, statics);
 
-		// Perform propagation on fields from 'static' sections.
-		Set<SIRGlobal> statics = new HashSet<SIRGlobal>();
-		if (global != null)
-			statics.add(global);
-		StaticsProp.propagate/* IntoContainers */(str, statics);
-		
-		// propagate constants and unroll loop
+        // propagate constants and unroll loop
         System.err.print("Running Constant Prop and Unroll...");
 
         // Constant propagate and unroll.
         // Set unrolling factor to <= 4 for loops that don't involve
         //  any tape operations.
-        Unroller.setLimitNoTapeLoops(true, 4);
-    
+        //        Unroller.setLimitNoTapeLoops(true, 4);
+
         ConstantProp.propagateAndUnroll(str);
-        
 
         System.err.println(" done.");
 
         // do constant propagation on fields
         System.err.print("Running Constant Field Propagation...");
         ConstantProp.propagateAndUnroll(str, true);
-        
-		// construct stream hierarchy from SIRInitStatements
-//		ConstructSIRTree.doit(str);
 
-		// this must be run now, Further passes expect unique names!!!
-		RenameAll.renameAllFilters(str);
+        // construct stream hierarchy from SIRInitStatements
+        //		ConstructSIRTree.doit(str);
 
-		// System.err.println("Analyzing Branches..");
-		// new BlockFlattener().flattenBlocks(str);
-		// new BranchAnalyzer().analyzeBranches(str);
+        // this must be run now, Further passes expect unique names!!!
+        //        RenameAll.renameAllFilters(str);
 
-		SIRPortal.findMessageStatements(str);
+        // System.err.println("Analyzing Branches..");
+        // new BlockFlattener().flattenBlocks(str);
+        // new BranchAnalyzer().analyzeBranches(str);
 
-		// canonicalize stream graph, reorganizing some splits and joins
-		Lifter.liftAggressiveSync(str);
+        SIRPortal.findMessageStatements(str);
 
-		// Unroll and propagate maximally within each (not phased) filter.
-		// Initially justified as necessary for IncreaseFilterMult which is
-		// now obsolete.
-		StreamItDot.printGraph(str, "canonical-graph.dot");
+        // canonicalize stream graph, reorganizing some splits and joins
+        //        Lifter.liftAggressiveSync(str);
 
-		// put timers for each filters
-		// InsertFilterPerfCounters.doit(str);
+        // Unroll and propagate maximally within each (not phased) filter.
+        // Initially justified as necessary for IncreaseFilterMult which is
+        // now obsolete.
+        StreamItDot.printGraph(str, "canonical-graph.dot");
 
-		// run constrained scheduler
+        // run constrained scheduler
 
-		System.err.print("Constrained Scheduler Begin...");
-		streamit.scheduler2.iriter.Iterator topStreamIter = IterFactory
-				.createFactory().createIter(str);
+        System.err.print("Constrained Scheduler Begin...");
+        topStreamIter = IterFactory.createFactory().createIter(str);
 
-		streamit.scheduler2.constrained.Scheduler scheduler = streamit.scheduler2.constrained.Scheduler
-				.create(topStreamIter);
-		
-		scheduler.computeSchedule();
+        debugOutput(str);
+
+        streamit.scheduler2.constrained.Scheduler scheduler = streamit.scheduler2.constrained.Scheduler
+                .create(topStreamIter);
+
+        scheduler.computeSchedule();
         scheduler.computeBufferUse();
         Schedule initSched = scheduler.getOptimizedInitSchedule();
         Schedule steadySched = scheduler.getOptimizedSteadySchedule();
-        
+
         System.err.println(" done.");
-        
-		scheduler.printReps();
-		//cscheduler.computeSchedule();
 
-		new streamit.scheduler2.print.PrintGraph().printProgram(topStreamIter);
-//		new streamit.scheduler2.print.PrintProgram().printProgram(topStreamIter);
+        scheduler.printReps();
+        //cscheduler.computeSchedule();
 
-		 
+        new streamit.scheduler2.print.PrintGraph().printProgram(topStreamIter);
+        //		new streamit.scheduler2.print.PrintProgram().printProgram(topStreamIter);
 
-		// end constrained scheduler
+        // end constrained scheduler
 
-		// calculate latency constraints for all portals
-		// and save for later query.
-		LatencyConstraints.detectConstraints(SIRPortal.getPortals());
+        // calculate latency constraints for all portals
+        // and save for later query.
+        LatencyConstraints.detectConstraints(SIRPortal.getPortals());
 
-		System.exit(0);
-	}
+        //create graph
 
+        //create vertices
+        Set<Vertex> vertices = createVertices(scheduler);
+        Set<Edge> edges = new HashSet<Edge>();
+
+        addCausalityEdges(scheduler, edges, vertices);
+
+        addDataDependencyEdges(scheduler, edges, vertices);
+
+        //add dependency edges
+        //add causality edges
+
+        System.exit(0);
+    }
+
+    private static void addCausalityEdges(
+            streamit.scheduler2.constrained.Scheduler scheduler,
+            Set<Edge> edges, Set<Vertex> vertices) {
+
+        HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+
+        for (Object key : strRepetitions.keySet()) {
+            int[] reps = (int[]) strRepetitions.get(key);
+            for (int i = 1; i < reps[0]; i++) {
+                Vertex v = getVertex((SIRStream) key, i, vertices);
+                Vertex u = getVertex((SIRStream) key, i + 1, vertices);
+                Edge e = new Edge(u, v, 0);
+                edges.add(e);
+            }
+
+            Vertex u = getVertex((SIRStream) key, 1, vertices);
+            Vertex v = getVertex((SIRStream) key, reps[0], vertices);
+            Edge e = new Edge(u, v, 1);
+            edges.add(e);
+        }
+
+    }
+
+    private static void addDataDependencyEdges(
+            streamit.scheduler2.constrained.Scheduler scheduler,
+            Set<Edge> edges, Set<Vertex> vertices) {
+
+        HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+
+        for (Vertex v : vertices) {
+            if(!(v.str instanceof SIRFilter))
+                    continue;
+
+            for (SIRFilter f : findClosestUpstreamFilters(v.getStream(), true)) {
+
+                streamit.scheduler2.iriter.Iterator srcIter = IterFactory
+                        .createFactory().createIter(f);
+                streamit.scheduler2.iriter.Iterator dstIter = IterFactory
+                        .createFactory().createIter(v.getStream());
+
+                streamit.scheduler2.SDEPData sdep;
+                streamit.scheduler2.constrained.Scheduler cscheduler = streamit.scheduler2.constrained.Scheduler
+                        .createForSDEP(topStreamIter);
+
+                try {
+                    sdep = cscheduler.computeSDEP(srcIter, dstIter);
+
+                    System.out.println("\n");
+                    System.out.println("Source(" + f.getName()
+                            + ") --> Sink(" + v.getStream().getName()
+                            + ") Dependency:\n");
+
+                    System.out.println("  Source Init Phases: "
+                            + sdep.getNumSrcInitPhases());
+                    System.out.println("  Destn. Init Phases: "
+                            + sdep.getNumDstInitPhases());
+                    System.out.println("  Source Steady Phases: "
+                            + sdep.getNumSrcSteadyPhases());
+                    System.out.println("  Destn. Steady Phases: "
+                            + sdep.getNumDstSteadyPhases());
+                    
+                    for (int t = 0; t < Math.max(sdep.getNumSrcSteadyPhases(),
+                            sdep.getNumDstSteadyPhases()); t++) {
+                        int phase = sdep.getSrcPhase4DstPhase(t);
+                        int phaserev = sdep.getDstPhase4SrcPhase(t);
+                        System.out.println("sdep [" + t + "] = " + phase
+                                + " reverse_sdep[" + t + "] = " + phaserev);
+                    }
+
+                } catch (streamit.scheduler2.constrained.NoPathException ex) {
+                    System.out.println(ex);
+
+                }
+            }
+        }
+
+    }
+
+    private static Set<SIRFilter> findClosestUpstreamFilters(SIRStream str,
+            boolean inside) {
+        Set<SIRFilter> filters = new HashSet<SIRFilter>();
+
+        if (str instanceof SIRSplitJoin && inside) {
+            List<SIROperator> children = new LinkedList<SIROperator>(
+                    ((SIRSplitJoin) str).getChildren());
+            children.remove(0);
+            children.remove(children.size() - 1);
+            for (SIROperator child : children) {
+                if (child instanceof SIRFilter) {
+                    filters.add((SIRFilter) child);
+                } else {
+                    filters.addAll(findClosestUpstreamFilters(
+                            (SIRStream) child, true));
+                }
+            }
+        } else if (str instanceof SIRPipeline && inside) {
+            SIRStream firstChild = ((SIRPipeline)str).get(0);
+            if(firstChild instanceof SIRFilter) {
+                filters.add((SIRFilter) firstChild);
+            } else {
+                filters.addAll(findClosestUpstreamFilters(
+                        (SIRStream) firstChild, true));
+            }
+        } else {
+            //outside or SIRFilter
+            if (str.getParent() instanceof SIRSplitJoin) {
+                filters.addAll(findClosestUpstreamFilters(str.getParent(),
+                        false));
+            } else if(str.getParent() instanceof SIRPipeline) {
+                SIRPipeline parent = (SIRPipeline) str.getParent();
+                for (int i = 0; i < parent.size(); i++) {
+                    if (parent.get(i) == str) {
+                        if (i > 0) {
+                            if (parent.get(i - 1) instanceof SIRFilter) {
+                                filters.add((SIRFilter) parent.get(i - 1));
+                            } else {
+                                filters.addAll(findClosestUpstreamFilters(
+                                        parent.get(i - 1), true));
+                            }
+                        } else {
+                            filters.addAll(findClosestUpstreamFilters(
+                                    str.getParent(), false));
+                        }
+                        
+                        break;
+                    }
+                }
+
+            }
+        }
+
+        return filters;
+    }
+
+    /*
+     * 
+     */
+    private static Set<Vertex> createVertices(
+            streamit.scheduler2.constrained.Scheduler scheduler) {
+        Set<Vertex> vertices = new HashSet<Vertex>();
+
+        HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+
+        for (Object key : strRepetitions.keySet()) {
+            int[] reps = (int[]) strRepetitions.get(key);
+            for (int i = 0; i < reps[0]; i++) {
+                Vertex v = new Vertex((SIRStream) key, i + 1);
+                vertices.add(v);
+            }
+        }
+        return vertices;
+    }
+
+    static Vertex getVertex(SIRStream str, int index, Set<Vertex> vertices) {
+        for (Vertex v : vertices) {
+            if (v.str == str && v.index == index) {
+                return v;
+            }
+        }
+        return null;
+    }
+
+    /**
+    * Just some debugging output.
+    */
+    private static void debugOutput(SIRStream str) {
+        streamit.scheduler2.constrained.Scheduler cscheduler = streamit.scheduler2.constrained.Scheduler
+                .createForSDEP(topStreamIter);
+
+        //cscheduler.computeSchedule(); //"Not Implemented"
+
+        if (!(str instanceof SIRPipeline))
+            return;
+
+        SIRPortal[] portals = SIRPortal.getPortals();
+        LatencyConstraints.detectConstraints(portals);
+
+        for (int i = 0; i < portals.length; i++) {
+
+            SIRPortal portal = portals[i];
+
+            for (SIRPortalSender sender : portal.getSenders()) {
+                for (SIRStream receiver : portal.getReceivers()) {
+
+                    SIRStream src = sender.getStream();
+                    SIRStream dst = receiver;
+
+                    streamit.scheduler2.iriter.Iterator srcIter = IterFactory
+                            .createFactory().createIter(src);
+                    streamit.scheduler2.iriter.Iterator dstIter = IterFactory
+                            .createFactory().createIter(dst);
+
+                    streamit.scheduler2.SDEPData sdep;
+
+                    try {
+                        boolean downstream = LatencyConstraints
+                                .isMessageDirectionDownstream((SIRFilter) src,
+                                        (SIRFilter) dst);
+
+                        if (downstream)
+                            sdep = cscheduler.computeSDEP(srcIter, dstIter);
+                        else
+                            sdep = cscheduler.computeSDEP(dstIter, srcIter);
+
+                        {
+                            System.out.println("\n");
+                            System.out.println("Source(" + src.getName()
+                                    + ") --> Sink(" + dst.getName()
+                                    + ") Dependency:\n");
+
+                            System.out.println("  Source Init Phases: "
+                                    + sdep.getNumSrcInitPhases());
+                            System.out.println("  Destn. Init Phases: "
+                                    + sdep.getNumDstInitPhases());
+                            System.out.println("  Source Steady Phases: "
+                                    + sdep.getNumSrcSteadyPhases());
+                            System.out.println("  Destn. Steady Phases: "
+                                    + sdep.getNumDstSteadyPhases());
+                        }
+
+                        for (int t = 0; t < Math.max(
+                                sdep.getNumSrcSteadyPhases(),
+                                sdep.getNumDstSteadyPhases()); t++) {
+                            int phase = sdep.getSrcPhase4DstPhase(t);
+                            int phaserev = sdep.getDstPhase4SrcPhase(t);
+                            System.out.println("sdep [" + t + "] = " + phase
+                                    + " reverse_sdep[" + t + "] = " + phaserev);
+                        }
+
+                    } catch (streamit.scheduler2.constrained.NoPathException ex) {
+                        System.out.println(ex);
+
+                    }
+                }
+            }
+        }
+        //        DoSchedules.findSchedules(topStreamIter, firstIter, str);
+    }
+
+    static class Edge {
+        private Vertex src, dst;
+
+        private int weight = 0;
+
+        public Edge(Vertex src, Vertex dst) {
+            this.src = src;
+            this.dst = dst;
+        }
+
+        public Edge(Vertex src, Vertex dst, int weight) {
+            this.src = src;
+            this.dst = dst;
+            this.weight = weight;
+        }
+
+        public void setWeight(int weight) {
+            this.weight = weight;
+        }
+
+        public int getWeight() {
+            return weight;
+        }
+
+        public Vertex getSrc() {
+            return src;
+        }
+
+        public Vertex getDst() {
+            return dst;
+        }
+    }
+
+    static class Vertex {
+        SIRStream str;
+        int index;
+
+        public Vertex(SIRStream str, int index) {
+            this.str = str;
+            this.index = index;
+        }
+
+        public SIRStream getStream() {
+            return str;
+        }
+
+        public int getIndex() {
+            return index;
+        }
+    }
 }
