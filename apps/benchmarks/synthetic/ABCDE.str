@@ -1,24 +1,36 @@
-float->float filter B(int k) {
+float->float filter B(int k, portal<D> DBPort) {
     work pop 1 push k {
         push(pop());
         for(int i = 1; i < k; i++)
-            push(0);
+            push(i);
+        DBPort.setFreq(3) [-1:-1];
     } 
 }
 
 float->float filter D(int k) {
+    int freq;
+    init {
+        freq = 0;
+    }
+
+    handler setFreq(int newFreq) {
+        freq = newFreq;
+    }
+
+
     work pop k push 1 {
-        push(pop());
         for(int i = 1; i < k; i++) {
             pop();
             pop();
         }
+        push(pop());
     } 
 }
 
 float->float pipeline BD {
-    add B(2);
-    add D(3);
+    portal<D> BDPort;
+    add B(2, BDPort);
+    add D(3) to BDPort;
 }
 
 float->float filter C(int n, int m) {
@@ -50,23 +62,37 @@ float->float splitjoin BCD {
 }
 
 void->float filter A(int k) {
+    int scale;
+    init {
+        scale = 1;
+    }
+
+    handler changeScale(int n) {
+        scale = n;
+    }
+
     work push k {
         for(int i = 0; i < k; i++) {
-            push(i);
+            push(i * scale);
         }
+
     }
 }
 
-float->void filter E(int k) {
+float->void filter E(int k, portal<A> EAPort) {
+   
     work pop k {
         for(int i = 0; i < k; i++) {
-            pop();
+            //pop();
+            println(pop());
         }
+        EAPort.changeScale(3)[0:0];
     }
 }
 
 void->void pipeline ABCDE {
-    add A(3);
+    portal<A> EAPort;
+    add A(3) to EAPort;
     add BCD();
-    add E(2);
+    add E(2, EAPort);
 }
