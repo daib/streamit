@@ -1,49 +1,40 @@
 // $Header: /n/tiamat/y/repository/StreamItNew/streams/src/at/dms/kjc/cluster/ClusterBackend.java,v 1.1 2009/02/24 18:14:55 hormati Exp $
 package at.dms.kjc.teleport;
 
-import at.dms.kjc.flatgraph.FlatNode;
-import at.dms.kjc.flatgraph.DumpSymbolicGraph;
-import at.dms.kjc.flatgraph.GraphFlattener;
-//import at.dms.kjc.flatgraph.*;
-//import at.dms.util.IRPrinter;
-//import at.dms.util.SIRPrinter;
-import at.dms.util.Utils;
-import at.dms.kjc.*;
-import at.dms.kjc.cluster.DoSchedules;
-import at.dms.kjc.cluster.LatencyConstraints;
-import at.dms.kjc.common.*;
-import at.dms.kjc.iterator.*;
-import at.dms.kjc.sir.*;
-import at.dms.kjc.sir.stats.StatisticsGathering;
-import at.dms.kjc.sir.lowering.*;
-import at.dms.kjc.sir.lowering.partition.*;
-import at.dms.kjc.sir.lowering.partition.cache.*;
-import at.dms.kjc.sir.lowering.partition.dynamicprog.*;
-import at.dms.kjc.sir.lowering.fusion.*;
-
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.*;
-//import java.io.*;
-//import streamit.scheduler2.print.PrintProgram;
-//import streamit.scheduler2.*;
-//import streamit.scheduler2.constrained.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Set;
 
-import streamit.misc.DLListIterator;
-import streamit.misc.DLList_const;
 import streamit.scheduler2.Schedule;
-import streamit.scheduler2.constrained.Filter;
-import streamit.scheduler2.constrained.LatencyEdge;
-import streamit.scheduler2.constrained.LatencyNode;
+import at.dms.kjc.JInterfaceDeclaration;
+import at.dms.kjc.StreamItDot;
+import at.dms.kjc.cluster.LatencyConstraints;
+import at.dms.kjc.common.CodegenPrintWriter;
+import at.dms.kjc.common.StructureIncludeFile;
+import at.dms.kjc.flatgraph.FlatNode;
+import at.dms.kjc.iterator.IterFactory;
+import at.dms.kjc.linprog.LPSolve;
+import at.dms.kjc.sir.SIRFilter;
+import at.dms.kjc.sir.SIRGlobal;
+import at.dms.kjc.sir.SIRHelper;
+import at.dms.kjc.sir.SIRInterfaceTable;
+import at.dms.kjc.sir.SIRJoiner;
+import at.dms.kjc.sir.SIROperator;
+import at.dms.kjc.sir.SIRPipeline;
+import at.dms.kjc.sir.SIRPortal;
+import at.dms.kjc.sir.SIRPortalSender;
+import at.dms.kjc.sir.SIRSplitJoin;
+import at.dms.kjc.sir.SIRStream;
+import at.dms.kjc.sir.SIRStructure;
+import at.dms.kjc.sir.lowering.ConstantProp;
+import at.dms.kjc.sir.lowering.SimplifyPopPeekPush;
 
 /**
- * Top level of back ends for cluster and uniprocessor based on cluster. For a
- * cluster creates computation nodes connected with pipes. For a uniprocessor
- * creates computation nodes connected by buffers. <br/>
- * Starts with: Standard sequence of optimization passes. Followed by: Dynamic
- * region handling and partitioning, still standard in that it is similar to
- * SpaceDynamic. Followed by: Code generation for cluster or uniprocessor.
  */
 public class CircularCheckBackend {
 
@@ -192,22 +183,17 @@ public class CircularCheckBackend {
         addControlDependencyEdges(scheduler, edges, vertices);
 
         printGraph(edges);
-        
+
         //checking for zero edges
-        if (zeroCycleDetection(edges, vertices))
+        if (zeroCycleDetection(edges, vertices)) {
             System.out.println("Found a circular dependency");
+            System.exit(1);
+        }
         //sorting
+        topoSort(edges, vertices);
 
         System.exit(0);
     }
-
-    //    static class PathLengths {
-    //        public Set<Integer> lengths;
-    //
-    //        PathLengths() {
-    //            lengths = new HashSet<Integer>();
-    //        }
-    //    }
 
     private static boolean zeroCycleDetection(Set<Edge> edges,
             Set<Vertex> vertices) {
@@ -269,11 +255,13 @@ public class CircularCheckBackend {
                         Vertex lastV = null;
                         for (int index : vers) {
                             Vertex v = (Vertex) vs[index];
-                            
-                            if(lastV != null) {
-                                System.out.print("[" + getEdge(lastV, v, edges).getWeight() + "]-> ");
+
+                            if (lastV != null) {
+                                System.out.print("["
+                                        + getEdge(lastV, v, edges).getWeight()
+                                        + "]-> ");
                             }
-                            
+
                             System.out.print("(" + v.getStream().getIdent()
                                     + "," + v.getIndex() + ") -");
                             lastV = v;
@@ -283,8 +271,10 @@ public class CircularCheckBackend {
                         vers.add(i);
                         for (int index : vers) {
                             Vertex v = (Vertex) vs[index];
-                            if(lastV != null) {
-                                System.out.print("[" + getEdge(lastV, v, edges).getWeight() + "]-> ");
+                            if (lastV != null) {
+                                System.out.print("["
+                                        + getEdge(lastV, v, edges).getWeight()
+                                        + "]-> ");
                             }
                             System.out.print("(" + v.getStream().getIdent()
                                     + "," + v.getIndex() + ") -");
@@ -295,62 +285,6 @@ public class CircularCheckBackend {
                 }
             }
         return false;
-        //        PathLengths[][][] alpha = new PathLengths[n][n][n+1];
-        //
-        //        //initialize
-        //        for (int i = 0; i < n; i++)
-        //            for (int j = 0; j < n; j++)
-        //                for (int k = 0; k < n+1; k++)
-        //                    alpha[i][j][k] = new PathLengths();
-        //        for (int i = 0; i < n; i++)
-        //            for (int j = 0; j < n; j++) {
-        //                Vertex u = (Vertex) vs[i];
-        //                Vertex v = (Vertex) vs[j];
-        //
-        //                //get the edge weight
-        //                Edge e = getEdge(u, v, edges);
-        //                if (e != null) {
-        //                    alpha[i][j][0].lengths.add(e.getWeight());
-        //                }
-        //            }
-        //
-        //        for (int k = 1; k < n+1; k++) {
-        //            for (int i = 0; i < n; i++)
-        //                for (int j = 0; j < n; j++) {
-        //                    alpha[i][j][k].lengths.addAll(alpha[i][j][k - 1].lengths);
-        //                    Set<Integer> alphaKKK_1Star = new HashSet<Integer>();
-        //                    alphaKKK_1Star.add(0);      //a^0
-        //                    Set<Integer> alphaKKK_1I = new HashSet<Integer>(
-        //                            alpha[k-1][k-1][k - 1].lengths);
-        //                    Set<Integer> mult = null;
-        //                    //compute * operator
-        //                    while (true) {
-        //                        alphaKKK_1Star.addAll(alphaKKK_1I);
-        //                        mult = setMult(alphaKKK_1I, alpha[k-1][k-1][k - 1].lengths);
-        //
-        //                        if (alphaKKK_1I.containsAll(mult)
-        //                                && mult.containsAll(alphaKKK_1I)) {
-        //                            break;
-        //                        }
-        //
-        //                        alphaKKK_1I = mult;
-        //                    }
-        //                    
-        //                    alpha[i][j][k].lengths
-        //                            .addAll(setMult(
-        //                                    setMult(alpha[i][k-1][k - 1].lengths,
-        //                                            alphaKKK_1Star),
-        //                                    alpha[k-1][j][k - 1].lengths));
-        //                    
-        //                    for(int t = 0; t < n; t++) {
-        //                        if(alpha[t][t][k].lengths.contains(0))
-        //                            return true;
-        //                    }
-        //
-        //                }
-        //        }
-
-        //        return false;
     }
 
     static void GetPath(int i, int j, Integer[][] path, int[][] next,
@@ -365,15 +299,106 @@ public class CircularCheckBackend {
         }
     }
 
-    //    static Set<Integer> setMult(Set<Integer> s1, Set<Integer> s2) {
-    //        Set<Integer> mult = new HashSet<Integer>();
-    //        for (Integer a : s1) {
-    //            for (Integer b : s2) {
-    //                mult.add(a + b);
-    //            }
-    //        }
-    //        return mult;
-    //    }
+    private static void topoSort(Set<Edge> edges, Set<Vertex> vertices) {
+        CodegenPrintWriter p;
+        try {
+            p = new CodegenPrintWriter(new BufferedWriter(new FileWriter(
+                    "sort.lp", false)));
+
+            //objective function
+            for (Edge e : edges) {
+                assert e != null : "wrong value for an edge";
+                p.print("-sigma_" + e.getName() + " ");
+            }
+            p.println(";");
+
+            for (Edge e : edges) {
+                p.println("pi_" + e.getSrc().getName() + " - pi_"
+                        + e.getDst().getName() + " + " + e.getWeight()
+                        + " gamma  >= 0;");
+                p.println("pi_" + e.getSrc().getName() + " - pi_"
+                        + e.getDst().getName() + " + " + e.getWeight()
+                        + " gamma " + "sigma_" + e.getName() + " >= 1;");
+                p.println("sigma_" + e.getName() + " >= 0;");
+
+            }
+
+            p.close();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        int nVars = edges.size() + vertices.size() + 1;
+        int nConstraints = edges.size() * 3;
+
+        LPSolve solver = new LPSolve(nConstraints, nVars);
+//        double[] obj = new double[nVars];
+        double[] obj = solver.getEmptyConstraint();
+
+        for (int i = 0; i < nVars; i++) {
+            if (i < edges.size())
+                obj[i] = 1;
+            else
+                obj[i] = 0;
+        }
+
+        solver.setObjective(obj);
+
+        Object[] es = edges.toArray();
+        Object[] vs = vertices.toArray();
+
+        for (int i = 0; i < es.length; i++) {
+            Edge e = (Edge) es[i];
+            double[] constraints1 = solver.getEmptyConstraint();
+            double[] constraints2 = solver.getEmptyConstraint();
+            double[] constraints3 = solver.getEmptyConstraint();
+            
+            int u = -1, v = -1;
+
+            for (int j = 0; j < vs.length; j++) {
+                if (vs[j] == e.getSrc()) {
+                    u = j;
+                    if (v != -1)
+                        break;
+                }
+                if (vs[j] == e.getDst()) {
+                    v = j;
+                    if (u != -1)
+                        break;
+                }
+            }
+
+            constraints1[u + es.length] = 1;
+            constraints1[v + es.length] = -1;
+            constraints1[nVars - 1] = e.getWeight();
+
+            solver.addConstraintGE(constraints1, 0);
+
+            constraints2[u + es.length] = 1;
+            constraints2[v + es.length] = -1;
+            constraints2[nVars - 1] = e.getWeight();
+            constraints2[i] = 1;
+
+            solver.addConstraintGE(constraints2, 1);
+
+            constraints3[i] = 1;
+
+            solver.addConstraintGE(constraints3, 0);
+        }
+
+        double[] result = solver.solve();
+
+        double gamma = result[nVars - 1];
+        System.out.println("Gamma = " + gamma);
+        
+        for (int i = 0; i < vs.length; i++) {
+            Vertex v = ((Vertex)vs[i]);
+            v.setPi(result[i + es.length]);
+            
+            System.out.println("Vertex " + v.getName() + " pi = " + v.getPi());
+        }
+    }
 
     private static Edge getEdge(Vertex u, Vertex v, Set<Edge> edges) {
         for (Edge e : edges) {
@@ -563,7 +588,7 @@ public class CircularCheckBackend {
 
         if (str == null)
             return filters;
-        
+
         if (str instanceof SIRSplitJoin && inside) {
             List<SIROperator> children = new LinkedList<SIROperator>(
                     ((SIRSplitJoin) str).getChildren());
@@ -670,6 +695,7 @@ public class CircularCheckBackend {
             e.printStackTrace();
         }
     }
+
     /**
     * Just some debugging output.
     */
@@ -778,11 +804,17 @@ public class CircularCheckBackend {
         public Vertex getDst() {
             return dst;
         }
+
+        public String getName() {
+            return src.getStream().getName() + "_" + src.getIndex() + "_"
+                    + dst.getStream().getName() + "_" + dst.getIndex();
+        }
     }
 
     static class Vertex {
         SIRStream str;
         int index;
+        double pi = Double.POSITIVE_INFINITY;
 
         public Vertex(SIRStream str, int index) {
             this.str = str;
@@ -795,6 +827,18 @@ public class CircularCheckBackend {
 
         public int getIndex() {
             return index;
+        }
+
+        public String getName() {
+            return str.getName() + "_" + index;
+        }
+
+        public double getPi() {
+            return pi;
+        }
+        
+        public void setPi(double pi) {
+            this.pi = pi;
         }
     }
 }
