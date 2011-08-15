@@ -4,6 +4,8 @@ package at.dms.kjc.teleport;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -189,8 +191,20 @@ public class CircularCheckBackend {
             System.out.println("Found a circular dependency");
             System.exit(1);
         }
+        
+        
         //sorting
-        topoSort(edges, vertices);
+        double gamma = topoSort(edges, vertices);
+        List<Vertex> verticesList = new ArrayList<Vertex>(vertices);
+        java.util.Comparator<Vertex> comparer = new Comparator();
+        ((Comparator)comparer).gamma = gamma;
+        ((Comparator)comparer).iteration = 10;
+        Collections.sort(verticesList, comparer);
+        
+        System.out.println("Sorted list:");
+        for(Vertex v: verticesList) {
+            System.out.println("Vertex " + v.getName() + " pi = " + v.getPi());
+        }
 
         System.exit(0);
     }
@@ -234,11 +248,9 @@ public class CircularCheckBackend {
                             path[i][j] = path[i][k] + path[k][j];
                             next[i][j] = k;
                         } else {
-                            //                            path[i][j] = Math.min(path[i][j], path[i][k]
-                            //                                    + path[k][j]);
                             if (path[i][j] > path[i][k] + path[k][j]) {
-                                next[i][j] = k;
                                 path[i][j] = path[i][k] + path[k][j];
+                                next[i][j] = k;
                             }
                         }
                     }
@@ -299,7 +311,7 @@ public class CircularCheckBackend {
         }
     }
 
-    private static void topoSort(Set<Edge> edges, Set<Vertex> vertices) {
+    private static double topoSort(Set<Edge> edges, Set<Vertex> vertices) {
         CodegenPrintWriter p;
         try {
             p = new CodegenPrintWriter(new BufferedWriter(new FileWriter(
@@ -325,7 +337,6 @@ public class CircularCheckBackend {
 
             p.close();
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
 
@@ -333,7 +344,7 @@ public class CircularCheckBackend {
         int nConstraints = edges.size() * 3;
 
         LPSolve solver = new LPSolve(nConstraints, nVars);
-//        double[] obj = new double[nVars];
+        
         double[] obj = solver.getEmptyConstraint();
 
         for (int i = 0; i < nVars; i++) {
@@ -398,6 +409,7 @@ public class CircularCheckBackend {
             
             System.out.println("Vertex " + v.getName() + " pi = " + v.getPi());
         }
+        return gamma;
     }
 
     private static Edge getEdge(Vertex u, Vertex v, Set<Edge> edges) {
@@ -806,8 +818,8 @@ public class CircularCheckBackend {
         }
 
         public String getName() {
-            return src.getStream().getName() + "_" + src.getIndex() + "_"
-                    + dst.getStream().getName() + "_" + dst.getIndex();
+            return src.getName() + "_" + src.getIndex() + "_"
+                    + dst.getName() + "_" + dst.getIndex();
         }
     }
 
@@ -830,7 +842,7 @@ public class CircularCheckBackend {
         }
 
         public String getName() {
-            return str.getName() + "_" + index;
+            return str.getIdent() + "_" + index;
         }
 
         public double getPi() {
@@ -840,5 +852,17 @@ public class CircularCheckBackend {
         public void setPi(double pi) {
             this.pi = pi;
         }
+    }
+    
+    static class Comparator implements java.util.Comparator<Vertex> {
+        public static double gamma;
+        public static int iteration;
+        @Override
+        public int compare(Vertex v1, Vertex v2) {
+            double a1 = v1.pi - gamma * iteration;
+            double a2 = v2.pi - gamma * iteration;
+            return (int)(a1 - a2);
+        }
+        
     }
 }
