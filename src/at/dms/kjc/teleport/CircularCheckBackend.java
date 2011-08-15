@@ -184,9 +184,12 @@ public class CircularCheckBackend {
         addCausalityEdges(scheduler, edges, vertices);
 
         addDataDependencyEdges(scheduler, edges, vertices);
-
-        //add dependency edges
-        //add causality edges
+        
+        addControlDependencyEdges(scheduler, edges, vertices);
+        
+        //checking for zero edges
+        
+        //sorting
 
         System.exit(0);
     }
@@ -220,28 +223,29 @@ public class CircularCheckBackend {
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
-        for (Vertex v : vertices) {
-            if(!(v.str instanceof SIRFilter))
-                    continue;
+        streamit.scheduler2.SDEPData sdep;
+        streamit.scheduler2.constrained.Scheduler cscheduler = streamit.scheduler2.constrained.Scheduler
+                .createForSDEP(topStreamIter);
 
-            for (SIRFilter f : findClosestUpstreamFilters(v.getStream(), true)) {
+        for (Object key : strRepetitions.keySet()) {
+            if (!(key instanceof SIRFilter))
+                continue;
+            int[] reps = (int[]) strRepetitions.get(key);
+            SIRStream str = (SIRStream) key;
+
+            for (SIRFilter f : findClosestUpstreamFilters(str, true)) {
 
                 streamit.scheduler2.iriter.Iterator srcIter = IterFactory
                         .createFactory().createIter(f);
                 streamit.scheduler2.iriter.Iterator dstIter = IterFactory
-                        .createFactory().createIter(v.getStream());
-
-                streamit.scheduler2.SDEPData sdep;
-                streamit.scheduler2.constrained.Scheduler cscheduler = streamit.scheduler2.constrained.Scheduler
-                        .createForSDEP(topStreamIter);
+                        .createFactory().createIter(str);
 
                 try {
                     sdep = cscheduler.computeSDEP(srcIter, dstIter);
 
                     System.out.println("\n");
-                    System.out.println("Source(" + f.getName()
-                            + ") --> Sink(" + v.getStream().getName()
-                            + ") Dependency:\n");
+                    System.out.println("Source(" + f.getName() + ") --> Sink("
+                            + str.getName() + ") Dependency:\n");
 
                     System.out.println("  Source Init Phases: "
                             + sdep.getNumSrcInitPhases());
@@ -251,7 +255,7 @@ public class CircularCheckBackend {
                             + sdep.getNumSrcSteadyPhases());
                     System.out.println("  Destn. Steady Phases: "
                             + sdep.getNumDstSteadyPhases());
-                    
+
                     for (int t = 0; t < Math.max(sdep.getNumSrcSteadyPhases(),
                             sdep.getNumDstSteadyPhases()); t++) {
                         int phase = sdep.getSrcPhase4DstPhase(t);
@@ -260,13 +264,102 @@ public class CircularCheckBackend {
                                 + " reverse_sdep[" + t + "] = " + phaserev);
                     }
 
+                    for (int i = 1; i <= reps[0]; i++) {
+                        Vertex u = getVertex(str, i, vertices);
+                        Vertex v = getVertex(f, sdep.getSrcPhase4DstPhase(i),
+                                vertices);
+                        Edge e = new Edge(u, v, 0);
+                        edges.add(e);
+                    }
+
                 } catch (streamit.scheduler2.constrained.NoPathException ex) {
                     System.out.println(ex);
 
                 }
             }
+
         }
 
+    }
+
+    private static void addControlDependencyEdges(
+            streamit.scheduler2.constrained.Scheduler scheduler,
+            Set<Edge> edges, Set<Vertex> vertices) {
+
+        SIRPortal[] portals = SIRPortal.getPortals();
+        LatencyConstraints.detectConstraints(portals);
+
+        streamit.scheduler2.SDEPData sdep;
+        streamit.scheduler2.constrained.Scheduler cscheduler = streamit.scheduler2.constrained.Scheduler
+                .createForSDEP(topStreamIter);
+
+        for (int i = 0; i < portals.length; i++) {
+
+            SIRPortal portal = portals[i];
+
+            for (SIRPortalSender sender : portal.getSenders()) {
+                for (SIRStream receiver : portal.getReceivers()) {
+
+                    SIRStream src = sender.getStream();
+                    SIRStream dst = receiver;
+
+                    int latency = LatencyConstraints.MinLatency(sender
+                            .getLatency());
+
+                    streamit.scheduler2.iriter.Iterator srcIter = IterFactory
+                            .createFactory().createIter(src);
+                    streamit.scheduler2.iriter.Iterator dstIter = IterFactory
+                            .createFactory().createIter(dst);
+
+                    try {
+                        boolean downstream = LatencyConstraints
+                                .isMessageDirectionDownstream((SIRFilter) src,
+                                        (SIRFilter) dst);
+
+                        if (downstream)
+                            sdep = cscheduler.computeSDEP(srcIter, dstIter);
+                        else
+                            sdep = cscheduler.computeSDEP(dstIter, srcIter);
+
+                        //compute relative iteration, executions
+
+                        //compute absolute iteration of sources
+                        int srcIteration = 10000;
+                        HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+
+                        int[] reps = (int[]) strRepetitions.get(src);
+
+                        for (int j = 1; j <= reps[0]; j++) {
+                            int srcAbsExe = srcIteration * reps[0] + j;
+                            
+                            int dstAbsExe;
+                            
+                            if (downstream)
+                                dstAbsExe = sdep.getDstPhase4SrcPhase(srcAbsExe + latency);
+                            else 
+                                dstAbsExe = sdep.getSrcPhase4DstPhase(srcAbsExe + latency) + 1;
+                            
+                            int dstReps = ((int[]) strRepetitions.get(dst))[0];
+                            int dstIteration = (dstAbsExe-1)/dstReps;
+                            
+                            int dstExe = (dstAbsExe - 1) % dstReps + 1;
+                            
+                            int relativeIteration = dstIteration - srcIteration;
+                            
+                            Vertex u = getVertex(dst, dstExe, vertices);
+                            Vertex v = getVertex(src, j, vertices);
+                            
+                            Edge e = new Edge(u,v, relativeIteration);
+                            edges.add(e);
+                        }
+
+                    } catch (streamit.scheduler2.constrained.NoPathException ex) {
+                        System.out.println(ex);
+
+                    }
+                }
+            }
+        }
     }
 
     private static Set<SIRFilter> findClosestUpstreamFilters(SIRStream str,
@@ -287,8 +380,8 @@ public class CircularCheckBackend {
                 }
             }
         } else if (str instanceof SIRPipeline && inside) {
-            SIRStream firstChild = ((SIRPipeline)str).get(0);
-            if(firstChild instanceof SIRFilter) {
+            SIRStream firstChild = ((SIRPipeline) str).get(0);
+            if (firstChild instanceof SIRFilter) {
                 filters.add((SIRFilter) firstChild);
             } else {
                 filters.addAll(findClosestUpstreamFilters(
@@ -299,7 +392,7 @@ public class CircularCheckBackend {
             if (str.getParent() instanceof SIRSplitJoin) {
                 filters.addAll(findClosestUpstreamFilters(str.getParent(),
                         false));
-            } else if(str.getParent() instanceof SIRPipeline) {
+            } else if (str.getParent() instanceof SIRPipeline) {
                 SIRPipeline parent = (SIRPipeline) str.getParent();
                 for (int i = 0; i < parent.size(); i++) {
                     if (parent.get(i) == str) {
@@ -314,7 +407,7 @@ public class CircularCheckBackend {
                             filters.addAll(findClosestUpstreamFilters(
                                     str.getParent(), false));
                         }
-                        
+
                         break;
                     }
                 }
@@ -335,6 +428,8 @@ public class CircularCheckBackend {
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
         for (Object key : strRepetitions.keySet()) {
+            if (!(key instanceof SIRFilter))
+                continue;
             int[] reps = (int[]) strRepetitions.get(key);
             for (int i = 0; i < reps[0]; i++) {
                 Vertex v = new Vertex((SIRStream) key, i + 1);
