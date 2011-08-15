@@ -20,6 +20,10 @@ import at.dms.kjc.sir.lowering.partition.*;
 import at.dms.kjc.sir.lowering.partition.cache.*;
 import at.dms.kjc.sir.lowering.partition.dynamicprog.*;
 import at.dms.kjc.sir.lowering.fusion.*;
+
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
 //import java.io.*;
 //import streamit.scheduler2.print.PrintProgram;
@@ -184,14 +188,200 @@ public class CircularCheckBackend {
         addCausalityEdges(scheduler, edges, vertices);
 
         addDataDependencyEdges(scheduler, edges, vertices);
-        
+
         addControlDependencyEdges(scheduler, edges, vertices);
+
+        printGraph(edges);
         
         //checking for zero edges
-        
+        if (zeroCycleDetection(edges, vertices))
+            System.out.println("Found a circular dependency");
         //sorting
 
         System.exit(0);
+    }
+
+    //    static class PathLengths {
+    //        public Set<Integer> lengths;
+    //
+    //        PathLengths() {
+    //            lengths = new HashSet<Integer>();
+    //        }
+    //    }
+
+    private static boolean zeroCycleDetection(Set<Edge> edges,
+            Set<Vertex> vertices) {
+        int n = vertices.size();
+
+        Object[] vs = vertices.toArray();
+
+        Integer[][] path = new Integer[n][n];
+        int[][] next = new int[n][n];
+
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++) {
+                next[i][j] = -1;
+
+                if (i == j)
+                    path[i][j] = 0;
+                else
+                    path[i][j] = null;
+
+                Vertex u = (Vertex) vs[i];
+                Vertex v = (Vertex) vs[j];
+                //get the edge weight
+                Edge e = getEdge(u, v, edges);
+                if (e != null) {
+                    path[i][j] = e.getWeight();
+                    System.out.println("Edge (" + u.getStream().getIdent()
+                            + ", " + u.getIndex() + ") - " + e.getWeight()
+                            + " -> (" + v.getStream().getIdent() + ","
+                            + v.getIndex() + ")");
+                }
+            }
+
+        for (int k = 0; k < n; k++)
+            for (int i = 0; i < n; i++)
+                for (int j = 0; j < n; j++) {
+                    if (path[i][k] != null && path[k][j] != null) {
+                        if (path[i][j] == null) { //infinity
+                            path[i][j] = path[i][k] + path[k][j];
+                            next[i][j] = k;
+                        } else {
+                            //                            path[i][j] = Math.min(path[i][j], path[i][k]
+                            //                                    + path[k][j]);
+                            if (path[i][j] > path[i][k] + path[k][j]) {
+                                next[i][j] = k;
+                                path[i][j] = path[i][k] + path[k][j];
+                            }
+                        }
+                    }
+                }
+
+        for (int i = 0; i < n; i++)
+            for (int j = 0; j < n; j++) {
+                if (i != j && path[i][j] != null && path[j][i] != null) {
+                    if (path[i][j] + path[j][i] <= 0) {
+                        List<Integer> vers = new LinkedList<Integer>();
+                        GetPath(i, j, path, next, vers);
+                        vers.add(0, i);
+                        vers.add(j);
+                        Vertex lastV = null;
+                        for (int index : vers) {
+                            Vertex v = (Vertex) vs[index];
+                            
+                            if(lastV != null) {
+                                System.out.print("[" + getEdge(lastV, v, edges).getWeight() + "]-> ");
+                            }
+                            
+                            System.out.print("(" + v.getStream().getIdent()
+                                    + "," + v.getIndex() + ") -");
+                            lastV = v;
+                        }
+                        vers.clear();
+                        GetPath(j, i, path, next, vers);
+                        vers.add(i);
+                        for (int index : vers) {
+                            Vertex v = (Vertex) vs[index];
+                            if(lastV != null) {
+                                System.out.print("[" + getEdge(lastV, v, edges).getWeight() + "]-> ");
+                            }
+                            System.out.print("(" + v.getStream().getIdent()
+                                    + "," + v.getIndex() + ") -");
+                            lastV = v;
+                        }
+                        return true;
+                    }
+                }
+            }
+        return false;
+        //        PathLengths[][][] alpha = new PathLengths[n][n][n+1];
+        //
+        //        //initialize
+        //        for (int i = 0; i < n; i++)
+        //            for (int j = 0; j < n; j++)
+        //                for (int k = 0; k < n+1; k++)
+        //                    alpha[i][j][k] = new PathLengths();
+        //        for (int i = 0; i < n; i++)
+        //            for (int j = 0; j < n; j++) {
+        //                Vertex u = (Vertex) vs[i];
+        //                Vertex v = (Vertex) vs[j];
+        //
+        //                //get the edge weight
+        //                Edge e = getEdge(u, v, edges);
+        //                if (e != null) {
+        //                    alpha[i][j][0].lengths.add(e.getWeight());
+        //                }
+        //            }
+        //
+        //        for (int k = 1; k < n+1; k++) {
+        //            for (int i = 0; i < n; i++)
+        //                for (int j = 0; j < n; j++) {
+        //                    alpha[i][j][k].lengths.addAll(alpha[i][j][k - 1].lengths);
+        //                    Set<Integer> alphaKKK_1Star = new HashSet<Integer>();
+        //                    alphaKKK_1Star.add(0);      //a^0
+        //                    Set<Integer> alphaKKK_1I = new HashSet<Integer>(
+        //                            alpha[k-1][k-1][k - 1].lengths);
+        //                    Set<Integer> mult = null;
+        //                    //compute * operator
+        //                    while (true) {
+        //                        alphaKKK_1Star.addAll(alphaKKK_1I);
+        //                        mult = setMult(alphaKKK_1I, alpha[k-1][k-1][k - 1].lengths);
+        //
+        //                        if (alphaKKK_1I.containsAll(mult)
+        //                                && mult.containsAll(alphaKKK_1I)) {
+        //                            break;
+        //                        }
+        //
+        //                        alphaKKK_1I = mult;
+        //                    }
+        //                    
+        //                    alpha[i][j][k].lengths
+        //                            .addAll(setMult(
+        //                                    setMult(alpha[i][k-1][k - 1].lengths,
+        //                                            alphaKKK_1Star),
+        //                                    alpha[k-1][j][k - 1].lengths));
+        //                    
+        //                    for(int t = 0; t < n; t++) {
+        //                        if(alpha[t][t][k].lengths.contains(0))
+        //                            return true;
+        //                    }
+        //
+        //                }
+        //        }
+
+        //        return false;
+    }
+
+    static void GetPath(int i, int j, Integer[][] path, int[][] next,
+            List<Integer> vertices) {
+        if (path[i][j] != null) {
+            int intermediate = next[i][j];
+            if (intermediate != -1) {
+                GetPath(i, intermediate, path, next, vertices);
+                vertices.add(intermediate);
+                GetPath(intermediate, j, path, next, vertices);
+            }
+        }
+    }
+
+    //    static Set<Integer> setMult(Set<Integer> s1, Set<Integer> s2) {
+    //        Set<Integer> mult = new HashSet<Integer>();
+    //        for (Integer a : s1) {
+    //            for (Integer b : s2) {
+    //                mult.add(a + b);
+    //            }
+    //        }
+    //        return mult;
+    //    }
+
+    private static Edge getEdge(Vertex u, Vertex v, Set<Edge> edges) {
+        for (Edge e : edges) {
+            if (e.getSrc() == u && e.getDst() == v) {
+                return e;
+            }
+        }
+        return null;
     }
 
     private static void addCausalityEdges(
@@ -201,6 +391,8 @@ public class CircularCheckBackend {
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
         for (Object key : strRepetitions.keySet()) {
+            if (!(key instanceof SIRFilter))
+                continue;
             int[] reps = (int[]) strRepetitions.get(key);
             for (int i = 1; i < reps[0]; i++) {
                 Vertex v = getVertex((SIRStream) key, i, vertices);
@@ -331,25 +523,27 @@ public class CircularCheckBackend {
 
                         for (int j = 1; j <= reps[0]; j++) {
                             int srcAbsExe = srcIteration * reps[0] + j;
-                            
+
                             int dstAbsExe;
-                            
+
                             if (downstream)
-                                dstAbsExe = sdep.getDstPhase4SrcPhase(srcAbsExe + latency);
-                            else 
-                                dstAbsExe = sdep.getSrcPhase4DstPhase(srcAbsExe + latency) + 1;
-                            
+                                dstAbsExe = sdep.getDstPhase4SrcPhase(srcAbsExe
+                                        + latency);
+                            else
+                                dstAbsExe = sdep.getSrcPhase4DstPhase(srcAbsExe
+                                        + latency) + 1;
+
                             int dstReps = ((int[]) strRepetitions.get(dst))[0];
-                            int dstIteration = (dstAbsExe-1)/dstReps;
-                            
+                            int dstIteration = (dstAbsExe - 1) / dstReps;
+
                             int dstExe = (dstAbsExe - 1) % dstReps + 1;
-                            
+
                             int relativeIteration = dstIteration - srcIteration;
-                            
+
                             Vertex u = getVertex(dst, dstExe, vertices);
                             Vertex v = getVertex(src, j, vertices);
-                            
-                            Edge e = new Edge(u,v, relativeIteration);
+
+                            Edge e = new Edge(u, v, relativeIteration);
                             edges.add(e);
                         }
 
@@ -364,8 +558,12 @@ public class CircularCheckBackend {
 
     private static Set<SIRFilter> findClosestUpstreamFilters(SIRStream str,
             boolean inside) {
+
         Set<SIRFilter> filters = new HashSet<SIRFilter>();
 
+        if (str == null)
+            return filters;
+        
         if (str instanceof SIRSplitJoin && inside) {
             List<SIROperator> children = new LinkedList<SIROperator>(
                     ((SIRSplitJoin) str).getChildren());
@@ -380,12 +578,13 @@ public class CircularCheckBackend {
                 }
             }
         } else if (str instanceof SIRPipeline && inside) {
-            SIRStream firstChild = ((SIRPipeline) str).get(0);
-            if (firstChild instanceof SIRFilter) {
-                filters.add((SIRFilter) firstChild);
+            SIRStream lastChild = ((SIRPipeline) str).get(((SIRPipeline) str)
+                    .size() - 1);
+            if (lastChild instanceof SIRFilter) {
+                filters.add((SIRFilter) lastChild);
             } else {
                 filters.addAll(findClosestUpstreamFilters(
-                        (SIRStream) firstChild, true));
+                        (SIRStream) lastChild, true));
             }
         } else {
             //outside or SIRFilter
@@ -445,9 +644,32 @@ public class CircularCheckBackend {
                 return v;
             }
         }
+        System.out.println("Could not find" + str.getIdent() + " " + index);
         return null;
     }
 
+    static void printGraph(Set<Edge> edges) {
+        CodegenPrintWriter p;
+        try {
+            p = new CodegenPrintWriter(new BufferedWriter(new FileWriter(
+                    "depgraph.dot", false)));
+            p.println("digraph G1 {");
+
+            for (Edge e : edges) {
+                assert e != null : "wrong value for an edge";
+                p.println(e.getSrc().getStream().getIdent() + "_"
+                        + e.getSrc().getIndex() + " -> "
+                        + e.getDst().getStream().getIdent() + "_"
+                        + e.getDst().getIndex() + "[label=\"" + e.getWeight()
+                        + "\"];");
+            }
+            p.println("}");
+            p.close();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
     /**
     * Just some debugging output.
     */
