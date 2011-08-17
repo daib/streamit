@@ -6,6 +6,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
@@ -145,25 +146,34 @@ public class CircularCheckBackend {
 
         // run constrained scheduler
 
-        System.err.print("Constrained Scheduler Begin...");
+        if (debugging)
+            System.err.print("Constrained Scheduler Begin...");
         topStreamIter = IterFactory.createFactory().createIter(str);
 
         debugOutput(str);
 
+        System.gc();
+        
+        long startTime = (new Date()).getTime();
+        
         streamit.scheduler2.constrained.Scheduler scheduler = streamit.scheduler2.constrained.Scheduler
                 .create(topStreamIter);
 
         scheduler.computeSchedule();
-        scheduler.computeBufferUse();
+        //        scheduler.computeBufferUse();
         Schedule initSched = scheduler.getOptimizedInitSchedule();
         Schedule steadySched = scheduler.getOptimizedSteadySchedule();
 
-        System.err.println(" done.");
+        if (debugging)
+            System.err.println(" done.");
 
-        scheduler.printReps();
+        if (debugging)
+            scheduler.printReps();
         //cscheduler.computeSchedule();
 
-        new streamit.scheduler2.print.PrintGraph().printProgram(topStreamIter);
+        if (debugging)
+            new streamit.scheduler2.print.PrintGraph()
+                    .printProgram(topStreamIter);
         //		new streamit.scheduler2.print.PrintProgram().printProgram(topStreamIter);
 
         // end constrained scheduler
@@ -178,33 +188,41 @@ public class CircularCheckBackend {
         Set<Vertex> vertices = createVertices(scheduler);
         Set<Edge> edges = new HashSet<Edge>();
 
-        addCausalityEdges(scheduler, edges, vertices);
+        addCausalityDependencyEdges(scheduler, edges, vertices);
 
         addDataDependencyEdges(scheduler, edges, vertices);
 
         addControlDependencyEdges(scheduler, edges, vertices);
 
-        printGraph(edges);
+        if (debugging)
+            printGraph(edges);
 
         //checking for zero edges
         if (zeroCycleDetection(edges, vertices)) {
             System.out.println("Found a circular dependency");
             System.exit(1);
         }
-        
-        
+
         //sorting
         double gamma = topoSort(edges, vertices);
         List<Vertex> verticesList = new ArrayList<Vertex>(vertices);
         java.util.Comparator<Vertex> comparer = new Comparator();
-        ((Comparator)comparer).gamma = gamma;
-        ((Comparator)comparer).iteration = 10;
+        ((Comparator) comparer).gamma = gamma;
+        ((Comparator) comparer).iteration = 10;
         Collections.sort(verticesList, comparer);
-        
-        System.out.println("Sorted list:");
-        for(Vertex v: verticesList) {
-            System.out.println("Vertex " + v.getName() + " pi = " + v.getPi());
+
+        if (debugging) {
+            System.out.println("Sorted list:");
+            for (Vertex v : verticesList) {
+                //System.out.println("Vertex " + v.getName() + " pi = " + v.getPi());
+                System.out.print("\\pi^*_{" + v.getName() + "}="
+                        + (int) v.getPi() + ",");
+            }
         }
+        
+        long endTime = (new Date()).getTime();
+        
+        System.out.println("\nComputational time: " + (endTime - startTime));
 
         System.exit(0);
     }
@@ -233,10 +251,11 @@ public class CircularCheckBackend {
                 Edge e = getEdge(u, v, edges);
                 if (e != null) {
                     path[i][j] = e.getWeight();
-                    System.out.println("Edge (" + u.getStream().getIdent()
-                            + ", " + u.getIndex() + ") - " + e.getWeight()
-                            + " -> (" + v.getStream().getIdent() + ","
-                            + v.getIndex() + ")");
+                    if (debugging)
+                        System.out.println("Edge (" + u.getStream().getIdent()
+                                + ", " + u.getIndex() + ") - " + e.getWeight()
+                                + " -> (" + v.getStream().getIdent() + ","
+                                + v.getIndex() + ")");
                 }
             }
 
@@ -312,39 +331,42 @@ public class CircularCheckBackend {
     }
 
     private static double topoSort(Set<Edge> edges, Set<Vertex> vertices) {
-        CodegenPrintWriter p;
-        try {
-            p = new CodegenPrintWriter(new BufferedWriter(new FileWriter(
-                    "sort.lp", false)));
 
-            //objective function
-            for (Edge e : edges) {
-                assert e != null : "wrong value for an edge";
-                p.print("-sigma_" + e.getName() + " ");
+        if (debugging) {
+            CodegenPrintWriter p;
+            try {
+                p = new CodegenPrintWriter(new BufferedWriter(new FileWriter(
+                        "sort.lp", false)));
+
+                //objective function
+                for (Edge e : edges) {
+                    assert e != null : "wrong value for an edge";
+                    p.print("-sigma_" + e.getName() + " ");
+                }
+                p.println(";");
+
+                for (Edge e : edges) {
+                    p.println("pi_" + e.getSrc().getName() + " - pi_"
+                            + e.getDst().getName() + " + " + e.getWeight()
+                            + " gamma  >= 0;");
+                    p.println("pi_" + e.getSrc().getName() + " - pi_"
+                            + e.getDst().getName() + " + " + e.getWeight()
+                            + " gamma " + "sigma_" + e.getName() + " >= 1;");
+                    p.println("sigma_" + e.getName() + " >= 0;");
+
+                }
+
+                p.close();
+            } catch (IOException e) {
+                e.printStackTrace();
             }
-            p.println(";");
-
-            for (Edge e : edges) {
-                p.println("pi_" + e.getSrc().getName() + " - pi_"
-                        + e.getDst().getName() + " + " + e.getWeight()
-                        + " gamma  >= 0;");
-                p.println("pi_" + e.getSrc().getName() + " - pi_"
-                        + e.getDst().getName() + " + " + e.getWeight()
-                        + " gamma " + "sigma_" + e.getName() + " >= 1;");
-                p.println("sigma_" + e.getName() + " >= 0;");
-
-            }
-
-            p.close();
-        } catch (IOException e) {
-            e.printStackTrace();
         }
 
         int nVars = edges.size() + vertices.size() + 1;
         int nConstraints = edges.size() * 3;
 
         LPSolve solver = new LPSolve(nConstraints, nVars);
-        
+
         double[] obj = solver.getEmptyConstraint();
 
         for (int i = 0; i < nVars; i++) {
@@ -364,7 +386,7 @@ public class CircularCheckBackend {
             double[] constraints1 = solver.getEmptyConstraint();
             double[] constraints2 = solver.getEmptyConstraint();
             double[] constraints3 = solver.getEmptyConstraint();
-            
+
             int u = -1, v = -1;
 
             for (int j = 0; j < vs.length; j++) {
@@ -401,13 +423,15 @@ public class CircularCheckBackend {
         double[] result = solver.solve();
 
         double gamma = result[nVars - 1];
-        System.out.println("Gamma = " + gamma);
-        
+        if (debugging)
+            System.out.println("Gamma = " + gamma);
+
         for (int i = 0; i < vs.length; i++) {
-            Vertex v = ((Vertex)vs[i]);
+            Vertex v = ((Vertex) vs[i]);
             v.setPi(result[i + es.length]);
-            
-            System.out.println("Vertex " + v.getName() + " pi = " + v.getPi());
+            if (debugging)
+                System.out.println("Vertex " + v.getName() + " pi = "
+                        + v.getPi());
         }
         return gamma;
     }
@@ -421,7 +445,7 @@ public class CircularCheckBackend {
         return null;
     }
 
-    private static void addCausalityEdges(
+    private static void addCausalityDependencyEdges(
             streamit.scheduler2.constrained.Scheduler scheduler,
             Set<Edge> edges, Set<Vertex> vertices) {
 
@@ -462,7 +486,7 @@ public class CircularCheckBackend {
             int[] reps = (int[]) strRepetitions.get(key);
             SIRStream str = (SIRStream) key;
 
-            for (SIRFilter f : findClosestUpstreamFilters(str, true)) {
+            for (SIRFilter f : findClosestUpstreamFilters(str, false)) {
 
                 streamit.scheduler2.iriter.Iterator srcIter = IterFactory
                         .createFactory().createIter(f);
@@ -472,31 +496,35 @@ public class CircularCheckBackend {
                 try {
                     sdep = cscheduler.computeSDEP(srcIter, dstIter);
 
-                    System.out.println("\n");
-                    System.out.println("Source(" + f.getName() + ") --> Sink("
-                            + str.getName() + ") Dependency:\n");
+                    if (debugging) {
+                        System.out.println("\n");
+                        System.out.println("Source(" + f.getName()
+                                + ") --> Sink(" + str.getName()
+                                + ") Dependency:\n");
 
-                    System.out.println("  Source Init Phases: "
-                            + sdep.getNumSrcInitPhases());
-                    System.out.println("  Destn. Init Phases: "
-                            + sdep.getNumDstInitPhases());
-                    System.out.println("  Source Steady Phases: "
-                            + sdep.getNumSrcSteadyPhases());
-                    System.out.println("  Destn. Steady Phases: "
-                            + sdep.getNumDstSteadyPhases());
+                        System.out.println("  Source Init Phases: "
+                                + sdep.getNumSrcInitPhases());
+                        System.out.println("  Destn. Init Phases: "
+                                + sdep.getNumDstInitPhases());
+                        System.out.println("  Source Steady Phases: "
+                                + sdep.getNumSrcSteadyPhases());
+                        System.out.println("  Destn. Steady Phases: "
+                                + sdep.getNumDstSteadyPhases());
+                    }
 
                     for (int t = 0; t < Math.max(sdep.getNumSrcSteadyPhases(),
                             sdep.getNumDstSteadyPhases()); t++) {
                         int phase = sdep.getSrcPhase4DstPhase(t);
                         int phaserev = sdep.getDstPhase4SrcPhase(t);
-                        System.out.println("sdep [" + t + "] = " + phase
-                                + " reverse_sdep[" + t + "] = " + phaserev);
+                        if (debugging)
+                            System.out.println("sdep [" + t + "] = " + phase
+                                    + " reverse_sdep[" + t + "] = " + phaserev);
                     }
 
                     for (int i = 1; i <= reps[0]; i++) {
                         Vertex u = getVertex(str, i, vertices);
-                        Vertex v = getVertex(f, sdep.getSrcPhase4DstPhase(i),
-                                vertices);
+                        Vertex v = getVertex(f, sdep.getSrcPhase4DstPhase(i)
+                                - sdep.getNumSrcInitPhases(), vertices);
                         Edge e = new Edge(u, v, 0);
                         edges.add(e);
                     }
@@ -670,6 +698,9 @@ public class CircularCheckBackend {
             for (int i = 0; i < reps[0]; i++) {
                 Vertex v = new Vertex((SIRStream) key, i + 1);
                 vertices.add(v);
+                if (debugging)
+                    System.out.println("Vertex " + v.getStream().getName()
+                            + " " + v.getIndex());
             }
         }
         return vertices;
@@ -681,7 +712,7 @@ public class CircularCheckBackend {
                 return v;
             }
         }
-        System.out.println("Could not find" + str.getIdent() + " " + index);
+        System.out.println("Could not find" + str.getName() + " " + index);
         return null;
     }
 
@@ -703,7 +734,6 @@ public class CircularCheckBackend {
             p.println("}");
             p.close();
         } catch (IOException e) {
-            // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
@@ -750,7 +780,7 @@ public class CircularCheckBackend {
                         else
                             sdep = cscheduler.computeSDEP(dstIter, srcIter);
 
-                        {
+                        if (debugging) {
                             System.out.println("\n");
                             System.out.println("Source(" + src.getName()
                                     + ") --> Sink(" + dst.getName()
@@ -771,8 +801,10 @@ public class CircularCheckBackend {
                                 sdep.getNumDstSteadyPhases()); t++) {
                             int phase = sdep.getSrcPhase4DstPhase(t);
                             int phaserev = sdep.getDstPhase4SrcPhase(t);
-                            System.out.println("sdep [" + t + "] = " + phase
-                                    + " reverse_sdep[" + t + "] = " + phaserev);
+                            if (debugging)
+                                System.out.println("sdep [" + t + "] = "
+                                        + phase + " reverse_sdep[" + t + "] = "
+                                        + phaserev);
                         }
 
                     } catch (streamit.scheduler2.constrained.NoPathException ex) {
@@ -818,8 +850,8 @@ public class CircularCheckBackend {
         }
 
         public String getName() {
-            return src.getName() + "_" + src.getIndex() + "_"
-                    + dst.getName() + "_" + dst.getIndex();
+            return src.getName() + "_" + src.getIndex() + "_" + dst.getName()
+                    + "_" + dst.getIndex();
         }
     }
 
@@ -848,21 +880,22 @@ public class CircularCheckBackend {
         public double getPi() {
             return pi;
         }
-        
+
         public void setPi(double pi) {
             this.pi = pi;
         }
     }
-    
+
     static class Comparator implements java.util.Comparator<Vertex> {
         public static double gamma;
         public static int iteration;
+
         @Override
         public int compare(Vertex v1, Vertex v2) {
             double a1 = v1.pi - gamma * iteration;
             double a2 = v2.pi - gamma * iteration;
-            return (int)(a1 - a2);
+            return (int) (a1 - a2);
         }
-        
+
     }
 }
