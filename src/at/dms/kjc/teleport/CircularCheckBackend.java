@@ -47,7 +47,7 @@ public class CircularCheckBackend {
     /**
      * Print out some debugging info if true.
      */
-    public static boolean debugging = false;
+    public static boolean debugging = true;
 
     /**
      * Given a flatnode, map to the init execution count.
@@ -523,9 +523,12 @@ public class CircularCheckBackend {
 
                     for (int i = 1; i <= reps[0]; i++) {
                         Vertex u = getVertex(str, i, vertices);
-                        Vertex v = getVertex(f, sdep.getSrcPhase4DstPhase(i)
-                                - sdep.getNumSrcInitPhases(), vertices);
-                        Edge e = new Edge(u, v, 0);
+                        int srcPhase = sdep.getSrcPhase4DstPhase(i);
+                        int srcReps = ((int[]) strRepetitions.get(f))[0];
+                        int relativeExe = (srcPhase - 1) % srcReps + 1;
+                        int srcIteration = (srcPhase - 1) / srcReps;
+                        Vertex v = getVertex(f, relativeExe, vertices);
+                        Edge e = new Edge(u, v, -srcIteration);
                         edges.add(e);
                     }
 
@@ -712,7 +715,7 @@ public class CircularCheckBackend {
                 return v;
             }
         }
-        System.out.println("Could not find" + str.getName() + " " + index);
+        System.out.println("Could not find " + str.getName() + " " + index);
         return null;
     }
 
