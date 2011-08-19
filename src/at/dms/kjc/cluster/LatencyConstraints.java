@@ -91,6 +91,35 @@ public class LatencyConstraints {
 
         return 0;
     }
+    
+    public static int MinLatency(SIRLatency latency) {
+        
+        if (latency instanceof SIRLatencyMax) {
+            return ((SIRLatencyMax)latency).getMax();
+        }
+
+        if (latency instanceof SIRLatencyRange) {
+            return ((SIRLatencyRange)latency).getMin();
+        }
+    
+        if (latency instanceof SIRLatencySet) {
+            Iterator<Integer> it = ((SIRLatencySet)latency).iterator();
+
+            int max = -1000000;
+
+            while (it.hasNext()) {
+                Integer i = it.next();
+
+                if (i.intValue() > max) max = i.intValue();
+            }
+
+            return max;
+        }
+
+        // this should never be reached!
+
+        return 0;
+    }
 
     /**
      * Checks if the message direction between sender and receiver is
