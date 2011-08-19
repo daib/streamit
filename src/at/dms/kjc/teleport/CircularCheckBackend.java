@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import streamit.scheduler2.Schedule;
@@ -35,7 +36,10 @@ import at.dms.kjc.sir.SIRSplitJoin;
 import at.dms.kjc.sir.SIRStream;
 import at.dms.kjc.sir.SIRStructure;
 import at.dms.kjc.sir.lowering.ConstantProp;
+import at.dms.kjc.sir.lowering.SimplifyArguments;
 import at.dms.kjc.sir.lowering.SimplifyPopPeekPush;
+import at.dms.kjc.sir.lowering.StaticsProp;
+import at.dms.kjc.sir.lowering.Unroller;
 
 /**
  */
@@ -47,7 +51,7 @@ public class CircularCheckBackend {
     /**
      * Print out some debugging info if true.
      */
-    public static boolean debugging = true;
+    public static boolean debugging = false;
 
     /**
      * Given a flatnode, map to the init execution count.
@@ -95,6 +99,10 @@ public class CircularCheckBackend {
 
         structures = structs;
 
+        // make arguments to functions be three-address code so can replace max, min, abs
+        // and possibly others with macros, knowing that there will be no side effects.
+        SimplifyArguments.simplify(str);
+
         // Pull pop, push, peek into own statements (must be done eventually
         // before
         // generating C code, and is best done here while type info is still
@@ -106,7 +114,7 @@ public class CircularCheckBackend {
         Set<SIRGlobal> statics = new HashSet<SIRGlobal>();
         if (global != null)
             statics.add(global);
-        //        StaticsProp.propagate/* IntoContainers */(str, statics);
+        StaticsProp.propagate/* IntoContainers */(str, statics);
 
         // propagate constants and unroll loop
         System.err.print("Running Constant Prop and Unroll...");
@@ -114,7 +122,7 @@ public class CircularCheckBackend {
         // Constant propagate and unroll.
         // Set unrolling factor to <= 4 for loops that don't involve
         //  any tape operations.
-        //        Unroller.setLimitNoTapeLoops(true, 4);
+        Unroller.setLimitNoTapeLoops(true, 4);
 
         ConstantProp.propagateAndUnroll(str);
 
@@ -123,6 +131,7 @@ public class CircularCheckBackend {
         // do constant propagation on fields
         System.err.print("Running Constant Field Propagation...");
         ConstantProp.propagateAndUnroll(str, true);
+        System.err.println(" done.");
 
         // construct stream hierarchy from SIRInitStatements
         //		ConstructSIRTree.doit(str);
@@ -153,9 +162,9 @@ public class CircularCheckBackend {
         debugOutput(str);
 
         System.gc();
-        
+
         long startTime = (new Date()).getTime();
-        
+
         streamit.scheduler2.constrained.Scheduler scheduler = streamit.scheduler2.constrained.Scheduler
                 .create(topStreamIter);
 
@@ -163,9 +172,6 @@ public class CircularCheckBackend {
         //        scheduler.computeBufferUse();
         Schedule initSched = scheduler.getOptimizedInitSchedule();
         Schedule steadySched = scheduler.getOptimizedSteadySchedule();
-
-        if (debugging)
-            System.err.println(" done.");
 
         if (debugging)
             scheduler.printReps();
@@ -205,24 +211,10 @@ public class CircularCheckBackend {
 
         //sorting
         double gamma = topoSort(edges, vertices);
-        List<Vertex> verticesList = new ArrayList<Vertex>(vertices);
-        java.util.Comparator<Vertex> comparer = new Comparator();
-        ((Comparator) comparer).gamma = gamma;
-        ((Comparator) comparer).iteration = 10;
-        Collections.sort(verticesList, comparer);
 
-        if (debugging) {
-            System.out.println("Sorted list:");
-            for (Vertex v : verticesList) {
-                //System.out.println("Vertex " + v.getName() + " pi = " + v.getPi());
-                System.out.print("\\pi^*_{" + v.getName() + "}="
-                        + (int) v.getPi() + ",");
-            }
-        }
-        
         long endTime = (new Date()).getTime();
-        
-        System.out.println("\nComputational time: " + (endTime - startTime));
+
+        System.out.println("\nComputational time: " + (endTime - startTime) + " n vertices " + vertices.size());
 
         System.exit(0);
     }
@@ -402,14 +394,14 @@ public class CircularCheckBackend {
                 }
             }
 
-            constraints1[u + es.length] = 1;
-            constraints1[v + es.length] = -1;
+            constraints1[u + es.length] = -1;
+            constraints1[v + es.length] = 1;
             constraints1[nVars - 1] = e.getWeight();
 
             solver.addConstraintGE(constraints1, 0);
 
-            constraints2[u + es.length] = 1;
-            constraints2[v + es.length] = -1;
+            constraints2[u + es.length] = -1;
+            constraints2[v + es.length] = 1;
             constraints2[nVars - 1] = e.getWeight();
             constraints2[i] = 1;
 
@@ -426,13 +418,72 @@ public class CircularCheckBackend {
         if (debugging)
             System.out.println("Gamma = " + gamma);
 
+        double maxPi = Double.NEGATIVE_INFINITY;
+        double minPi = Double.POSITIVE_INFINITY;
         for (int i = 0; i < vs.length; i++) {
             Vertex v = ((Vertex) vs[i]);
             v.setPi(result[i + es.length]);
+            if (maxPi < v.getPi()) {
+                maxPi = v.getPi();
+            }
+
+            if (minPi > v.getPi())
+                minPi = v.getPi();
+
             if (debugging)
                 System.out.println("Vertex " + v.getName() + " pi = "
                         + v.getPi());
         }
+
+        int iterationRange = (int) Math.ceil((maxPi - minPi) / gamma);
+
+        int currentIteration = iterationRange + 2;
+
+        double currentIterLowerBound = minPi - gamma * currentIteration;
+        double currentIterUpperBound = maxPi - gamma * currentIteration;
+
+        Map<Vertex, Integer> v2Iter = new HashMap<Vertex, Integer>();
+
+        for (int i = 0; i < vs.length; i++) {
+            Vertex v = (Vertex) vs[i];
+
+            //compute iteration of the vertex
+            int iter = (int) Math.ceil((v.getPi() - currentIterUpperBound)
+                    / gamma);
+            v2Iter.put(v, iter);
+        }
+
+        List<Vertex> verticesList = new ArrayList<Vertex>(vertices);
+        java.util.Comparator<Vertex> comparer = new Comparator();
+        ((Comparator) comparer).gamma = gamma;
+        ((Comparator) comparer).v2Iter = v2Iter;
+        Collections.sort(verticesList, comparer);
+
+        if (debugging) {
+            System.out.println("Sorted list:");
+            for (Vertex v : verticesList) {
+                int offset = (v2Iter.get(v) - currentIteration);
+                System.out.println("Vertex "
+                        + v.getName()
+                        + " pi = "
+                        + v.getPi()
+                        + " iter: n "
+                        + (offset == 0 ? "" : (offset > 0 ? "+ " + offset
+                                : offset)) + " value "
+                        + (v.getPi() - gamma * (currentIteration + offset)));
+                //                System.out.print("\\pi^*_{" + v.getName() + "}="
+                //                        + (int) v.getPi() + ",");
+            }
+
+            for (Vertex v : verticesList) {
+                int offset = (v2Iter.get(v) - currentIteration);
+                System.out.print(v.getName()
+                        + "^{n"
+                        + (offset == 0 ? "" : (offset > 0 ? "+ " + offset
+                                : offset)) + "},");
+            }
+        }
+
         return gamma;
     }
 
@@ -891,13 +942,14 @@ public class CircularCheckBackend {
 
     static class Comparator implements java.util.Comparator<Vertex> {
         public static double gamma;
-        public static int iteration;
+        //        public static int iteration;
+        public static Map<Vertex, Integer> v2Iter = null;
 
         @Override
         public int compare(Vertex v1, Vertex v2) {
-            double a1 = v1.pi - gamma * iteration;
-            double a2 = v2.pi - gamma * iteration;
-            return (int) (a1 - a2);
+            double a1 = v1.pi - gamma * v2Iter.get(v1);
+            double a2 = v2.pi - gamma * v2Iter.get(v2);
+            return (int) (a2 - a1);
         }
 
     }
