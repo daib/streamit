@@ -29,7 +29,7 @@ import java.util.HashMap;
 public class Scheduler extends streamit.scheduler2.Scheduler
 {
     final StreamInterface rootStream;
-    final StreamFactory factory;
+    private final StreamFactory factory;
 
     protected Scheduler(Iterator _root, boolean needsSchedule) {
         super(_root);
@@ -40,7 +40,7 @@ public class Scheduler extends streamit.scheduler2.Scheduler
              streamit
              .scheduler2
              .constrained
-             .StreamInterface)factory
+             .StreamInterface)getFactory()
             .newFrom(
                      root,
                      null);
@@ -88,11 +88,11 @@ public class Scheduler extends streamit.scheduler2.Scheduler
     public SDEPData computeSDEP(Iterator src, Iterator dst)
         throws NoPathException
     {
-        LatencyGraph graph = factory.getLatencyGraph();
+        LatencyGraph graph = getFactory().getLatencyGraph();
         LatencyNode srcNode =
-            ((Filter)factory.newFrom(src, null)).getLatencyNode();
+            ((Filter)getFactory().newFrom(src, null)).getLatencyNode();
         LatencyNode dstNode =
-            ((Filter)factory.newFrom(dst, null)).getLatencyNode();
+            ((Filter)getFactory().newFrom(dst, null)).getLatencyNode();
         return graph.computeSDEP(srcNode, dstNode);
     }
 
@@ -103,16 +103,16 @@ public class Scheduler extends streamit.scheduler2.Scheduler
     public HashMap<Iterator, LatencyEdge> computeSDEP(Iterator src, HashSet<streamit.library.iriter.Iterator> dst)
         throws NoPathException
     {
-        LatencyGraph graph = factory.getLatencyGraph();
+        LatencyGraph graph = getFactory().getLatencyGraph();
         LatencyNode srcNode =
-            ((Filter)factory.newFrom(src, null)).getLatencyNode();
+            ((Filter)getFactory().newFrom(src, null)).getLatencyNode();
 
         // translate <pre>dst</pre> into a new HashSet of LatencyNodes rather
         // than Iterators
         HashSet<LatencyNode> dstNodes = new HashSet<LatencyNode>();
         for (java.util.Iterator<streamit.library.iriter.Iterator> i = dst.iterator(); i.hasNext(); ) {
             Iterator dstNode = i.next();
-            dstNodes.add(((Filter)factory.newFrom(dstNode, null)).getLatencyNode());
+            dstNodes.add(((Filter)getFactory().newFrom(dstNode, null)).getLatencyNode());
         }
             
         // compute LatencyNode -> SDEPData
@@ -147,11 +147,11 @@ public class Scheduler extends streamit.scheduler2.Scheduler
                                       int max,
                                       Object handlerFunction)
     {
-        LatencyGraph graph = factory.getLatencyGraph();
-        Filter upstreamFilter = (Filter)factory.newFrom(upstream, null);
+        LatencyGraph graph = getFactory().getLatencyGraph();
+        Filter upstreamFilter = (Filter)getFactory().newFrom(upstream, null);
         LatencyNode srcNode = upstreamFilter.getLatencyNode();
         LatencyNode dstNode =
-            ((Filter)factory.newFrom(downstream, null)).getLatencyNode();
+            ((Filter)getFactory().newFrom(downstream, null)).getLatencyNode();
 
         StreamInterface parent =
             graph.findLowestCommonAncestor(srcNode, dstNode);
@@ -198,5 +198,9 @@ public class Scheduler extends streamit.scheduler2.Scheduler
         subNoMsgs.insert(sched, newSched);
 
         return newSched;
+    }
+
+    public StreamFactory getFactory() {
+        return factory;
     }
 }

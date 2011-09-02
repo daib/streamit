@@ -78,7 +78,7 @@ abstract class Stream extends DestroyedClass implements StreamInterface
     /**
      * set the steady peek value
      */
-    void setSteadyPeek (int _steadyPeek)
+    protected void setSteadyPeek (int _steadyPeek)
     {
         steadyPeek = _steadyPeek;
     }
@@ -86,7 +86,7 @@ abstract class Stream extends DestroyedClass implements StreamInterface
     /**
      * set the steady pop value
      */
-    void setSteadyPop (int _steadyPop)
+    protected void setSteadyPop (int _steadyPop)
     {
         steadyPop = _steadyPop;
     }
@@ -94,7 +94,7 @@ abstract class Stream extends DestroyedClass implements StreamInterface
     /**
      * set the steady push value
      */
-    void setSteadyPush (int _steadyPush)
+    protected void setSteadyPush (int _steadyPush)
     {
         steadyPush = _steadyPush;
     }

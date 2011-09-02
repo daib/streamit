@@ -14,207 +14,215 @@
  * without express or implied warranty.
  */
 
-package streamit.scheduler2.base;
+package streamit.scheduler2.scaledsingleappearance;
 
-import streamit.scheduler2.iriter./*persistent.*/
-SplitJoinIter;
 import java.math.BigInteger;
 
 import at.dms.kjc.sir.SIRStream;
 import streamit.misc.Fraction;
+import streamit.scheduler2.iriter./*persistent.*/
+SplitJoinIter;
+import streamit.scheduler2.base.StreamFactory;
+import streamit.scheduler2.hierarchical.StreamInterface;
+import streamit.scheduler2.hierarchical.PhasingSchedule;
 
 /**
- * Computes some basic steady state data for SplitJoins.
- *
- * Namely it computes how many times each child, splitter and joiner 
- * need to execute their steady states to achieve a steady state execution
- * for the SplitJoin.
+ * This class implements a single-appearance algorithm for creating
+ * schedules.
  * 
  * @version 2
  * @author  Michal Karczmarek
  */
 
-abstract public class SplitJoin extends StreamWithSplitNJoin {
-    protected SplitJoinIter splitjoin;
+public class SplitJoin extends streamit.scheduler2.hierarchical.SplitJoin {
+    final private PhasingSchedule splitSched, joinSched;
 
-    protected int nChildren;
-    protected StreamInterface children[];
+    public SplitJoin(SplitJoinIter iterator, StreamFactory factory) {
+        super(iterator, factory);
 
-    public SplitJoin(SplitJoinIter _splitjoin, StreamFactory factory) {
-        super(_splitjoin);
-
-        assert _splitjoin != null;
-        splitjoin = _splitjoin;
-
-        // fill up the children array
-        // do this to preseve consistancy of iterators
+        // compute the splitter schedule
         {
-            nChildren = splitjoin.getNumChildren();
-
-            // Debugging:
-            if (debugrates) {
-                if (librarydebug) {
-                    System.err.print("SPLITJOIN "
-                            + splitjoin.getObject().getClass().getName());
-                } else {
-                    System.err.print("SPLITJOIN "
-                            + ((SIRStream) splitjoin.getObject()).getIdent());
-                }
-                System.err.println("[" + nChildren + "]");
+            splitSched = new PhasingSchedule(this);
+            int nPhase;
+            for (nPhase = 0; nPhase < super.getNumSplitPhases(); nPhase++) {
+                splitSched.appendPhase(super.getSplitPhase(nPhase));
             }
-            // End Debugging
+        }
 
-            // a pipeline must have some children
-            assert nChildren > 0;
-
-            children = new StreamInterface[nChildren];
-
-            int nChild;
-            for (nChild = 0; nChild < splitjoin.getNumChildren(); nChild++) {
-                // Debugging:
-                if (debugrates) {
-                    if (librarydebug) {
-                        System.err.println(splitjoin.getObject().getClass()
-                                .getName()
-                                + "["
-                                + nChild
-                                + "] begin: "
-                                + ((at.dms.kjc.iterator.SIRIterator) splitjoin
-                                        .getChild(nChild)).getObject()
-                                        .getClass().getName());
-                    } else {
-                        System.err
-                                .println(((SIRStream) splitjoin.getObject())
-                                        .getIdent()
-                                        + "["
-                                        + nChild
-                                        + "] begin: "
-                                        + ((SIRStream) ((at.dms.kjc.iterator.SIRIterator) splitjoin
-                                                .getChild(nChild)).getObject())
-                                                .getIdent());
-                    }
-                }
-                // End Debugging
-
-                // create a new object for the child
-                children[nChild] = factory.newFrom(splitjoin.getChild(nChild),
-                        splitjoin.getUnspecializedIter());
-
-                // Debugging:
-                if (debugrates) {
-                    if (librarydebug) {
-                        System.err.println(splitjoin.getObject().getClass()
-                                .getName()
-                                + "["
-                                + nChild
-                                + "] end: "
-                                + ((at.dms.kjc.iterator.SIRIterator) splitjoin
-                                        .getChild(nChild)).getObject()
-                                        .getClass().getName());
-                    } else {
-                        System.err
-                                .println(((SIRStream) splitjoin.getObject())
-                                        .getIdent()
-                                        + "["
-                                        + nChild
-                                        + "] end: "
-                                        + ((SIRStream) ((at.dms.kjc.iterator.SIRIterator) splitjoin
-                                                .getChild(nChild)).getObject())
-                                                .getIdent());
-                    }
-                }
-                // End Debugging
-            }
-
-            // compute my steady schedule
-            // my children already have computed their steady schedules,
-            // so I just have to do mine
-            if (factory.needsSchedule()) {
-                computeSteadyState();
+        // compute the joiner schedule
+        {
+            joinSched = new PhasingSchedule(this);
+            int nPhase;
+            for (nPhase = 0; nPhase < super.getNumJoinPhases(); nPhase++) {
+                joinSched.appendPhase(super.getJoinPhase(nPhase));
             }
         }
     }
 
-    /**
-     * Get the number of children this SplitJoin has.
-     * @return number of children
-     */
-    public int getNumChildren() {
-        return nChildren;
+    // Override the functions that deal with schedules for joiner
+    // and splitter - single appearance schedules only need one
+    // phase for the splitter and joiner schedules respectively
+
+    public int getNumSplitPhases() {
+        return 1;
+    }
+
+    public PhasingSchedule getSplitPhase(int nPhase) {
+        // single appearance schedule has only one split phase
+        assert nPhase == 0;
+        return splitSched;
     }
 
     /**
-     * Get the a child of this splitjoin.
-     * @return nth child
+     * @return one phase schedule for the splitter
      */
-    protected StreamInterface getChild(int nChild) {
-        assert nChild >= 0 && nChild < nChildren;
-        return children[nChild];
+    public PhasingSchedule getSplitPhase() {
+        return splitSched;
+    }
+
+    public int getNumJoinPhases() {
+        return 1;
+    }
+
+    public PhasingSchedule getJoinPhase(int nPhase) {
+        // single appearance schedule has only one join phase
+        assert nPhase == 0;
+        return joinSched;
     }
 
     /**
-     * get the fan-out of a splitter
-     * @return fan-out of a splitter
+     * @return one phase schedule for the joiner
      */
-
-    public int getSplitFanOut() {
-        return nChildren;
+    public PhasingSchedule getJoinPhase() {
+        return joinSched;
     }
 
-    /**
-     * get the fan-in of a joiner
-     * @return fan-in of a joiner
-     */
 
-    public int getJoinFanIn() {
-        return nChildren;
-    }
+    // this function is basically copied from scheduler v1
+    public void computeSchedule() {
+        // compute the children's schedules and figure out
+        // how many times the split needs to be executed to feed
+        // all the buffers so the children can initialize (including the
+        // peek - pop amounts!)
+        int initSplitRunCount = 0;
+        {
+            // go through all the children and check how much
+            int nChild;
+            for (nChild = 0; nChild < getNumChildren(); nChild++) {
+                // get the child
+                StreamInterface child = getHierarchicalChild(nChild);
+                assert child != null;
 
-    /**
-     * stores how many times each child needs to be executed for the
-     * SplitJoin to go through an entire steady state.
-     * These are initialized by computeSteadySchedule
-     */
-    protected BigInteger childrenNumExecs[];
+                // compute child's schedule
+                child.computeSchedule();
 
-    /**
-     * Return how many times a particular child should be executed in
-     * a full steady-state execution of this pipeline.
-     * @return number of executions of a child in steady state
-     */
-    protected int getChildNumExecs(int nChild) {
-        // make sure nChild is in range
-        assert nChild >= 0 && nChild < getNumChildren();
+                // get the amount of data needed to initilize this child
+                int childInitDataConsumption = child.getInitPeek();
 
-        return childrenNumExecs[nChild].intValue();
-    }
+                // this child may need more data in order to safely enter
+                // the steady state computation model (as per notes 02/07/02)
+                childInitDataConsumption += MAX(
+                        (child.getSteadyPeek() - child.getSteadyPop())
+                                - (child.getInitPeek() - child.getInitPop()), 0);
 
-    /**
-     * these store how many times the splitter and joiner need to
-     * go through their ENTIRE execution (all work functions)
-     * in order to execute a full steady state of this SplitJoin.
-     * These are initialized by computeSteadySchedule
-     */
-    protected BigInteger splitNumRounds;
+                // now figure out how many times the split needs to be run in
+                // initialization to accomodate this child
+                int splitRunCount;
+                if (childInitDataConsumption != 0) {
+                    // just divide the amount of data needed by data received
+                    // per iteration of the split
+                    int splitDataSent = getSteadySplitFlow().getPushWeight(
+                            nChild);
+                    assert splitDataSent > 0;
 
-    protected BigInteger joinNumRounds;
+                    splitRunCount = (childInitDataConsumption + splitDataSent - 1)
+                            / splitDataSent;
+                } else {
+                    // the child doesn't need any data to intitialize, so I
+                    // don't need to run the split for it at all
+                    splitRunCount = 0;
+                }
 
-    /**
-     * return the numberof times all the splitter work functions need to
-     * run in order to complete a steady schedule.
-     * @return number of rounds the splitter needs to run in a steady schedule
-     */
-    protected int getSplitNumRounds() {
-        return splitNumRounds.intValue();
-    }
+                // pick the max
+                if (splitRunCount > initSplitRunCount) {
+                    initSplitRunCount = splitRunCount;
+                }
+            }
+        }
 
-    /**
-     * return the numberof times all the joiner work functions need to
-     * run in order to complete a steady schedule.
-     * @return number of rounds the joiner needs to run in a steady schedule
-     */
-    protected int getJoinNumRounds() {
-        return joinNumRounds.intValue();
+        // compute the init schedule
+        {
+            PhasingSchedule initSched = new PhasingSchedule(this);
+
+            // run through the split an appropriate number of times
+            // and append it to the init schedule
+            {
+                PhasingSchedule splitSched = getSplitPhase();
+
+                int nRun;
+                for (nRun = 0; nRun < initSplitRunCount; nRun++) {
+                    initSched.appendPhase(splitSched);
+                }
+            }
+
+            // now add the initialization schedules for all the children
+            {
+                int nChild;
+                for (nChild = 0; nChild < getNumChildren(); nChild++) {
+                    StreamInterface child = getHierarchicalChild(nChild);
+
+                    int nStage = 0;
+                    for (; nStage < child.getNumInitStages(); nStage++) {
+                        initSched.appendPhase(child
+                                .getInitScheduleStage(nStage));
+                    }
+                }
+            }
+
+            if (initSched.getNumPhases() != 0)
+                addInitScheduleStage(initSched);
+        }
+
+        // compute the steady schedule
+        {
+            PhasingSchedule steadySched = new PhasingSchedule(this);
+
+            // first add the split schedule the right # of times
+            {
+                int nReps;
+                for (nReps = 0; nReps < getSplitNumRounds(); nReps++) {
+                    steadySched.appendPhase(getSplitPhase());
+                }
+            }
+
+            // add the schedule for execution of all the children
+            // of the split join
+            {
+                int nChild;
+                for (nChild = 0; nChild < getNumChildren(); nChild++) {
+                    StreamInterface child = getHierarchicalChild(nChild);
+
+                    int nRun;
+                    for (nRun = 0; nRun < getChildNumExecs(nChild); nRun++) {
+                        int nPhase;
+                        for (nPhase = 0; nPhase < child.getNumSteadyPhases(); nPhase++) {
+                            steadySched.appendPhase(child
+                                    .getSteadySchedulePhase(nPhase));
+                        }
+                    }
+                }
+            }
+
+            // finally add the join schedule the right # of times
+            {
+                int nReps;
+                for (nReps = 0; nReps < getJoinNumRounds(); nReps++) {
+                    steadySched.appendPhase(getJoinPhase());
+                }
+            }
+
+            addSteadySchedulePhase(steadySched);
+        }
     }
 
     /**
@@ -236,6 +244,16 @@ abstract public class SplitJoin extends StreamWithSplitNJoin {
         Fraction splitRate = null;
         Fraction joinRate = null;
 
+        int scale = Scheduler.scaled;
+        //if all children are filters
+        //then scale their iterations
+        for (int nChild = 0; nChild < nChildren; nChild++) {
+            streamit.scheduler2.base.StreamInterface child = getChild(nChild);
+            if (child.getStreamIter().isFilter() == null) {
+                scale = 1;
+                break;
+            }
+        }
         // go through all children and calculate the rates at which
         // they will be called w.r.t. the splitter.
         // also, compute the rate of execution of the joiner
@@ -243,7 +261,7 @@ abstract public class SplitJoin extends StreamWithSplitNJoin {
         {
             int nChild;
             for (nChild = 0; nChild < nChildren; nChild++) {
-                StreamInterface child = children[nChild];
+                streamit.scheduler2.base.StreamInterface child = getChild(nChild);
                 assert child != null;
 
                 // the rate at which the child should be executed
@@ -320,7 +338,7 @@ abstract public class SplitJoin extends StreamWithSplitNJoin {
 
             int nChild;
             for (nChild = 0; nChild < nChildren; nChild++) {
-                StreamInterface child = children[nChild];
+                streamit.scheduler2.base.StreamInterface child = getChild(nChild);
                 assert child != null;
 
                 // get the child rate
@@ -439,6 +457,8 @@ abstract public class SplitJoin extends StreamWithSplitNJoin {
                 }
             }
 
+            multiplier = multiplier.multiply(BigInteger.valueOf(scale));
+
             // multiply all the rates by this factor and set the rates for
             // the children and splitter and joiner
             {
@@ -527,7 +547,7 @@ abstract public class SplitJoin extends StreamWithSplitNJoin {
     public int getNumNodes() {
         int nodes = 0;
         for (int nChild = 0; nChild < nChildren; nChild++) {
-            StreamInterface child = children[nChild];
+            streamit.scheduler2.base.StreamInterface child = getChild(nChild);
             assert child != null;
 
             nodes += child.getNumNodes();
@@ -542,7 +562,7 @@ abstract public class SplitJoin extends StreamWithSplitNJoin {
     public int getNumNodeFirings() {
         int firings = 0;
         for (int nChild = 0; nChild < nChildren; nChild++) {
-            StreamInterface child = children[nChild];
+            streamit.scheduler2.base.StreamInterface child = getChild(nChild);
             assert child != null;
 
             firings += child.getNumNodeFirings() * getChildNumExecs(nChild);

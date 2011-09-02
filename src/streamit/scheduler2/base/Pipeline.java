@@ -34,8 +34,8 @@ abstract public class Pipeline extends Stream
 {
     private PipelineIter pipeline;
 
-    private int nChildren;
-    private StreamInterface[] children;
+    protected int nChildren;
+    protected StreamInterface[] children;
 
     protected Pipeline(PipelineIter _pipeline, StreamFactory factory)
     {
@@ -138,7 +138,7 @@ abstract public class Pipeline extends Stream
         return children[nChild];
     }
 
-    private BigInteger childrenNumExecs[];
+    protected BigInteger childrenNumExecs[];
 
     /**
      * Return how many times a particular child should be executed in
