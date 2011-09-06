@@ -23,10 +23,8 @@ public abstract class CodeStoreHelper extends MinCodeUnit {
     /** possible prefix for loop counters for iterating work function */
     public static String workCounter = "__WORKCOUNTER__";
     /** Do we want to inline work functions or just call a single copy? */
-    public static boolean INLINE_WORK = true;
+    public static boolean INLINE_WORK = false;
     
-    public static boolean PERF_COUNTER = true;
-
     /** The slice node that we are generating helper code for */
     protected SliceNode sliceNode;
 
@@ -236,23 +234,6 @@ public abstract class CodeStoreHelper extends MinCodeUnit {
         }
 
         JBlock block = new JBlock();
-
-        if (PERF_COUNTER && sliceNode.isFilterSlice()) {
-            String filterName = sliceNode.toString();
-
-            if (filterName.indexOf("__") > 0) {
-                filterName = filterName.substring(0,
-                        filterName.lastIndexOf("__"));
-            }
-
-            filterName = (sliceNode.isFilterSlice() ? "Filter" : (sliceNode
-                    .isInputSlice() ? "Splitter"
-                    : (sliceNode.isOutputSlice() ? "Joiner" : "UnkownClass")))
-                    + "_" + filterName;
-
-            block.addStatement(new JExpressionStatement(
-                    new JEmittedTextExpression(filterName + "_runtime_obj.prework_checkpoint()")));
-        }
         
         JStatement workStmt = getWorkFunctionCall();
         if (mult > 1) {
@@ -267,23 +248,6 @@ public abstract class CodeStoreHelper extends MinCodeUnit {
         } else
             block.addStatement(workStmt);
         
-        if (PERF_COUNTER && sliceNode.isFilterSlice()) {
-            String filterName = sliceNode.toString();
-
-            if (filterName.indexOf("__") > 0) {
-                filterName = filterName.substring(0,
-                        filterName.lastIndexOf("__"));
-            }
-
-            filterName = (sliceNode.isFilterSlice() ? "Filter" : (sliceNode
-                    .isInputSlice() ? "Splitter"
-                    : (sliceNode.isOutputSlice() ? "Joiner" : "UnkownClass")))
-                    + "_" + filterName;
-
-            block.addStatement(new JExpressionStatement(
-                    new JEmittedTextExpression( filterName + "_runtime_obj.postwork_checkpoint()")));
-        }
-
         return block;
     }
 

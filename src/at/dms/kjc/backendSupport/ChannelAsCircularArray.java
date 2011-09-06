@@ -41,7 +41,7 @@ public class ChannelAsCircularArray extends ChannelAsArray {
     public ChannelAsCircularArray(Edge edge) {
         super(edge);
         // fix up buffer size to be next power of 2
-        bufSize = 256 * CommonUtils.nextPow2(bufSize);
+        bufSize = 2 * CommonUtils.nextPow2(bufSize);
         bufDefn = CommonUtils.makeArrayVariableDefn(bufSize,edge.getType(),bufName);
         // create mask for anding sith offset to make modulo power of 2.
         offsetMask = bufSize - 1;
