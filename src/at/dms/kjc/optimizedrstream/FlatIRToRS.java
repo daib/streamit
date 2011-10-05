@@ -179,6 +179,9 @@ public class FlatIRToRS extends ToC
         if (type.isArrayType() && KjcOptions.absarray) {
             handleArrayDecl(ident, (CArrayType)type);
         } else {
+            if((modifiers & at.dms.kjc.Constants.ACC_STATIC) != 0)
+                p.print("static ");
+            
             printDecl(type, ident);
         
             if (expr != null) {

@@ -96,7 +96,7 @@ public class FFSNoPeekBuffer extends FilterFusionState {
 
     /** return the declarations for the index variables of this filter,
         the stage depends on *isInit* **/
-    private JStatement[] getIndexDecls(boolean isInit) {
+    public JStatement[] getIndexDecls(boolean isInit) {
         Vector<JVariableDeclarationStatement> stmts = new Vector<JVariableDeclarationStatement>();
 
         if (isInit && StrToRStream.getMult(node, isInit) < 1)

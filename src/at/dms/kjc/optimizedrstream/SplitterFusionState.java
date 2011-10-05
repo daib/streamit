@@ -283,13 +283,52 @@ public class SplitterFusionState extends FusionState {
                                 new JLocalVariableExpression(null, innerVar)));
                 JArrayAccessExpression incomingAccess = new JArrayAccessExpression(
                         null, incomingBuffer, incomingIndex);
-                
-                //get an value from the incoming and let the next node execute
-                //get the fusion state for the next node
-                //FusionState nextFS = FusionState.getFusionState(nextNode);
-                //nextFS.getWork(enclosingBlock, isInit);
-                loops.addAllStatements(((SIRFilter)nextNode.contents).getWork().getStatements());
-                
+                JBlock oldBody = new JBlock(null,
+                        ((SIRFilter) nextNode.contents).getWork()
+                                .getStatements(), null);
+
+                JStatement body = (JBlock) ObjectDeepCloner.deepCopy(oldBody);
+
+                //get the fusion state for this node
+                FilterFusionState nextFS = (FilterFusionState) FusionState
+                        .getFusionState(nextNode);
+
+                JExpression pushExpr = null;
+                JLocalVariable pushBuffer = null;
+                JLocalVariable pushCounter = null;
+
+                //set the push buffer and the push counter if this filter pushes
+                if (nextFS.getNode().ways > 0) {
+                    assert nextFS.getNode().ways == 1;
+                    //get the downstream incoming buffer
+                    pushBuffer = nextFS.getPushBufferVar(false);
+
+                    pushCounter = nextFS.getPushCounterVar(false);
+
+                    if (!(GenerateCCode.declaredFS.contains(nextFS))) {
+                        GenerateCCode.addStmtArrayFirst(enclosingBlock,
+                                ((FFSNoPeekBuffer) nextFS)
+                                        .getIndexDecls(isInit));
+                        GenerateCCode.declaredFS.add(nextFS);
+                    }
+
+                    // build ref to push array
+                    JLocalVariableExpression lhs = new JLocalVariableExpression(
+                            null, pushBuffer);
+
+                    // build increment of index to array
+                    JExpression rhs = new JPrefixExpression(null,
+                            Constants.OPE_PREINC, new JLocalVariableExpression(
+                                    null, pushCounter));
+                    pushExpr = new JArrayAccessExpression(null, lhs, rhs);
+                }
+
+                body.accept(new ChannelReplacer(incomingAccess, null, pushExpr));
+
+                //loop the assign statement based on the weight of this incoming way
+                loops.addStatement(GenerateCCode.makeDoLoop(body, innerVar,
+                        new JIntLiteral(node.weights[i])));
+
             } else {
                 //the outgoing buffer of this way
                 JLocalVariableExpression outgoingBuffer = new JLocalVariableExpression(

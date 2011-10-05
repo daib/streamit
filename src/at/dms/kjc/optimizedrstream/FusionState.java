@@ -222,7 +222,7 @@ public abstract class FusionState
     
         //return the var def..
         return new JVariableDefinition(null,
-                                       at.dms.kjc.Constants.ACC_FINAL,
+                                       at.dms.kjc.Constants.ACC_FINAL | at.dms.kjc.Constants.ACC_STATIC,
                                        bufferType,
                                        bufferName,
                                        null);

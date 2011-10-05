@@ -36,6 +36,7 @@ import java.util.Hashtable;
 
 public class GenerateCCode {
     public static List<FlatNode> visitedNodes = new LinkedList<FlatNode>();
+    public static List<FilterFusionState> declaredFS = new LinkedList<FilterFusionState>();
     
     /* Whether or not to generate code for timing */
     public static final boolean generateTimingCode = !(KjcOptions.absarray || KjcOptions.doloops);
@@ -370,13 +371,13 @@ public class GenerateCCode {
         // dupplicate code excised here
 
         try {
-            FileWriter fw = new FileWriter("str.c");
+            FileWriter fw = new FileWriter(FNAME);
             fw.write(str.toString());
             fw.close();
         } catch (Exception e) {
             System.err.println("Unable to write application code.");
         }
-        System.out.println("Code for application written to str.c");
+        System.out.println("Code for application written to " + FNAME);
     }
 
     /** visit each node in the flat graph generating the SIR imperative code 

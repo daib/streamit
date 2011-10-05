@@ -249,8 +249,9 @@ public class JoinerFusionState extends FusionState {
                         new JLocalVariableExpression(null, incomingBuffer),
                         incomingIndex);
 
-                JBlock oldBody = new JBlock(null, ((SIRFilter) nextNode.contents).getWork()
-                        .getStatements(), null);
+                JBlock oldBody = new JBlock(null,
+                        ((SIRFilter) nextNode.contents).getWork()
+                                .getStatements(), null);
 
                 JStatement body = (JBlock) ObjectDeepCloner.deepCopy(oldBody);
 
@@ -269,6 +270,13 @@ public class JoinerFusionState extends FusionState {
                     pushBuffer = nextFS.getPushBufferVar(false);
 
                     pushCounter = nextFS.getPushCounterVar(false);
+
+                    if (!(GenerateCCode.declaredFS.contains(nextFS))) {
+                        GenerateCCode.addStmtArrayFirst(enclosingBlock,
+                                ((FFSNoPeekBuffer) nextFS)
+                                        .getIndexDecls(isInit));
+                        GenerateCCode.declaredFS.add(nextFS);
+                    }
 
                     // build ref to push array
                     JLocalVariableExpression lhs = new JLocalVariableExpression(
