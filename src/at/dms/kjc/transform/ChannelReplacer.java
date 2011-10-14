@@ -1,4 +1,4 @@
-package at.dms.kjc.optimizedrstream;
+package at.dms.kjc.transform;
 
 import at.dms.kjc.CType;
 import at.dms.kjc.Constants;
@@ -14,7 +14,7 @@ import at.dms.kjc.sir.SIRPushExpression;
 
 public class ChannelReplacer extends SLIRReplacingVisitor {
     private JExpression popExpr, pushExpr, peekExpr; 
-    ChannelReplacer(JExpression popExpr, JExpression peekExpr, JExpression pushExpr) {
+    public ChannelReplacer(JExpression popExpr, JExpression peekExpr, JExpression pushExpr) {
         this.popExpr = popExpr;
         this.pushExpr = pushExpr;
         this.peekExpr = peekExpr;

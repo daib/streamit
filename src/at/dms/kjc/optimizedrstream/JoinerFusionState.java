@@ -6,6 +6,8 @@ import java.util.Vector;
 import at.dms.kjc.*;
 import at.dms.kjc.common.CommonUtils;
 import at.dms.kjc.sir.*;
+import at.dms.kjc.transform.ChannelReplacer;
+import at.dms.kjc.transform.PullableTransform;
 import at.dms.compiler.*;
 
 /**
@@ -212,30 +214,16 @@ public class JoinerFusionState extends FusionState {
             if (node.incomingWeights[i] == 0)
                 continue;
 
-            //get the incoming buffer variable
-            JVariableDefinition incomingBuffer = getBufferVar(node.incoming[i],
-                    isInit);
+            JExpression incomingAccess;
+            
+            if (PullableTransform.pullableNodes.contains(node.incoming[i])) {
+                incomingAccess = new JMethodCallExpression(null, ((SIRFilter) node.incoming[i].contents).getWork()
+                                    .getName(), null);
+            } else {
+              //get the incoming buffer variable
+                JVariableDefinition incomingBuffer = getBufferVar(node.incoming[i],
+                        isInit);
 
-            //add the code to perform the joining
-
-            //check if the next node is suitable to be fused
-            FlatNode nextNode = node.getEdges()[0];
-
-            boolean blending = false;
-
-            //check if the next node is fusable?
-            if (nextNode.isFilter()) {
-                //first, test if the next node is 'simple' , e.g. pop 1 like Add actor
-                SIRFilter filter = (SIRFilter) nextNode.contents;
-                if (filter.getPopInt() == 1) {
-                    GenerateCCode.visitedNodes.add(nextNode);
-
-                    //blending the code of this downstream node with the current node.
-                    blending = true;
-                }
-            }
-
-            if (blending) {
                 //now construct the incoming buffer access
                 //incoming[weight * induction + innerVar]
                 JAddExpression incomingIndex = new JAddExpression(null,
@@ -243,105 +231,124 @@ public class JoinerFusionState extends FusionState {
                                 node.incomingWeights[i]),
                                 new JLocalVariableExpression(null, induction)),
                         new JLocalVariableExpression(null, innerVar));
-
-                JArrayAccessExpression incomingAccess = new JArrayAccessExpression(
-                        null,
+                
+                incomingAccess = new JArrayAccessExpression(null,
                         new JLocalVariableExpression(null, incomingBuffer),
                         incomingIndex);
+            }
 
-                JBlock oldBody = new JBlock(null,
-                        ((SIRFilter) nextNode.contents).getWork()
-                                .getStatements(), null);
+            {
 
-                JStatement body = (JBlock) ObjectDeepCloner.deepCopy(oldBody);
+                //add the code to perform the joining
 
-                //get the fusion state for this node
-                FilterFusionState nextFS = (FilterFusionState) FusionState
-                        .getFusionState(nextNode);
+                //check if the next node is suitable to be fused
+                FlatNode nextNode = node.getEdges()[0];
 
-                JExpression pushExpr = null;
-                JLocalVariable pushBuffer = null;
-                JLocalVariable pushCounter = null;
+                boolean blending = false;
 
-                //set the push buffer and the push counter if this filter pushes
-                if (nextFS.getNode().ways > 0) {
-                    assert nextFS.getNode().ways == 1;
-                    //get the downstream incoming buffer
-                    pushBuffer = nextFS.getPushBufferVar(false);
+                //check if the next node is fusable?
+                if (nextNode.isFilter()) {
+                    //first, test if the next node is 'simple' , e.g. pop 1 like Add actor
+                    SIRFilter filter = (SIRFilter) nextNode.contents;
+                    if (filter.getPopInt() == 1) {
+                        GenerateCCode.visitedNodes.add(nextNode);
 
-                    pushCounter = nextFS.getPushCounterVar(false);
+                        //blending the code of this downstream node with the current node.
+                        blending = true;
+                    }
+                }
 
-                    if (!(GenerateCCode.declaredFS.contains(nextFS))) {
-                        GenerateCCode.addStmtArrayFirst(enclosingBlock,
-                                ((FFSNoPeekBuffer) nextFS)
-                                        .getIndexDecls(isInit));
-                        GenerateCCode.declaredFS.add(nextFS);
+                if (blending) {
+
+                    JBlock nextOldBody = new JBlock(null,
+                            ((SIRFilter) nextNode.contents).getWork()
+                                    .getStatements(), null);
+
+                    JStatement nextBody = (JBlock) ObjectDeepCloner
+                            .deepCopy(nextOldBody);
+
+                    //get the fusion state for next node
+                    FilterFusionState nextFS = (FilterFusionState) FusionState
+                            .getFusionState(nextNode);
+
+                    JExpression pushExpr = null;
+                    JLocalVariable pushBuffer = null;
+                    JLocalVariable pushCounter = null;
+
+                    //set the push buffer and the push counter if this filter pushes
+                    if (nextFS.getNode().ways > 0) {
+                        assert nextFS.getNode().ways == 1;
+                        //get the downstream incoming buffer
+                        pushBuffer = nextFS.getPushBufferVar(false);
+
+                        pushCounter = nextFS.getPushCounterVar(false);
+
+                        if (!(GenerateCCode.declaredFS.contains(nextFS))) {
+                            GenerateCCode.addStmtArrayFirst(enclosingBlock,
+                                    ((FFSNoPeekBuffer) nextFS)
+                                            .getIndexDecls(isInit));
+                            GenerateCCode.declaredFS.add(nextFS);
+                        }
+
+                        // build ref to push array
+                        JLocalVariableExpression lhs = new JLocalVariableExpression(
+                                null, pushBuffer);
+
+                        // build increment of index to array
+                        JExpression rhs = new JPrefixExpression(null,
+                                Constants.OPE_PREINC,
+                                new JLocalVariableExpression(null, pushCounter));
+                        pushExpr = new JArrayAccessExpression(null, lhs, rhs);
                     }
 
-                    // build ref to push array
-                    JLocalVariableExpression lhs = new JLocalVariableExpression(
-                            null, pushBuffer);
+                    nextBody.accept(new ChannelReplacer(incomingAccess, null,
+                            pushExpr));
 
-                    // build increment of index to array
-                    JExpression rhs = new JPrefixExpression(null,
-                            Constants.OPE_PREINC, new JLocalVariableExpression(
-                                    null, pushCounter));
-                    pushExpr = new JArrayAccessExpression(null, lhs, rhs);
+                    //loop the assign statement based on the weight of this incoming way
+                    innerLoops
+                            .addStatement(GenerateCCode.makeDoLoop(nextBody,
+                                    innerVar, new JIntLiteral(
+                                            node.incomingWeights[i])));
+
+                } else {
+
+                    //first create the outgoing buffer access:
+                    //outgoing[induction * totalWeights + partialSum + innerVar] if init
+                    //outgoing[induction * totalWeights + partialSum + innerVar + peekBufferSize_of_outgoing] 
+                    //if steady
+                    JAddExpression outgoingIndex = new JAddExpression(
+                            null,
+                            new JMultExpression(null,
+                                    new JLocalVariableExpression(null,
+                                            induction), new JIntLiteral(node
+                                            .getTotalIncomingWeights())),
+                            new JAddExpression(
+                                    null,
+                                    new JIntLiteral(node
+                                            .getPartialIncomingSum(i)),
+                                    new JLocalVariableExpression(null, innerVar)));
+                    //so if this is not init add the remaining items
+                    if (!isInit && downstream.getRemaining(node, isInit) > 0)
+                        outgoingIndex = new JAddExpression(null, outgoingIndex,
+                                new JIntLiteral(downstream.getRemaining(node,
+                                        isInit)));
+
+                    JArrayAccessExpression outgoingAccess = new JArrayAccessExpression(
+                            null, new JLocalVariableExpression(null,
+                                    outgoingBuffer), outgoingIndex);
+
+                    //create the assignment expression
+                    JExpressionStatement assignment = new JExpressionStatement(
+                            null, new JAssignmentExpression(null,
+                                    outgoingAccess, incomingAccess), null);
+
+                    //loop the assign statement based on the weight of this incoming way
+                    innerLoops.addStatement(GenerateCCode.makeDoLoop(
+                            assignment, innerVar, new JIntLiteral(
+                                    node.incomingWeights[i])));
                 }
 
-                body.accept(new ChannelReplacer(incomingAccess, null, pushExpr));
-
-                //loop the assign statement based on the weight of this incoming way
-                innerLoops.addStatement(GenerateCCode.makeDoLoop(body,
-                        innerVar, new JIntLiteral(node.incomingWeights[i])));
-
-            } else {
-
-                //first create the outgoing buffer access:
-                //outgoing[induction * totalWeights + partialSum + innerVar] if init
-                //outgoing[induction * totalWeights + partialSum + innerVar + peekBufferSize_of_outgoing] 
-                //if steady
-                JAddExpression outgoingIndex = new JAddExpression(null,
-                        new JMultExpression(null, new JLocalVariableExpression(
-                                null, induction), new JIntLiteral(node
-                                .getTotalIncomingWeights())),
-                        new JAddExpression(null, new JIntLiteral(node
-                                .getPartialIncomingSum(i)),
-                                new JLocalVariableExpression(null, innerVar)));
-                //so if this is not init add the remaining items
-                if (!isInit && downstream.getRemaining(node, isInit) > 0)
-                    outgoingIndex = new JAddExpression(null, outgoingIndex,
-                            new JIntLiteral(downstream.getRemaining(node,
-                                    isInit)));
-
-                JArrayAccessExpression outgoingAccess = new JArrayAccessExpression(
-                        null,
-                        new JLocalVariableExpression(null, outgoingBuffer),
-                        outgoingIndex);
-
-                //now construct the incoming buffer access
-                //incoming[weight * induction + innerVar]
-                JAddExpression incomingIndex = new JAddExpression(null,
-                        new JMultExpression(null, new JIntLiteral(
-                                node.incomingWeights[i]),
-                                new JLocalVariableExpression(null, induction)),
-                        new JLocalVariableExpression(null, innerVar));
-
-                JArrayAccessExpression incomingAccess = new JArrayAccessExpression(
-                        null,
-                        new JLocalVariableExpression(null, incomingBuffer),
-                        incomingIndex);
-
-                //create the assignment expression
-                JExpressionStatement assignment = new JExpressionStatement(
-                        null, new JAssignmentExpression(null, outgoingAccess,
-                                incomingAccess), null);
-
-                //loop the assign statement based on the weight of this incoming way
-                innerLoops.addStatement(GenerateCCode.makeDoLoop(assignment,
-                        innerVar, new JIntLiteral(node.incomingWeights[i])));
             }
-
         }
         //now make an outer do loop with trip count equal to the multiplicity of this joiner in this stage
         statements.addStatement(GenerateCCode.makeDoLoop(innerLoops, induction,

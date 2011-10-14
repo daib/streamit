@@ -5,6 +5,8 @@ import java.util.Vector;
 import at.dms.kjc.*;
 import at.dms.kjc.common.CommonUtils;
 import at.dms.kjc.sir.*;
+import at.dms.kjc.transform.ChannelReplacer;
+import at.dms.kjc.transform.PullableTransform;
 import at.dms.compiler.*;
 
 /**
@@ -251,9 +253,29 @@ public class SplitterFusionState extends FusionState {
                 enclosingBlock
                         .addStatementFirst(new JVariableDeclarationStatement(
                                 null, innerVar, null));
-            //the incoming buffer
-            JLocalVariableExpression incomingBuffer = new JLocalVariableExpression(
-                    null, getBufferVar(null, isInit));
+
+            JExpression incomingAccess;
+
+            if (PullableTransform.pullableNodes.contains(node.incoming[0])) {
+                incomingAccess = new JMethodCallExpression(null,
+                        ((SIRFilter) node.incoming[0].contents).getWork()
+                                .getName(), null);
+            } else {
+                //the incoming buffer
+                JLocalVariableExpression incomingBuffer = new JLocalVariableExpression(
+                        null, getBufferVar(null, isInit));
+
+                //incoming[induction * totalWeights + partialSum + innerVar]
+                JAddExpression incomingIndex = new JAddExpression(null,
+                        new JMultExpression(null, new JLocalVariableExpression(
+                                null, induction), new JIntLiteral(node
+                                .getTotalOutgoingWeights())),
+                        new JAddExpression(null, new JIntLiteral(node
+                                .getPartialOutgoingSum(i)),
+                                new JLocalVariableExpression(null, innerVar)));
+                incomingAccess = new JArrayAccessExpression(
+                        null, incomingBuffer, incomingIndex);
+            }
 
             //check if the next node is suitable to be fused
             FlatNode nextNode = node.getEdges()[i];
@@ -273,16 +295,7 @@ public class SplitterFusionState extends FusionState {
             }
 
             if (blending) {
-                //incoming[induction * totalWeights + partialSum + innerVar]
-                JAddExpression incomingIndex = new JAddExpression(null,
-                        new JMultExpression(null, new JLocalVariableExpression(
-                                null, induction), new JIntLiteral(node
-                                .getTotalOutgoingWeights())),
-                        new JAddExpression(null, new JIntLiteral(node
-                                .getPartialOutgoingSum(i)),
-                                new JLocalVariableExpression(null, innerVar)));
-                JArrayAccessExpression incomingAccess = new JArrayAccessExpression(
-                        null, incomingBuffer, incomingIndex);
+
                 JBlock oldBody = new JBlock(null,
                         ((SIRFilter) nextNode.contents).getWork()
                                 .getStatements(), null);
@@ -351,17 +364,6 @@ public class SplitterFusionState extends FusionState {
 
                 JArrayAccessExpression outgoingAccess = new JArrayAccessExpression(
                         null, outgoingBuffer, outgoingIndex);
-
-                //incoming[induction * totalWeights + partialSum + innerVar]
-                JAddExpression incomingIndex = new JAddExpression(null,
-                        new JMultExpression(null, new JLocalVariableExpression(
-                                null, induction), new JIntLiteral(node
-                                .getTotalOutgoingWeights())),
-                        new JAddExpression(null, new JIntLiteral(node
-                                .getPartialOutgoingSum(i)),
-                                new JLocalVariableExpression(null, innerVar)));
-                JArrayAccessExpression incomingAccess = new JArrayAccessExpression(
-                        null, incomingBuffer, incomingIndex);
 
                 JExpressionStatement assignment = new JExpressionStatement(
                         null, new JAssignmentExpression(null, outgoingAccess,

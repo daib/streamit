@@ -310,7 +310,10 @@ public class FlatIRToRS extends ToC
         }
 
         p.newLine();
-        // print(CModifier.toString(modifiers));
+        //p.print(CModifier.toString(modifiers));
+        if((modifiers | JMethodDeclaration.ACC_INLINE) != 0) {
+            p.print("inline ");
+        }
         printType(returnType);
         p.print(" ");
     
