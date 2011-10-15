@@ -216,7 +216,9 @@ public class JoinerFusionState extends FusionState {
 
             JExpression incomingAccess;
             
-            if (PullableTransform.pullableNodes.contains(node.incoming[i])) {
+          //FIXME: What should we do when the filter is both pushable and pullable?
+            
+            if (PullableTransform.pullableNodes.contains(node.incoming[i]) && ((SIRFilter)(node.incoming[i].contents)).getPopInt() != 1) {
                 incomingAccess = new JMethodCallExpression(null, ((SIRFilter) node.incoming[i].contents).getWork()
                                     .getName(), null);
             } else {
@@ -264,6 +266,10 @@ public class JoinerFusionState extends FusionState {
                             ((SIRFilter) nextNode.contents).getWork()
                                     .getStatements(), null);
 
+                    nextOldBody.addStatementFirst(new SIRBeginMarker(nextNode.getName()));
+                    nextOldBody.addStatement(new SIREndMarker(nextNode.getName()));
+
+                    
                     JStatement nextBody = (JBlock) ObjectDeepCloner
                             .deepCopy(nextOldBody);
 

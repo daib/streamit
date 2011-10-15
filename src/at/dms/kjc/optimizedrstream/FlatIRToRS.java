@@ -26,10 +26,9 @@ import at.dms.util.SIRPrinter;
  *
  * @author Michael Gordon
  */
-public class FlatIRToRS extends ToC 
-{
-    
-    /** the hashmap of for loops -> do loops **/   
+public class FlatIRToRS extends ToC {
+
+    /** the hashmap of for loops -> do loops **/
     private HashMap doloops;
     /** the current filter we are visiting **/
     private SIRFilter filter;
@@ -38,42 +37,41 @@ public class FlatIRToRS extends ToC
 
     public int doLoops = 0;
     public int staticDoLoops = 0;
-    
+
+    boolean toC = false;
 
     private static final String ARRAY_COPY = "__array_copy__";
-    
-    public FlatIRToRS() 
-    {
+
+    public FlatIRToRS() {
         super();
         doloops = new HashMap();
     }
-    
+
     /**
      * prints an assignment expression
      */
     public void visitAssignmentExpression(JAssignmentExpression self,
-                                          JExpression left,
-                                          JExpression right) {
+            JExpression left, JExpression right) {
 
         //do not print class creation expression
-        if (passParentheses(right) instanceof JQualifiedInstanceCreation ||
-            passParentheses(right) instanceof JUnqualifiedInstanceCreation ||
-            passParentheses(right) instanceof JQualifiedAnonymousCreation ||
-            passParentheses(right) instanceof JUnqualifiedAnonymousCreation)
+        if (passParentheses(right) instanceof JQualifiedInstanceCreation
+                || passParentheses(right) instanceof JUnqualifiedInstanceCreation
+                || passParentheses(right) instanceof JQualifiedAnonymousCreation
+                || passParentheses(right) instanceof JUnqualifiedAnonymousCreation)
             return;
 
         //we are assigning an array to an array in C, we want to do 
         //element-wise copy!!
-    
-        if (!KjcOptions.absarray && 
-            ((left.getType() != null && left.getType().isArrayType()) ||
-             (right.getType() != null && right.getType().isArrayType()))) {
-        
+
+        if (!KjcOptions.absarray
+                && ((left.getType() != null && left.getType().isArrayType()) || (right
+                        .getType() != null && right.getType().isArrayType()))) {
+
             arrayCopy(left, right);
             return;
         }
 
-        lastLeft=left;
+        lastLeft = left;
         printLParen();
         left.accept(this);
         p.print(" = ");
@@ -84,14 +82,10 @@ public class FlatIRToRS extends ToC
     /**
      * prints a field declaration
      */
-    public void visitFieldDeclaration(JFieldDeclaration self,
-                                      int modifiers,
-                                      CType type,
-                                      String ident,
-                                      JExpression expr) {
+    public void visitFieldDeclaration(JFieldDeclaration self, int modifiers,
+            CType type, String ident, JExpression expr) {
         p.newLine();
-        assert !(expr instanceof JNewArrayExpression) :
-            "New Array expression in field declaration";
+        assert !(expr instanceof JNewArrayExpression) : "New Array expression in field declaration";
 
         /*
           if (expr instanceof JArrayInitializer) {
@@ -99,37 +93,36 @@ public class FlatIRToRS extends ToC
           return;
           }
         */
-    
+
         //we have an array declaration
         if (type.isArrayType()) {
-            handleArrayDecl(ident, (CArrayType)type);   
-        }
-        else {
+            handleArrayDecl(ident, (CArrayType) type);
+        } else {
             printType(type);
             p.print(" ");
             p.print(ident);
-        
+
             if (expr != null) {
                 p.print(" = ");
                 expr.accept(this);
             } else { //initialize all fields to 0
-                if (type instanceof CVectorType ||
-                    type instanceof CVectorTypeLow ||
-                    type instanceof CArrayType && 
-                        (((CArrayType)type).getBaseType() instanceof CVectorType ||
-                         ((CArrayType)type).getBaseType() instanceof CVectorTypeLow)) {
+                if (type instanceof CVectorType
+                        || type instanceof CVectorTypeLow
+                        || type instanceof CArrayType
+                        && (((CArrayType) type).getBaseType() instanceof CVectorType || ((CArrayType) type)
+                                .getBaseType() instanceof CVectorTypeLow)) {
                     // Do not print out initializer in these cases.  The underlying type is a union except in the
                     // case of CVectorTypeLow, and gcc4.1 gives errors on attempts to initialize.
                 } else {
-                if (type.isOrdinal())
-                    p.print (" = 0");
-                else if (type.isFloatingPoint())
-                    p.print(" = 0.0f");
-                else if (type.isArrayType())
-                    p.print(" = {0}");
+                    if (type.isOrdinal())
+                        p.print(" = 0");
+                    else if (type.isFloatingPoint())
+                        p.print(" = 0.0f");
+                    else if (type.isArrayType())
+                        p.print(" = {0}");
                 }
             }
-        
+
         }
         p.print(";");
     }
@@ -137,8 +130,7 @@ public class FlatIRToRS extends ToC
     /**
      * print an abstract array declaration and return the number of dimensions
      **/
-    private void handleArrayDecl(String ident, CArrayType type)
-    {
+    private void handleArrayDecl(String ident, CArrayType type) {
         String decl1 = CommonUtils.declToString(type, ident, false);
         // change brackets to double brackets
         String decl2 = Utils.replaceAll(decl1, "]", "]]");
@@ -146,63 +138,58 @@ public class FlatIRToRS extends ToC
 
         p.print(decl3);
     }
-    
-    
-    private void printArrayType(CArrayType type) 
-    {
+
+    private void printArrayType(CArrayType type) {
         assert false : "Should not be printing an array type";
 
         printType(type.getBaseType());
         p.print(" ");
 
         // print brackets
-        for (int i=0; i<type.getDims().length; i++) {
+        for (int i = 0; i < type.getDims().length; i++) {
             p.print("[[]]");
         }
     }
-    
+
     /**
      * prints a variable declaration statement
      */
     public void visitVariableDefinition(JVariableDefinition self,
-                                        int modifiers,
-                                        CType type,
-                                        String ident,
-                                        JExpression expr) {
-    
+            int modifiers, CType type, String ident, JExpression expr) {
+
         /*if (expr instanceof JArrayInitializer) {
           declareInitializedArray(type, ident, expr);
           return;
           }*/
-    
+
         //we have an array declaration
         if (type.isArrayType() && KjcOptions.absarray) {
-            handleArrayDecl(ident, (CArrayType)type);
+            handleArrayDecl(ident, (CArrayType) type);
         } else {
-            if((modifiers & at.dms.kjc.Constants.ACC_STATIC) != 0)
+            if ((modifiers & at.dms.kjc.Constants.ACC_STATIC) != 0)
                 p.print("static ");
-            
+
             printDecl(type, ident);
-        
+
             if (expr != null) {
                 p.print(" = ");
                 expr.accept(this);
             } else {
-                if (type instanceof CVectorType ||
-                        type instanceof CVectorTypeLow ||
-                        type instanceof CArrayType && 
-                            (((CArrayType)type).getBaseType() instanceof CVectorType ||
-                             ((CArrayType)type).getBaseType() instanceof CVectorTypeLow)) {
-                        // Do not print out initializer in these cases.  The underlying type is a union except in the
-                        // case of CVectorTypeLow, and gcc4.1 gives errors on attempts to initialize.
-                  } else {
-                if (type.isOrdinal())
-                    p.print (" = 0");
-                else if (type.isFloatingPoint())
-                    p.print(" = 0.0f");
-                else if (type.isArrayType())
-                    p.print(" = {0}");
-              }
+                if (type instanceof CVectorType
+                        || type instanceof CVectorTypeLow
+                        || type instanceof CArrayType
+                        && (((CArrayType) type).getBaseType() instanceof CVectorType || ((CArrayType) type)
+                                .getBaseType() instanceof CVectorTypeLow)) {
+                    // Do not print out initializer in these cases.  The underlying type is a union except in the
+                    // case of CVectorTypeLow, and gcc4.1 gives errors on attempts to initialize.
+                } else {
+                    if (type.isOrdinal())
+                        p.print(" = 0");
+                    else if (type.isFloatingPoint())
+                        p.print(" = 0.0f");
+                    else if (type.isArrayType())
+                        p.print(" = {0}");
+                }
             }
         }
         p.print(";");
@@ -254,23 +241,21 @@ public class FlatIRToRS extends ToC
     //      }
     //  }
     //     }
-    
-    private int[] getDims(CArrayType type) 
-    {
+
+    private int[] getDims(CArrayType type) {
         int dims[] = new int[type.getDims().length];
-    
+
         for (int i = 0; i < dims.length; i++) {
             assert type.getDims()[i] instanceof JIntLiteral;
-            dims[i] = ((JIntLiteral)type.getDims()[i]).intValue();
+            dims[i] = ((JIntLiteral) type.getDims()[i]).intValue();
         }
         return dims;
     }
-    
+
     /**
      * prints an expression statement
      */
-    public void visitBlockStatement(JBlock self,
-                                    JavaStyleComment[] comments) {
+    public void visitBlockStatement(JBlock self, JavaStyleComment[] comments) {
         if (self instanceof Jrstream_pr) {
             // RMR { did the rstream C language extensions change?
             // replace rstream_pr with a pragma so that rstream 2.1 doesn't barf
@@ -291,18 +276,12 @@ public class FlatIRToRS extends ToC
         p.print("}");
     }
 
-
-
     /**
      * prints a method declaration
      */
-    public void visitMethodDeclaration(JMethodDeclaration self,
-                                       int modifiers,
-                                       CType returnType,
-                                       String ident,
-                                       JFormalParameter[] parameters,
-                                       CClassType[] exceptions,
-                                       JBlock body) {
+    public void visitMethodDeclaration(JMethodDeclaration self, int modifiers,
+            CType returnType, String ident, JFormalParameter[] parameters,
+            CClassType[] exceptions, JBlock body) {
         // try converting to macro
         if (MacroConversion.shouldConvert(self)) {
             MacroConversion.doConvert(self, isDeclOnly(), this);
@@ -311,22 +290,22 @@ public class FlatIRToRS extends ToC
 
         p.newLine();
         //p.print(CModifier.toString(modifiers));
-        if((modifiers | JMethodDeclaration.ACC_INLINE) != 0) {
+        if ((modifiers & JMethodDeclaration.ACC_INLINE) != 0) {
             p.print("inline ");
         }
         printType(returnType);
         p.print(" ");
-    
+
         //just print initPath() instead of initPath<Type>
         //if (ident.startsWith("initPath"))
         //    p.print("initPath"); 
         //else
-    
+
         p.print(ident);
-    
+
         p.print("(");
         int count = 0;
-    
+
         // RMR { for the main function, do not use abstract array syntax
         // (maybe there is a better way to do this)
         boolean savedKjcOption_absarray = KjcOptions.absarray;
@@ -355,26 +334,22 @@ public class FlatIRToRS extends ToC
 
         //set the current method we are visiting
         method = self;
-    
+
         p.print(" ");
-        if (body != null) 
+        if (body != null)
             body.accept(this);
-        else 
+        else
             p.print(";");
 
         p.newLine();
         method = null;
     }
-    
-    
-    
 
     // ----------------------------------------------------------------------
     // STATEMENT
     // ----------------------------------------------------------------------   
 
-    public void visitDoLoopStatement(JDoLoopStatement self) 
-    {
+    public void visitDoLoopStatement(JDoLoopStatement self) {
         assert self.countUp() : "Currently we only handle doloops with positive increment";
 
         doLoops++;
@@ -404,40 +379,34 @@ public class FlatIRToRS extends ToC
         self.getIncrValue().accept(this);
         p.print(") ");
 
-    
         p.newLine();
         p.indent();
         self.getBody().accept(this);
         p.outdent();
         p.newLine();
     }
-    
 
     /**
      * prints a for statement
      */
-    public void visitForStatement(JForStatement self,
-                                  JStatement init,
-                                  JExpression cond,
-                                  JStatement incr,
-                                  JStatement body) {
+    public void visitForStatement(JForStatement self, JStatement init,
+            JExpression cond, JStatement incr, JStatement body) {
 
         if (KjcOptions.doloops && self instanceof JDoLoopStatement) {
-            visitDoLoopStatement((JDoLoopStatement)self);
+            visitDoLoopStatement((JDoLoopStatement) self);
             return;
         }
-    
+
         //be careful, if you return prematurely, decrement me
         forLoopHeader++;
 
-
         p.print("for (");
-    
+
         if (init != null) {
             init.accept(this);
             //the ; will print in a statement visitor
         }
-    
+
         p.print(" ");
         if (cond != null) {
             cond.accept(this);
@@ -452,14 +421,14 @@ public class FlatIRToRS extends ToC
             String str = l2c.getPrinter().getString();
             // leave off the trailing semicolon if there is one
             if (str.endsWith(";")) {
-                p.print(str.substring(0, str.length()-1));
-            } else { 
+                p.print(str.substring(0, str.length() - 1));
+            } else {
                 p.print(str);
             }
         }
         forLoopHeader--;
         p.print(") ");
-    
+
         //p.print("{");
         p.newLine();
         p.indent();
@@ -469,25 +438,22 @@ public class FlatIRToRS extends ToC
         //p.print("}");
     }
 
-
-
     /**
      * prints an array access expression
      */
     public void visitArrayAccessExpression(JArrayAccessExpression self,
-                                           JExpression prefix,
-                                           JExpression accessor) {
+            JExpression prefix, JExpression accessor) {
         if (KjcOptions.absarray) {
             String access = "[[";
             JExpression exp = prefix;
-        
+
             //if this is a multidimensional access, convert to the 
             //comma'ed form
             while (exp instanceof JArrayAccessExpression) {
-                JArrayAccessExpression arr = (JArrayAccessExpression)exp;
+                JArrayAccessExpression arr = (JArrayAccessExpression) exp;
                 FlatIRToRS toRS = new FlatIRToRS();
                 arr.getAccessor().accept(toRS);
-        
+
                 // RMR { syntax change in rstream 2.1: multidimmensional arrays do not use commas
                 // access = access + toRS.getString() + ", ";
                 access = access + toRS.getPrinter().getString() + "]][[";
@@ -500,16 +466,16 @@ public class FlatIRToRS extends ToC
             accessor.accept(this);
             p.print("]]");
         }
-    
+
         else {
             //normal c arrays
             String access = "";
             JExpression exp = prefix;
             while (exp instanceof JArrayAccessExpression) {
-                JArrayAccessExpression arr = (JArrayAccessExpression)exp;
+                JArrayAccessExpression arr = (JArrayAccessExpression) exp;
                 FlatIRToRS toRS = new FlatIRToRS();
                 arr.getAccessor().accept(toRS);
-        
+
                 access = access + "[" + toRS.getPrinter().getString() + "]";
                 exp = arr.getPrefix();
             }
@@ -520,29 +486,25 @@ public class FlatIRToRS extends ToC
             p.print("]");
         }
     }
-    
 
     /**
      * prints a method call expression
      */
     public void visitMethodCallExpression(JMethodCallExpression self,
-                                          JExpression prefix,
-                                          String ident,
-                                          JExpression[] args) {
+            JExpression prefix, String ident, JExpression[] args) {
 
-        assert (!ident.equals(Names.receiveMethod)) :
-            "Error: RStream code generation should not see network receive method";
+        assert (!ident.equals(Names.receiveMethod)) : "Error: RStream code generation should not see network receive method";
 
         // RMR { math functions are converted to use their floating-point counterparts;
         // to do this, some function names are prepended with a 'f', and others have an
         // 'f' appended to them
-        if (Utils.isMathMethod(prefix, ident)) {
+        if (Utils.isMathMethod(prefix, ident) && toC) {
             p.print(Utils.cMathEquivalent(prefix, ident));
         } else {
             p.print(ident);
         }
         // } RMR
-        
+
         p.print("(");
         if (args != null) {
             for (int i = 0; i < args.length; i++) {
@@ -562,46 +524,34 @@ public class FlatIRToRS extends ToC
         p.print(")");
     }
 
-    public JExpression passParentheses(JExpression exp) 
-    {
+    public JExpression passParentheses(JExpression exp) {
         while (exp instanceof JParenthesedExpression)
-            exp = ((JParenthesedExpression)exp).getExpr();
-    
+            exp = ((JParenthesedExpression) exp).getExpr();
+
         return exp;
     }
-    
 
-    public void visitPeekExpression(SIRPeekExpression self,
-                                    CType tapeType,
-                                    JExpression num)
-    {
+    public void visitPeekExpression(SIRPeekExpression self, CType tapeType,
+            JExpression num) {
         assert false : "RStream code generation should not see a pop statement";
     }
-    
-    public void visitPopExpression(SIRPopExpression self,
-                                   CType tapeType)
-    {
+
+    public void visitPopExpression(SIRPopExpression self, CType tapeType) {
         assert false : "RStream code generation should not see a pop statement";
     }
-    
+
     // visitPrintStatement innerited from ToCCommon
-    
-    public void visitPushExpression(SIRPushExpression self,
-                                    CType tapeType,
-                                    JExpression val)
-    {
-        assert false : "RStream Front-end should not see a push statement";
-    }    
 
-    
-    
+    public void visitPushExpression(SIRPushExpression self, CType tapeType,
+            JExpression val) {
+        assert false : "RStream Front-end should not see a push statement";
+    }
 
     // Special case for CTypes, to map some Java types to C types.
     protected void print(CType s) {
-        if (s instanceof CArrayType){
-            printArrayType((CArrayType)s);
-        }
-        else if (s.getTypeID() == TID_BOOLEAN)
+        if (s instanceof CArrayType) {
+            printArrayType((CArrayType) s);
+        } else if (s.getTypeID() == TID_BOOLEAN)
             p.print("int");
         else if (s.toString().endsWith("Portal"))
             // ignore the specific type of portal in the C library
@@ -609,49 +559,44 @@ public class FlatIRToRS extends ToC
         else
             p.print(s.toString());
     }
-    
 
     /** This function is called if we have an assignment expression of array types 
         and we are generating C code.  This will generate code to perform an 
         element-wise copy **/
-    private void arrayCopy(JExpression left, 
-                           JExpression right) 
-    {
+    private void arrayCopy(JExpression left, JExpression right) {
         String ident = "";
         //this is used to find the new array expression
         //it is either a string for fields or JVarDef for locals
         Object varDef = null;
         //the var access expression
         JExpression var = left;
-    
+
         //if this is an array access expression, get the variable access
         if (left instanceof JArrayAccessExpression) {
-            var = Util.getVar((JArrayAccessExpression)left);
+            var = Util.getVar((JArrayAccessExpression) left);
         }
-    
 
         if (var instanceof JFieldAccessExpression) {
-            varDef = ((JFieldAccessExpression)var).getIdent();
-            ident = ((JFieldAccessExpression)var).getIdent();
-        }
-        else if (var instanceof JLocalVariableExpression) {
-            varDef = ((JLocalVariableExpression)var).getVariable();
-            ident = ((JLocalVariableExpression)var).getVariable().getIdent();
-        }
-        else 
-            Utils.fail("Assigning an array to an unsupported expression of type " + left.getClass() + ": " + left);
-    
+            varDef = ((JFieldAccessExpression) var).getIdent();
+            ident = ((JFieldAccessExpression) var).getIdent();
+        } else if (var instanceof JLocalVariableExpression) {
+            varDef = ((JLocalVariableExpression) var).getVariable();
+            ident = ((JLocalVariableExpression) var).getVariable().getIdent();
+        } else
+            Utils.fail("Assigning an array to an unsupported expression of type "
+                    + left.getClass() + ": " + left);
+
         //  assert getDim(left.getType()) == getDim(right.getType()) :
         //    "Array dimensions of variables of array assignment do not match";
-    
+
         //find the number of dimensions
-        int bound = ((CArrayType)right.getType()).getArrayBound();
+        int bound = ((CArrayType) right.getType()).getArrayBound();
         //find the extent of each dimension
-        int[] dims = getDims((CArrayType)var.getType());
+        int[] dims = getDims((CArrayType) var.getType());
         //if we are assigning elements from a lower dimension array to a higher
         //dim array, remember the difference
         int diff = dims.length - bound;
-    
+
         assert diff >= 0 : "Error in array copy: " + left + " = " + right;
 
         assert bound > 0;
@@ -660,13 +605,14 @@ public class FlatIRToRS extends ToC
         p.print("{\n");
         p.print("int ");
         //print the index var decls
-        for (int i = 0; i < bound -1; i++)
+        for (int i = 0; i < bound - 1; i++)
             p.print(FlatIRToRS.ARRAY_COPY + i + ", ");
         p.print(FlatIRToRS.ARRAY_COPY + (bound - 1));
         p.print(";\n");
         for (int i = 0; i < bound; i++) {
-            p.print("for (" + FlatIRToRS.ARRAY_COPY + i + " = 0; " + FlatIRToRS.ARRAY_COPY + i +  
-                    " < " + dims[i + diff] + "; " + FlatIRToRS.ARRAY_COPY + i + "++)\n");
+            p.print("for (" + FlatIRToRS.ARRAY_COPY + i + " = 0; "
+                    + FlatIRToRS.ARRAY_COPY + i + " < " + dims[i + diff] + "; "
+                    + FlatIRToRS.ARRAY_COPY + i + "++)\n");
         }
         left.accept(this);
         for (int i = 0; i < bound; i++)
@@ -678,7 +624,6 @@ public class FlatIRToRS extends ToC
         p.print(";\n}\n");
         return;
     }
-    
 
     /**
     
@@ -687,7 +632,7 @@ public class FlatIRToRS extends ToC
         for (int i = 0; i < comments.length; i++)
             visitComment(comments[i]);
     }
-    
+
     /**
     
     */
@@ -695,7 +640,7 @@ public class FlatIRToRS extends ToC
         //don't print random comments, only sir comments
         if (!comment.getText().startsWith("SIR"))
             return;
-    
+
         String str = "";
         if (comment.isLineComment())
             str = "\n";
@@ -704,26 +649,22 @@ public class FlatIRToRS extends ToC
         str = str + "/*" + comment.getText() + "*/";
         if (comment.hadSpaceAfter())
             str = str + " ";
-    
+
         p.print(str);
     }
-    
 
     /**
      * prints a cast expression
      */
-    public void visitCastExpression(JCastExpression self,
-                                    JExpression expr,
-                                    CType type)
-    {
+    public void visitCastExpression(JCastExpression self, JExpression expr,
+            CType type) {
         //hack, if we not generating abstract arrays
         //then don't print array casts for C
         if (!KjcOptions.absarray && type.isArrayType()) {
             expr.accept(this);
             return;
         }
-    
-        
+
         printLParen();
         p.print("(");
         printType(type);
@@ -733,62 +674,47 @@ public class FlatIRToRS extends ToC
         p.print(")");
         printRParen();
     }
-    
 
     // ----------------------------------------------------------------------
     // UNUSED STREAM VISITORS
     // ----------------------------------------------------------------------
 
     /* pre-visit a pipeline */
-    public void preVisitPipeline(SIRPipeline self,
-                                 SIRPipelineIter iter) 
-    {
+    public void preVisitPipeline(SIRPipeline self, SIRPipelineIter iter) {
     }
-    
 
     /* pre-visit a splitjoin */
-    public void preVisitSplitJoin(SIRSplitJoin self,
-                                  SIRSplitJoinIter iter)
-    {
+    public void preVisitSplitJoin(SIRSplitJoin self, SIRSplitJoinIter iter) {
     }
-    
 
     /* pre-visit a feedbackloop */
     public void preVisitFeedbackLoop(SIRFeedbackLoop self,
-                                     SIRFeedbackLoopIter iter)
-    {
+            SIRFeedbackLoopIter iter) {
     }
-    
 
     /**
      * POST-VISITS 
      */
-        
+
     /* post-visit a pipeline */
-    public void postVisitPipeline(SIRPipeline self,
-                                  SIRPipelineIter iter) {
+    public void postVisitPipeline(SIRPipeline self, SIRPipelineIter iter) {
     }
-    
 
     /* post-visit a splitjoin */
-    public void postVisitSplitJoin(SIRSplitJoin self,
-                                   SIRSplitJoinIter iter) {
+    public void postVisitSplitJoin(SIRSplitJoin self, SIRSplitJoinIter iter) {
     }
-    
 
     /* post-visit a feedbackloop */
     public void postVisitFeedbackLoop(SIRFeedbackLoop self,
-                                      SIRFeedbackLoopIter iter) {
-    } 
+            SIRFeedbackLoopIter iter) {
+    }
 
-    public void visitPhasedFilter(SIRPhasedFilter self,
-                                  SIRPhasedFilterIter iter) {
+    public void visitPhasedFilter(SIRPhasedFilter self, SIRPhasedFilterIter iter) {
         // This is a stub; it'll get filled in once we figure out how phased
         // filters should actually work.
     }
 
-    protected void stackAllocateArray(String str) 
-    {
+    protected void stackAllocateArray(String str) {
         assert false : "Should not be called";
     }
 
@@ -817,7 +743,7 @@ public class FlatIRToRS extends ToC
     //     public void visitFilter(SIRFilter self,
     //              SIRFilterIter iter) {
     //  assert false : "Don't call me!";
-    
+
     //  //Entry point of the visitor
 
     //  //p.print("#include <stdlib.h>\n");
@@ -827,37 +753,37 @@ public class FlatIRToRS extends ToC
     //  //the structure definition header files
     //  if (StrToRStream.structures.length > 0) 
     //      p.print("#include \"structs.h\"\n");
-    
+
     //  printExterns();
     //  //Visit fields declared in the filter class
     //  JFieldDeclaration[] fields = self.getFields();
     //  for (int i = 0; i < fields.length; i++)
     //     fields[i].accept(this);
-    
+
     //  //visit methods of filter, print the declaration first
     //  declOnly = true;
     //  JMethodDeclaration[] methods = self.getMethods();
     //  for (int i =0; i < methods.length; i++)
     //      methods[i].accept(this);
-    
+
     //  //now print the functions with body
     //  declOnly = false;
     //  for (int i =0; i < methods.length; i++) {
     //      methods[i].accept(this);    
     //  }
-    
+
     //  p.print("int main() {\n");
     //  //generate array initializer blocks for fields...
     //  p.printFieldArrayInits();
-    
+
     //  //execute the main function
     //  p.print(Names.main + "();\n");
-    
+
     //  //return 0 even though this should never return!
     //  p.print("  return 0;\n");
     //  //closes main()
     //  p.print("}\n");
-       
+
     //  createFile();
     //     }
 
@@ -872,9 +798,9 @@ public class FlatIRToRS extends ToC
     //     public static void generateCode(FlatNode node) 
     //     {
     //  assert false : "don't call me";
-    
+
     //  //FlatIRToRS toC = new FlatIRToRS((SIRFilter)node.contents);
-        
+
     //  //optimizations...
     //  System.out.println
     //      ("Optimizing SIR ...");
@@ -884,7 +810,7 @@ public class FlatIRToRS extends ToC
     //  //iterate over all the methods, calling the magic below...
     //  for (int i = 0; i < ((SIRFilter)node.contents).getMethods().length; i++) {
     //      JMethodDeclaration method=((SIRFilter)node.contents).getMethods()[i];
-                
+
     //      if (!KjcOptions.nofieldprop) {
     //      Unroller unroller;
     //      do {
@@ -892,12 +818,12 @@ public class FlatIRToRS extends ToC
     //          unroller = new Unroller(new Hashtable());
     //          method.accept(unroller);
     //          } while (unroller.hasUnrolled());
-            
+
     //          method.accept(new Propagator(new Hashtable()));
     //          unroller = new Unroller(new Hashtable());
     //          method.accept(unroller);
     //      } while(unroller.hasUnrolled());
-        
+
     //      method.accept(new BlockFlattener());
     //      method.accept(new Propagator(new Hashtable()));
     //      } 
@@ -906,7 +832,7 @@ public class FlatIRToRS extends ToC
     //      method.accept(arrayDest);
     //      method.accept(new VarDeclRaiser());
     //  }
-    
+
     //  if(KjcOptions.destroyfieldarray)
     //     arrayDest.destroyFieldArrays((SIRFilter)node.contents);
     //     /*   
@@ -931,8 +857,6 @@ public class FlatIRToRS extends ToC
     //         IterFactory.createFactory().createIter((SIRFilter)node.contents).accept(toC);
     //     }
 
-
-    
     //     private void createFile() {
     //  System.out.println("Code for application written to str.c");
     //  try {
@@ -977,7 +901,7 @@ public class FlatIRToRS extends ToC
     //  p.print("extern EXTERNC float sqrtf(float);\n"); 
     //  p.print("extern EXTERNC float tanhf(float);\n"); 
     //  p.print("extern EXTERNC float tanf(float);\n");
-         
+
     //     }
 
 }

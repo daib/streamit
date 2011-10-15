@@ -10,6 +10,7 @@ import at.dms.kjc.CClassType;
 import at.dms.kjc.CType;
 import at.dms.kjc.Constants;
 import at.dms.kjc.JBlock;
+import at.dms.kjc.JBooleanLiteral;
 import at.dms.kjc.JEmptyStatement;
 import at.dms.kjc.JExpression;
 import at.dms.kjc.JExpressionStatement;
@@ -21,19 +22,23 @@ import at.dms.kjc.JReturnStatement;
 import at.dms.kjc.JStatement;
 import at.dms.kjc.JVariableDeclarationStatement;
 import at.dms.kjc.JVariableDefinition;
+import at.dms.kjc.JWhileStatement;
 import at.dms.kjc.ObjectDeepCloner;
 import at.dms.kjc.SLIRReplacingVisitor;
 import at.dms.kjc.flatgraph.DataFlowTraversal;
 import at.dms.kjc.flatgraph.FlatNode;
 import at.dms.kjc.optimizedrstream.ConvertChannelExprs;
+import at.dms.kjc.optimizedrstream.FFSNoPeekBuffer;
 import at.dms.kjc.optimizedrstream.FilterFusionState;
 import at.dms.kjc.optimizedrstream.FusionState;
+import at.dms.kjc.sir.SIRBeginMarker;
 import at.dms.kjc.sir.SIREndMarker;
 import at.dms.kjc.sir.SIRFilter;
 import at.dms.kjc.sir.SIRPushExpression;
 
 public class PullableTransform {
     public static List<FlatNode> pullableNodes = new LinkedList<FlatNode>();
+    public static List<JStatement> popIndexDeclarations = new LinkedList<JStatement>();
     /* any helper functions of the application */
     static public Vector<JMethodDeclaration> functions = new Vector<JMethodDeclaration>();
 
@@ -49,6 +54,10 @@ public class PullableTransform {
             if (node.isFilter()) {
                 //check if this node is transformable
                 SIRFilter filter = (SIRFilter) node.contents;
+                if (filter.getPopInt() == 1) //FIXME: no need to generate code for pusable filters?
+                    continue;
+                if(filter.getIdent().startsWith("iDCT"))
+                    continue;
                 List<JStatement> workStatements = filter.getWork()
                         .getStatements();
                 if (checkTranformableStatements(workStatements)) {
@@ -89,14 +98,20 @@ public class PullableTransform {
                         if (body != null) {
                             body.accept(this);
                         }
-                        
+
+                        body.addStatementFirst(new SIRBeginMarker(nodeName));
                         body.addStatement(new SIREndMarker(nodeName));
                         
+                        //add loop around
+                        JWhileStatement enclosingWhile = new JWhileStatement(null, new JBooleanLiteral(null, true), body, null);
+                        JBlock newBody = new JBlock();
+                        newBody.addStatement(enclosingWhile);
+
                         modifiers = modifiers | Constants.ACC_INLINE;
 
                         return new JMethodDeclaration(null, modifiers, self
                                 .getPush().getType(), ident, parameters,
-                                exceptions, body, null, null);
+                                exceptions, newBody, null, null);
                         //return self;
                     };
 
@@ -147,9 +162,9 @@ public class PullableTransform {
                 }
 
                 if (newExp instanceof SIRPushExpression) {
-                    return new JReturnStatement(self
-                            .getTokenReference(), ((SIRPushExpression) newExp)
-                            .getArg(), self.getComments());
+                    return new JReturnStatement(self.getTokenReference(),
+                            ((SIRPushExpression) newExp).getArg(), self
+                                    .getComments());
                 } else
                     return self;
             }
@@ -168,6 +183,10 @@ public class PullableTransform {
                     new ChannelReplacer(new JMethodCallExpression(null,
                             ((SIRFilter) node.incoming[0].contents).getWork()
                                     .getName(), null), null, null));
+        } else {
+            JStatement popIndexDeclaration = ((FFSNoPeekBuffer)(FusionState.getFusionState(node))).getPopIndexDecls();
+            if(popIndexDeclaration != null)
+                popIndexDeclarations.add(popIndexDeclaration);
         }
 
         workMethod.accept(new ConvertChannelExprs(

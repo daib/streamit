@@ -112,6 +112,13 @@ public class FFSNoPeekBuffer extends FilterFusionState {
         return stmts.toArray(new JStatement[0]);
     }
 
+    public JStatement getPopIndexDecls() {
+        if (filter.getPopInt() > 0)
+            return new JVariableDeclarationStatement(null, popCounterVar, null);
+        else
+            return null;
+    }
+
     /** return the number of items produced by the upstream node in the 
         init stage **/
     private int getLastProducedInit() {
@@ -223,7 +230,6 @@ public class FFSNoPeekBuffer extends FilterFusionState {
      * steady state (*isInit* == false), add all declaration to *enclosingBlock*.
      **/
     public JStatement[] getWork(JBlock enclosingBlock, boolean isInit) {
-
 
         JBlock statements = new JBlock(null, new JStatement[0], null);
 

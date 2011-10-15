@@ -64,6 +64,9 @@ public class GenerateCCode {
     /** the init state block, streams traversed in data-flow order **/
     private JBlock init;
 
+    /** the global block **/
+    private JBlock global;
+
     /** map string (variable name) to JVariableDefinition for fields, 
         set up in convertFieldsToLocals()**/
     HashMap<String, JVariableDefinition> stringVarDef = new HashMap<String, JVariableDefinition>();
@@ -95,6 +98,8 @@ public class GenerateCCode {
         main = new JBlock(null, new JStatement[0], null);
         steady = new JBlock(null, new JStatement[0], null);
         init = new JBlock(null, new JStatement[0], null);
+        global = new JBlock(null, new JStatement[0], null);
+
         fields = new Vector<JFieldDeclaration>();
         functions = new Vector<JMethodDeclaration>();
         initFunctionCalls = new JBlock(null, new JStatement[0], null);
@@ -112,20 +117,36 @@ public class GenerateCCode {
 
         //find transformable streams
         PullableTransform.findTransformableFilters(top);
-        
+        global.addAllStatements(PullableTransform.popIndexDeclarations);
+
         functions.addAll(PullableTransform.functions);
+
+        //insert pop index init to steady loop
+        for (JStatement st : PullableTransform.popIndexDeclarations) {
+            JVariableDefinition[] vars = ((JVariableDeclarationStatement) st)
+                    .getVars();
+            for (int i = 0; i < vars.length; i++) {
+                //vars[i].getIdent()
+                JAssignmentExpression init = new JAssignmentExpression(null,
+                        new JLocalVariableExpression(null, vars[i]),
+                        vars[i].getValue());
+                steady.addStatementFirst(new JExpressionStatement(null, init,
+                        null));
+            }
+        }
 
         //visit the graph in for the init stage
         visitGraph(top, true);
         //visit the graph for the steady-state stage
         visitGraph(top, false);
+
         //set up the complete sir application
         setUpSIR();
+
         //write the application to the C file using FlatIRToRS
         writeCompleteFile();
     }
 
-    
     /** rename the fields, locals, and methods of each filter
         so there are unique across filters **/
     private void renameFilterContents(FlatNode top) {
@@ -279,7 +300,9 @@ public class GenerateCCode {
         //add all fields to the main method as locals
         for (int i = 0; i < fields.size(); i++) {
             JFieldDeclaration field = fields.get(i);
-            main.addStatementFirst(new JVariableDeclarationStatement(null,
+            //            main.addStatementFirst(new JVariableDeclarationStatement(null,
+            //                    field.getVariable(), null));
+            global.addStatementFirst(new JVariableDeclarationStatement(null,
                     field.getVariable(), null));
             //remember the vardef for the visiter down below
             //this works because we renamed everything!
@@ -326,6 +349,8 @@ public class GenerateCCode {
         /* RMR { add helper C routine to parse arguments passed to top level driver */
         str.append("\n/* helper routines to parse command line arguments */\n");
         str.append("#include <unistd.h>\n\n");
+        str.append("#include <stdlib.h>\n");
+        str.append("#include <math.h>\n\n");
 
         str.append("/* retrieve iteration count for top level driver */\n");
         str.append("static int " + ARGHELPER_COUNTER
@@ -346,11 +371,18 @@ public class GenerateCCode {
         if (StrToRStream.structures.length > 0)
             str.append("#include \"structs.h\"\n");
 
-        str.append(getExterns());
+        //str.append(getExterns());
 
         //fields are now added as locals to main method...
         //  for(int i = 0; i < fields.size(); i++) 
         //    ((JFieldDeclaration)fields.get(i)).accept(toRS);
+
+        for (JStatement st : global.getStatements()) {
+            st.accept(toRS);
+            new JEmittedTextExpression("\n").accept(toRS);
+        }
+
+        //global.accept(toRS);
 
         //initially just print the function decls
         toRS.setDeclOnly(true);
@@ -419,11 +451,12 @@ public class GenerateCCode {
             if (node.isFilter())
                 optimizeFilter((SIRFilter) node.contents);
             //tell the node to do all of its initialization
-            me.initTasks(fields, functions, initFunctionCalls, main);
+            //            me.initTasks(fields, functions, initFunctionCalls, main);
+            me.initTasks(fields, functions, initFunctionCalls, global);
         }
 
         //do not execution generate code for pullable nodes
-        if(!PullableTransform.pullableNodes.contains(node))
+        if (!PullableTransform.pullableNodes.contains(node))
             //add the work function that will execute the stage
             addStmtArray(enclosingBlock, me.getWork(enclosingBlock, isInit));
     }

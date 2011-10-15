@@ -299,6 +299,9 @@ public class SplitterFusionState extends FusionState {
                 JBlock oldBody = new JBlock(null,
                         ((SIRFilter) nextNode.contents).getWork()
                                 .getStatements(), null);
+                
+                oldBody.addStatementFirst(new SIRBeginMarker(nextNode.getName()));
+                oldBody.addStatement(new SIREndMarker(nextNode.getName()));
 
                 JStatement body = (JBlock) ObjectDeepCloner.deepCopy(oldBody);
 
@@ -337,7 +340,7 @@ public class SplitterFusionState extends FusionState {
                 }
 
                 body.accept(new ChannelReplacer(incomingAccess, null, pushExpr));
-
+                
                 //loop the assign statement based on the weight of this incoming way
                 loops.addStatement(GenerateCCode.makeDoLoop(body, innerVar,
                         new JIntLiteral(node.weights[i])));
