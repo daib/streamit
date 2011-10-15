@@ -1,9 +1,13 @@
 package at.dms.kjc.transform;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import at.dms.kjc.JBlock;
 import at.dms.kjc.JExpression;
 import at.dms.kjc.JExpressionStatement;
 import at.dms.kjc.JForStatement;
+import at.dms.kjc.JLocalVariable;
 import at.dms.kjc.JReturnStatement;
 import at.dms.kjc.JStatement;
 import at.dms.kjc.JWhileStatement;
@@ -11,6 +15,10 @@ import at.dms.kjc.SLIRReplacingVisitor;
 import at.dms.kjc.sir.SIRPushExpression;
 
 public class ForLoopHasPushTransformer extends SLIRReplacingVisitor {
+
+    public boolean tranform = false;
+    public Set<JLocalVariable> indexVars = new HashSet<JLocalVariable>();
+    
 
     /**
      * visits a for statement
@@ -45,38 +53,51 @@ public class ForLoopHasPushTransformer extends SLIRReplacingVisitor {
 
         if (hp.hasPush()) {
             JBlock whileBodyBlock = new JBlock();
-            
+
             //replace push statement with return
             final JStatement tmpIncr = newIncr;
-            
+
             newBody.accept(new SLIRReplacingVisitor() {
                 /**
                  * prints an expression statement
                  */
-                public Object visitExpressionStatement(JExpressionStatement self,
-                                                       JExpression expr) {
-                    JExpression newExp = (JExpression)expr.accept(this);
-                    
-                    if (newExp!=null && newExp!=expr) {
+                public Object visitExpressionStatement(
+                        JExpressionStatement self, JExpression expr) {
+                    JExpression newExp = (JExpression) expr.accept(this);
+
+                    if (newExp != null && newExp != expr) {
                         self.setExpression(newExp);
                     }
-                    
-                    if(newExp instanceof SIRPushExpression) {
-                        JBlock tmpStatements = new JBlock();  
+
+                    if (newExp instanceof SIRPushExpression) {
+                        JBlock tmpStatements = new JBlock();
                         tmpStatements.addStatement(tmpIncr);
-                        tmpStatements.addStatement( new JReturnStatement(self.getTokenReference(), ((SIRPushExpression)newExp).getArg(), self.getComments()));
+                        tmpStatements.addStatement(new JReturnStatement(self
+                                .getTokenReference(),
+                                ((SIRPushExpression) newExp).getArg(), self
+                                        .getComments()));
                         return tmpStatements;
                     } else
                         return self;
                 }
             });
-            
+
             whileBodyBlock.addStatement(newBody);
-            JWhileStatement whileStatement = new JWhileStatement(null, newExp, whileBodyBlock, self.getComments());
-            
+            JWhileStatement whileStatement = new JWhileStatement(null, newExp,
+                    whileBodyBlock, self.getComments());
+
             JBlock newBlock = new JBlock();
             newBlock.addStatement(whileStatement);
             newBlock.addStatement(newInit);
+
+            tranform = true;
+
+            ForLoopIndexVarCollector vc =  new ForLoopIndexVarCollector();
+            
+            newInit.accept(vc);
+            
+            indexVars.addAll(vc.indexVars);
+
             return newBlock;
         } else
             return self;

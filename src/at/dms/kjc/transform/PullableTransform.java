@@ -16,6 +16,7 @@ import at.dms.kjc.JExpression;
 import at.dms.kjc.JExpressionStatement;
 import at.dms.kjc.JForStatement;
 import at.dms.kjc.JFormalParameter;
+import at.dms.kjc.JLocalVariable;
 import at.dms.kjc.JMethodCallExpression;
 import at.dms.kjc.JMethodDeclaration;
 import at.dms.kjc.JReturnStatement;
@@ -56,8 +57,8 @@ public class PullableTransform {
                 SIRFilter filter = (SIRFilter) node.contents;
                 if (filter.getPopInt() == 1) //FIXME: no need to generate code for pusable filters?
                     continue;
-                if(filter.getIdent().startsWith("iDCT"))
-                    continue;
+//                if (filter.getIdent().startsWith("iDCT"))
+//                    continue;
                 List<JStatement> workStatements = filter.getWork()
                         .getStatements();
                 if (checkTranformableStatements(workStatements)) {
@@ -101,53 +102,98 @@ public class PullableTransform {
 
                         body.addStatementFirst(new SIRBeginMarker(nodeName));
                         body.addStatement(new SIREndMarker(nodeName));
-                        
-                        //add loop around
-                        JWhileStatement enclosingWhile = new JWhileStatement(null, new JBooleanLiteral(null, true), body, null);
-                        JBlock newBody = new JBlock();
-                        newBody.addStatement(enclosingWhile);
 
                         modifiers = modifiers | Constants.ACC_INLINE;
 
                         return new JMethodDeclaration(null, modifiers, self
                                 .getPush().getType(), ident, parameters,
-                                exceptions, newBody, null, null);
+                                exceptions, body, null, null);
                         //return self;
                     };
 
-                    /**
-                     * prints a variable declaration statement
-                     */
-                    public Object visitVariableDefinition(
-                            JVariableDefinition self, int modifiers,
-                            CType type, String ident, JExpression expr) {
-                        if (expr != null) {
-                            JExpression newExp = (JExpression) expr
-                                    .accept(this);
-                            if (newExp != null && newExp != expr) {
-                                self.setValue(newExp);
-                            }
-
-                        }
-                        // visit static array dimensions
-                        if (type.isArrayType()) {
-                            JExpression[] dims = ((CArrayType) type).getDims();
-                            for (int i = 0; i < dims.length; i++) {
-                                JExpression newExp = (JExpression) dims[i]
-                                        .accept(this);
-                                if (newExp != null && newExp != dims[i]) {
-                                    dims[i] = newExp;
-                                }
-                            }
-                        }
-                        return new JVariableDefinition(null, modifiers
-                                | Constants.ACC_STATIC, type, ident, null);
-                    }
                 });
 
         workMethod.accept(new VariableDefinitionReplacer());
 
-        workMethod.accept(new ForLoopHasPushTransformer());
+        final ForLoopHasPushTransformer forTranformer = new ForLoopHasPushTransformer();
+
+        workMethod.accept(forTranformer);
+
+        if (forTranformer.tranform) {
+
+            //enclosing while of while loop only
+            workMethod = (JMethodDeclaration) workMethod
+                    .accept(new SLIRReplacingVisitor() {
+                        public Object visitMethodDeclaration(
+                                JMethodDeclaration self, int modifiers,
+                                CType returnType, String ident,
+                                JFormalParameter[] parameters,
+                                CClassType[] exceptions, JBlock body) {
+                            for (int i = 0; i < parameters.length; i++) {
+                                if (!parameters[i].isGenerated()) {
+                                    parameters[i].accept(this);
+                                }
+                            }
+                            if (body != null) {
+                                body.accept(this);
+                            }
+
+                            //add loop around
+                            JWhileStatement enclosingWhile = new JWhileStatement(
+                                    null, new JBooleanLiteral(null, true),
+                                    body, null);
+                            JBlock newBody = new JBlock();
+                            newBody.addStatement(enclosingWhile);
+
+                            return new JMethodDeclaration(null, modifiers, self
+                                    .getPush().getType(), ident, parameters,
+                                    exceptions, newBody, null, null);
+                            //return self;
+                        };
+
+                        /**
+                         * prints a variable declaration statement
+                         */
+                        public Object visitVariableDefinition(
+                                JVariableDefinition self, int modifiers,
+                                CType type, String ident, JExpression expr) {
+                            if (expr != null) {
+                                JExpression newExp = (JExpression) expr
+                                        .accept(this);
+                                if (newExp != null && newExp != expr) {
+                                    self.setValue(newExp);
+                                }
+
+                            }
+                            // visit static array dimensions
+                            if (type.isArrayType()) {
+                                JExpression[] dims = ((CArrayType) type)
+                                        .getDims();
+                                for (int i = 0; i < dims.length; i++) {
+                                    JExpression newExp = (JExpression) dims[i]
+                                            .accept(this);
+                                    if (newExp != null && newExp != dims[i]) {
+                                        dims[i] = newExp;
+                                    }
+                                }
+                            }
+                            
+                            for(JLocalVariable forIndexVar:forTranformer.indexVars) {
+                                if(forIndexVar.getIdent().equals(ident)) {
+                                    return new JVariableDefinition(null, modifiers
+                                            | Constants.ACC_STATIC, type, ident, null);
+                                }
+                            }
+                            
+                            return self;
+                            
+//                            return new JVariableDefinition(null, modifiers
+//                                    | Constants.ACC_STATIC, type, ident, null);
+                        }
+
+                    });
+
+        }
 
         workMethod.accept(new SLIRReplacingVisitor() {
             /**
@@ -184,8 +230,9 @@ public class PullableTransform {
                             ((SIRFilter) node.incoming[0].contents).getWork()
                                     .getName(), null), null, null));
         } else {
-            JStatement popIndexDeclaration = ((FFSNoPeekBuffer)(FusionState.getFusionState(node))).getPopIndexDecls();
-            if(popIndexDeclaration != null)
+            JStatement popIndexDeclaration = ((FFSNoPeekBuffer) (FusionState
+                    .getFusionState(node))).getPopIndexDecls();
+            if (popIndexDeclaration != null)
                 popIndexDeclarations.add(popIndexDeclaration);
         }
 
