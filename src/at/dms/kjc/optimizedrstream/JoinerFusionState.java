@@ -225,6 +225,8 @@ public class JoinerFusionState extends FusionState {
               //get the incoming buffer variable
                 JVariableDefinition incomingBuffer = getBufferVar(node.incoming[i],
                         isInit);
+                
+                GenerateCCode.usedBufferIndex.add(incomingBuffer);
 
                 //now construct the incoming buffer access
                 //incoming[weight * induction + innerVar]
@@ -286,6 +288,8 @@ public class JoinerFusionState extends FusionState {
                         assert nextFS.getNode().ways == 1;
                         //get the downstream incoming buffer
                         pushBuffer = nextFS.getPushBufferVar(false);
+                        
+                        GenerateCCode.usedBufferIndex.add(pushBuffer);
 
                         pushCounter = nextFS.getPushCounterVar(false);
 
@@ -342,6 +346,8 @@ public class JoinerFusionState extends FusionState {
                     JArrayAccessExpression outgoingAccess = new JArrayAccessExpression(
                             null, new JLocalVariableExpression(null,
                                     outgoingBuffer), outgoingIndex);
+                    
+                    GenerateCCode.usedBufferIndex.add(outgoingBuffer);
 
                     //create the assignment expression
                     JExpressionStatement assignment = new JExpressionStatement(

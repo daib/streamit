@@ -157,6 +157,8 @@ public class FlatIRToRS extends ToC {
     public void visitVariableDefinition(JVariableDefinition self,
             int modifiers, CType type, String ident, JExpression expr) {
 
+        if((GenerateCCode.unsedVars.contains(self)))
+            return;
         /*if (expr instanceof JArrayInitializer) {
           declareInitializedArray(type, ident, expr);
           return;

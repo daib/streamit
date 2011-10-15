@@ -65,6 +65,7 @@ public class ConvertChannelExprs extends SLIRReplacingVisitor {
     public Object visitPopExpression(SIRPopExpression self,
                                      CType tapeType) {
     
+        GenerateCCode.usedBufferIndex.add(popBuffer);
         // build ref to pop array
         JLocalVariableExpression lhs = 
             new JLocalVariableExpression(null, popBuffer);
@@ -86,6 +87,7 @@ public class ConvertChannelExprs extends SLIRReplacingVisitor {
                                       CType oldTapeType,
                                       JExpression oldArg) {
 
+        GenerateCCode.usedBufferIndex.add(popBuffer);
         // do the super
         SIRPeekExpression self = 
             (SIRPeekExpression)
@@ -115,6 +117,9 @@ public class ConvertChannelExprs extends SLIRReplacingVisitor {
     public Object visitPushExpression(SIRPushExpression oldSelf,
                                       CType oldTapeType,
                                       JExpression oldArg) {
+        
+        GenerateCCode.usedBufferIndex.add(pushBuffer);
+        
         // do the super
         SIRPushExpression self = 
             (SIRPushExpression)

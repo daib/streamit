@@ -265,6 +265,8 @@ public class SplitterFusionState extends FusionState {
                 JLocalVariableExpression incomingBuffer = new JLocalVariableExpression(
                         null, getBufferVar(null, isInit));
 
+                GenerateCCode.usedBufferIndex.add(getBufferVar(null, isInit));
+                
                 //incoming[induction * totalWeights + partialSum + innerVar]
                 JAddExpression incomingIndex = new JAddExpression(null,
                         new JMultExpression(null, new JLocalVariableExpression(
@@ -318,6 +320,8 @@ public class SplitterFusionState extends FusionState {
                     assert nextFS.getNode().ways == 1;
                     //get the downstream incoming buffer
                     pushBuffer = nextFS.getPushBufferVar(false);
+                    
+                    GenerateCCode.usedBufferIndex.add(pushBuffer);
 
                     pushCounter = nextFS.getPushCounterVar(false);
 
@@ -349,6 +353,8 @@ public class SplitterFusionState extends FusionState {
                 //the outgoing buffer of this way
                 JLocalVariableExpression outgoingBuffer = new JLocalVariableExpression(
                         null, downstream.getBufferVar(node, isInit));
+                
+                GenerateCCode.usedBufferIndex.add(downstream.getBufferVar(node, isInit));
 
                 //now create the buffer assignment
 

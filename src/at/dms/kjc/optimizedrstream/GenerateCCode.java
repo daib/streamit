@@ -1,7 +1,9 @@
 package at.dms.kjc.optimizedrstream;
 
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.Vector;
 import at.dms.kjc.common.*;
 import at.dms.kjc.flatgraph.*;
@@ -39,6 +41,8 @@ import java.util.Hashtable;
 public class GenerateCCode {
     public static List<FlatNode> visitedNodes = new LinkedList<FlatNode>();
     public static List<FilterFusionState> declaredFS = new LinkedList<FilterFusionState>();
+    public static Set<JLocalVariable> usedBufferIndex = new HashSet<JLocalVariable>();
+    public static Set<JLocalVariable> unsedVars;
 
     /* Whether or not to generate code for timing */
     public static final boolean generateTimingCode = !(KjcOptions.absarray || KjcOptions.doloops);
@@ -142,6 +146,11 @@ public class GenerateCCode {
 
         //set up the complete sir application
         setUpSIR();
+        
+        Set<JLocalVariable> collectedVars = collectBufferIndexVars(top);
+        
+        collectedVars.removeAll(usedBufferIndex);
+        unsedVars = collectedVars;
 
         //write the application to the C file using FlatIRToRS
         writeCompleteFile();
@@ -434,6 +443,20 @@ public class GenerateCCode {
                 generateCode(node, isInit);
 
         }
+    }
+    
+    private Set<JLocalVariable> collectBufferIndexVars(FlatNode top) {
+        Set<JLocalVariable> collectedVars = new HashSet<JLocalVariable>();
+        
+        Iterator<FlatNode> traversal = DataFlowTraversal.getTraversal(top)
+        .iterator();
+        while (traversal.hasNext()) {
+            FlatNode node = traversal.next();
+            for(int i = 0; i < node.incoming.length; i++) 
+            collectedVars.add(FusionState.getFusionState(node).getBufferVar(node.incoming[i], false));
+        }
+        
+        return collectedVars;
     }
 
     /** for each node in the graph visited by *visitGraph()*, 
