@@ -53,8 +53,14 @@ public class UniBackEnd {
         // assign SliceNodes to processors
         Layout<UniProcessor> layout;
         if (KjcOptions.spacetime && !KjcOptions.noswpipe) {
-            layout = new BasicGreedyLayout<UniProcessor>(schedule,
-                    processors.toArray());
+//            layout = new BasicGreedyLayout<UniProcessor>(schedule,
+//                    processors.toArray());
+            if (KjcOptions.profile)
+                layout = new BasicGreedyLayout<UniProcessor>(schedule,
+                        processors.toArray());
+            else
+                layout = new CompatibleFilterLayout<UniProcessor>(schedule,
+                        processors.toArray());
         } else {
             layout = new NoSWPipeLayout<UniProcessor, UniProcessors>(schedule,
                     processors);
@@ -99,10 +105,14 @@ public class UniBackEnd {
         try {
             CodegenPrintWriter p = new CodegenPrintWriter(new BufferedWriter(
                     new FileWriter(outputFileName, false)));
-            
-            for(String s:CodeStoreHelperSharedMem.runtimeObjs) {
-                p.println("E2Runtime " + s + ";");
+
+            if (KjcOptions.profile) {
+                p.println("#include <E2Runtime.h>");
+                for (String s : CodeStoreHelperSharedMem.runtimeObjs) {
+                    p.println("E2Runtime " + s + "_runtime_obj(\"" + s + "\");");
+                }
             }
+
             p.println("#include <pthread.h>\npthread_barrier_t barr;");
             // write out C code
             EmitStandaloneCode codeEmitter = new EmitStandaloneCode(

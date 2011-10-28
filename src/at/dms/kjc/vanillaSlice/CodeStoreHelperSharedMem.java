@@ -11,6 +11,7 @@ import at.dms.kjc.JIntLiteral;
 import at.dms.kjc.JStatement;
 import at.dms.kjc.JVariableDeclarationStatement;
 import at.dms.kjc.JVariableDefinition;
+import at.dms.kjc.KjcOptions;
 import at.dms.kjc.backendSupport.BackEndFactory;
 import at.dms.kjc.backendSupport.CodeStoreHelperSimple;
 import at.dms.kjc.slicegraph.FilterSliceNode;
@@ -18,7 +19,7 @@ import at.dms.util.Utils;
 
 public class CodeStoreHelperSharedMem extends CodeStoreHelperSimple {
 
-    public static boolean PERF_COUNTER = true;
+//    public static boolean PERF_COUNTER = true;
     
     public static Set<String> runtimeObjs = new HashSet<String>();
 
@@ -41,7 +42,7 @@ public class CodeStoreHelperSharedMem extends CodeStoreHelperSimple {
 
         JBlock block = new JBlock();
 
-        if (PERF_COUNTER && sliceNode.isFilterSlice()) {
+        if (KjcOptions.profile && sliceNode.isFilterSlice()) {
             String filterName = sliceNode.toString();
 
             if (filterName.indexOf("__") > 0) {
@@ -55,9 +56,9 @@ public class CodeStoreHelperSharedMem extends CodeStoreHelperSimple {
                     + "_" + filterName;
 
             block.addStatement(new JExpressionStatement(
-                    new JEmittedTextExpression(filterName + "_runtime_obj.prework_checkpoint()")));
+                    new JEmittedTextExpression(filterName + "_runtime_obj.prework_checkpoint(" + mult + ")")));
             
-            runtimeObjs.add(filterName + "_runtime_obj");
+            runtimeObjs.add(filterName);
         }
         
         JStatement workStmt = getWorkFunctionCall();
@@ -73,7 +74,7 @@ public class CodeStoreHelperSharedMem extends CodeStoreHelperSimple {
         } else
             block.addStatement(workStmt);
         
-        if (PERF_COUNTER && sliceNode.isFilterSlice()) {
+        if (KjcOptions.profile && sliceNode.isFilterSlice()) {
             String filterName = sliceNode.toString();
 
             if (filterName.indexOf("__") > 0) {
