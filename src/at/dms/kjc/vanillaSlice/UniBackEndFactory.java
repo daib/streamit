@@ -38,8 +38,8 @@ public class UniBackEndFactory extends BackEndFactory<
      * Creates <b>numProcessors</b> processors.
      * @param numProcessors  number of processors to create.
      */
-    public UniBackEndFactory(Integer numProcessors) {
-       this(new UniProcessors(numProcessors));
+    public UniBackEndFactory(Integer nRows, Integer nCols) {
+       this(new UniProcessors(nRows, nCols));
     }
     
     /**
@@ -49,7 +49,7 @@ public class UniBackEndFactory extends BackEndFactory<
      */
     public UniBackEndFactory(UniProcessors processors) {
         if (processors == null) {
-            processors = new UniProcessors(1);
+            processors = new UniProcessors(1,1);
         }
         this.processors = processors;
     }

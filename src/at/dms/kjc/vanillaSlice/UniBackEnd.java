@@ -4,6 +4,10 @@ import at.dms.kjc.sir.*;
 import at.dms.kjc.*;
 import at.dms.kjc.backendSupport.*;
 import at.dms.kjc.slicegraph.*;
+import at.dms.kjc.spacetime.AnnealedLayout;
+import at.dms.kjc.spacetime.RawChip;
+import at.dms.kjc.spacetime.RawTile;
+import at.dms.kjc.spacetime.SpaceTimeSchedule;
 import at.dms.kjc.common.CodegenPrintWriter;
 import at.dms.kjc.common.CommonUtils;
 
@@ -32,7 +36,9 @@ public class UniBackEnd {
             SIRInterfaceTable[] interfaceTables, SIRStructure[] structs,
             SIRHelper[] helpers, SIRGlobal global) {
 
-        int numCores = KjcOptions.newSimple;
+        int numCores = KjcOptions.newSimple * KjcOptions.newSimple;
+        int nRows = KjcOptions.newSimple;
+        int nCols = KjcOptions.newSimple;
 
         // The usual optimizations and transformation to slice graph
         CommonPasses commonPasses = new CommonPasses();
@@ -47,20 +53,25 @@ public class UniBackEnd {
         // partitioner contains information about the Slice graph used by dumpGraph
         Partitioner partitioner = commonPasses.getPartitioner();
 
+        //generate the schedule modeling values for each filter/slice 
+        partitioner.calculateWorkStats();
+
         // create a collection of (very uninformative) processor descriptions.
-        UniProcessors processors = new UniProcessors(numCores);
+        UniProcessors processors = new UniProcessors(nRows, nCols);
 
         // assign SliceNodes to processors
         Layout<UniProcessor> layout;
         if (KjcOptions.spacetime && !KjcOptions.noswpipe) {
-//            layout = new BasicGreedyLayout<UniProcessor>(schedule,
-//                    processors.toArray());
+            //            layout = new BasicGreedyLayout<UniProcessor>(schedule,
+            //                    processors.toArray());
             if (KjcOptions.profile)
                 layout = new BasicGreedyLayout<UniProcessor>(schedule,
                         processors.toArray());
             else
-                layout = new CompatibleFilterLayout<UniProcessor>(schedule,
-                        processors.toArray());
+                layout = new SWPipeLayout<UniProcessor, UniProcessors>(
+                        schedule, processors);
+            //                layout = new CompatibleFilterLayout<UniProcessor>(schedule,
+            //                        processors.toArray());
         } else {
             layout = new NoSWPipeLayout<UniProcessor, UniProcessors>(schedule,
                     processors);
@@ -132,5 +143,4 @@ public class UniBackEnd {
         // return success
         System.exit(0);
     }
-
 }

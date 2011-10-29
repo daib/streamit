@@ -16,13 +16,24 @@ public class UniProcessors  implements ComputeNodesI<UniComputeCodeStore>{
 
     /** our collection of nodes... */
     private Vector<UniProcessor> nodes; 
+    
+    private int nRows, nCols;
+    
+    public int getNRows() { return nRows;}
+    
+    public int getNCols() { return nCols;}
 
     /**
      * Construct a new collection and fill it with {@link ComputeNode}s.
      * 
      * @param numberOfNodes
      */
-    public UniProcessors(Integer numberOfNodes) {
+    public UniProcessors(Integer nRows, Integer nCols) {
+        int numberOfNodes = nRows * nCols;
+        
+        this.nRows = nRows;
+        this.nCols = nCols;
+        
         nodes = new Vector<UniProcessor>(numberOfNodes);
         for (int i = 0; i < numberOfNodes; i++) {
             UniProcessor node = new UniProcessor(i);
@@ -41,6 +52,11 @@ public class UniProcessors  implements ComputeNodesI<UniComputeCodeStore>{
         return nodes.elementAt(n);
     }
 
+    public UniProcessor getTile(int x, int y) {
+        return getNthComputeNode(x + y * nRows);
+        
+    }
+ 
     public boolean isValidComputeNodeNumber(int nodeNumber) {
         return 0 <= nodeNumber && nodeNumber < nodes.size();
     }
@@ -56,6 +72,22 @@ public class UniProcessors  implements ComputeNodesI<UniComputeCodeStore>{
 
     public UniProcessor[] toArray() {
         return nodes.toArray(new UniProcessor[nodes.size()]);
+    }
+
+    public static int getXDir(ComputeNode src, ComputeNode dst) {
+        if (dst.getX() - src.getX() < 0)
+            return -1;
+        if (dst.getX() - src.getX() > 0)
+            return 1;
+        return 0;
+    }
+
+    public static int getYDir(ComputeNode src, ComputeNode dst) {
+        if (dst.getY() - src.getY() < 0)
+            return -1;
+        if (dst.getY() - src.getY() > 0)
+            return 1;
+        return 0;
     }
 }
 
