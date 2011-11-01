@@ -5,6 +5,7 @@ import at.dms.kjc.*;
 import at.dms.kjc.backendSupport.*;
 import at.dms.kjc.slicegraph.*;
 import at.dms.kjc.spacetime.AnnealedLayout;
+import at.dms.kjc.spacetime.MultiplySteadyState;
 import at.dms.kjc.spacetime.RawChip;
 import at.dms.kjc.spacetime.RawTile;
 import at.dms.kjc.spacetime.SpaceTimeSchedule;
@@ -53,6 +54,9 @@ public class UniBackEnd {
         // partitioner contains information about the Slice graph used by dumpGraph
         Partitioner partitioner = commonPasses.getPartitioner();
 
+        System.out.println("Multiplying Steady-State...");
+        MultiplySteadyState.doit(partitioner.getSliceGraph());
+        
         //generate the schedule modeling values for each filter/slice 
         partitioner.calculateWorkStats();
 

@@ -1,7 +1,7 @@
 package at.dms.kjc.vanillaSlice;
 
 import at.dms.kjc.backendSupport.ComputeNode;
-import at.dms.kjc.backendSupport.ComputeNodesI; 
+import at.dms.kjc.backendSupport.ComputeNodesI;
 import java.util.*;
 import at.dms.kjc.backendSupport.ComputeNodes;
 
@@ -12,16 +12,20 @@ import at.dms.kjc.backendSupport.ComputeNodes;
  *
  */
 
-public class UniProcessors  implements ComputeNodesI<UniComputeCodeStore>{
+public class UniProcessors implements ComputeNodesI<UniComputeCodeStore> {
 
     /** our collection of nodes... */
-    private Vector<UniProcessor> nodes; 
-    
+    private Vector<UniProcessor> nodes;
+
     private int nRows, nCols;
-    
-    public int getNRows() { return nRows;}
-    
-    public int getNCols() { return nCols;}
+
+    public int getNRows() {
+        return nRows;
+    }
+
+    public int getNCols() {
+        return nCols;
+    }
 
     /**
      * Construct a new collection and fill it with {@link ComputeNode}s.
@@ -30,14 +34,18 @@ public class UniProcessors  implements ComputeNodesI<UniComputeCodeStore>{
      */
     public UniProcessors(Integer nRows, Integer nCols) {
         int numberOfNodes = nRows * nCols;
-        
+
         this.nRows = nRows;
         this.nCols = nCols;
-        
+
         nodes = new Vector<UniProcessor>(numberOfNodes);
-        for (int i = 0; i < numberOfNodes; i++) {
-            UniProcessor node = new UniProcessor(i);
-            nodes.add(node);
+        //for (int i = 0; i < numberOfNodes; i++) {
+        for (int x = 0; x < nCols; x++) {
+            for (int y = 0; y < nRows; y++) {
+                int i = y + x * nRows;
+                UniProcessor node = new UniProcessor(i, x, y);
+                nodes.add(node);
+            }
         }
     }
 
@@ -53,16 +61,16 @@ public class UniProcessors  implements ComputeNodesI<UniComputeCodeStore>{
     }
 
     public UniProcessor getTile(int x, int y) {
-        return getNthComputeNode(x + y * nRows);
-        
+        return getNthComputeNode(y + x * nRows);
+
     }
- 
+
     public boolean isValidComputeNodeNumber(int nodeNumber) {
         return 0 <= nodeNumber && nodeNumber < nodes.size();
     }
 
     public int newComputeNode() {
-        nodes.add(new UniProcessor(nodes.size()));
+        nodes.add(new UniProcessor(nodes.size(), -1, -1));
         return nodes.size() - 1;
     }
 
@@ -90,4 +98,3 @@ public class UniProcessors  implements ComputeNodesI<UniComputeCodeStore>{
         return 0;
     }
 }
-

@@ -3,11 +3,16 @@ package at.dms.kjc.vanillaSlice;
 
 //import java.util.*;
 //import at.dms.kjc.*;
+import at.dms.kjc.JExpression;
+import at.dms.kjc.JMethodCallExpression;
 import at.dms.kjc.KjcOptions;
-import at.dms.kjc.sir.*;
-import at.dms.kjc.backendSupport.*;
-//import at.dms.kjc.slicegraph.*;
-import at.dms.kjc.common.*;
+import at.dms.kjc.backendSupport.BackEndFactory;
+import at.dms.kjc.backendSupport.ComputeNode;
+import at.dms.kjc.backendSupport.EmitCode;
+import at.dms.kjc.backendSupport.EmitTypedefs;
+import at.dms.kjc.common.CodegenPrintWriter;
+import at.dms.kjc.common.CommonUtils;
+import at.dms.kjc.sir.SIRStructure;
 
 /**
  * Takes a ComputeNode collection, a collection of Channel's, 
@@ -154,4 +159,33 @@ public class EmitStandaloneCode extends EmitCode {
         p.outdent();
         p.println("}");
     }
+    
+    public void emitCodeForComputeNode(ComputeNode n, CodegenPrintWriter p) {
+        codegen = new CPPCodeGen(p);
+        emitCodeForComputeNode(n, p, codegen);
+    }
+
+    protected class CPPCodeGen extends CodeGen {
+
+        protected CPPCodeGen(CodegenPrintWriter p) {
+            super(p);
+            // TODO Auto-generated constructor stub
+        }
+
+        /**
+         * Prints a method call expression.
+         */
+        @Override
+        public void visitMethodCallExpression(JMethodCallExpression self,
+                JExpression prefix, String ident, JExpression[] args) {
+            // math functions are converted to use their floating-point counterparts;
+            p.print(ident);
+
+            p.print("(");
+            visitArgs(args, 0);
+            p.print(")");
+        }
+
+    }
+
 }

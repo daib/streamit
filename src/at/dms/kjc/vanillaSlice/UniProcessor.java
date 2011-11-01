@@ -9,9 +9,11 @@ import at.dms.kjc.backendSupport.ComputeNode;
  *
  */
 public class UniProcessor extends ComputeNode<UniComputeCodeStore> {
-    public UniProcessor(int uniqueId) {
+    public UniProcessor(int uniqueId, int x, int y) {
         super();
         setUniqueId(uniqueId);
+        setX(x);
+        setY(y);
         computeCode = new UniComputeCodeStore(this);
     }
 }
