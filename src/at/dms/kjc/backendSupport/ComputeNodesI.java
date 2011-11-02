@@ -1,5 +1,7 @@
 package at.dms.kjc.backendSupport;
 
+import at.dms.kjc.vanillaSlice.UniProcessor;
+
 /**
  * Define what a collection of ComputeNodes must implement.
  * A Collection of ComputeNodes inherits from a collection of ProcElements
@@ -54,4 +56,5 @@ public interface ComputeNodesI<CodeStoreType extends ComputeCodeStore<?>> {
      * @param <T> the actual class returned.
      */
     public <T extends ComputeNode<CodeStoreType>> T getNthComputeNode(int n);
+    
 }
