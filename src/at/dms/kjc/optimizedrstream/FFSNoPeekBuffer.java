@@ -252,20 +252,6 @@ public class FFSNoPeekBuffer extends FilterFusionState {
             //clone work function 
             JMethodDeclaration work = filter.getWork();
 
-            //FIXME: Dai added
-            //            System.out.println(filter.getIdent());
-            //            work.accept(new KjcEmptyVisitor() {
-            //                public void visitMethodDeclaration(JMethodDeclaration self,
-            //                        int modifiers, CType returnType, String ident,
-            //                        JFormalParameter[] parameters, CClassType[] exceptions,
-            //                        JBlock body) {
-            //                    if ((modifiers & ACC_EMBEDDING) != 0) {
-            //                        System.out.println(filter.getIdent() + " is embedded");
-            //                    }
-            //
-            //                }
-            //            });
-
             JBlock oldBody = new JBlock(null, work.getStatements(), null);
 
             JStatement body = (JBlock) ObjectDeepCloner.deepCopy(oldBody);

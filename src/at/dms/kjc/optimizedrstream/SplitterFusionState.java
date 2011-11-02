@@ -266,7 +266,7 @@ public class SplitterFusionState extends FusionState {
                         null, getBufferVar(null, isInit));
 
                 GenerateCCode.usedBufferIndex.add(getBufferVar(null, isInit));
-                
+
                 //incoming[induction * totalWeights + partialSum + innerVar]
                 JAddExpression incomingIndex = new JAddExpression(null,
                         new JMultExpression(null, new JLocalVariableExpression(
@@ -275,8 +275,8 @@ public class SplitterFusionState extends FusionState {
                         new JAddExpression(null, new JIntLiteral(node
                                 .getPartialOutgoingSum(i)),
                                 new JLocalVariableExpression(null, innerVar)));
-                incomingAccess = new JArrayAccessExpression(
-                        null, incomingBuffer, incomingIndex);
+                incomingAccess = new JArrayAccessExpression(null,
+                        incomingBuffer, incomingIndex);
             }
 
             //check if the next node is suitable to be fused
@@ -288,9 +288,7 @@ public class SplitterFusionState extends FusionState {
             if (nextNode.isFilter()) {
                 //first, test if the next node is 'simple' , e.g. pop 1 like Add actor
                 SIRFilter filter = (SIRFilter) nextNode.contents;
-                if (filter.getPopInt() == 1) {
-                    GenerateCCode.visitedNodes.add(nextNode);
-
+                if (PullableTransform.pushableEnable && filter.getPopInt() == 1) {
                     //blending the code of this downstream node with the current node.
                     blending = true;
                 }
@@ -298,10 +296,11 @@ public class SplitterFusionState extends FusionState {
 
             if (blending) {
 
+                GenerateCCode.visitedNodes.add(nextNode);
                 JBlock oldBody = new JBlock(null,
                         ((SIRFilter) nextNode.contents).getWork()
                                 .getStatements(), null);
-                
+
                 oldBody.addStatementFirst(new SIRBeginMarker(nextNode.getName()));
                 oldBody.addStatement(new SIREndMarker(nextNode.getName()));
 
@@ -320,7 +319,7 @@ public class SplitterFusionState extends FusionState {
                     assert nextFS.getNode().ways == 1;
                     //get the downstream incoming buffer
                     pushBuffer = nextFS.getPushBufferVar(false);
-                    
+
                     GenerateCCode.usedBufferIndex.add(pushBuffer);
 
                     pushCounter = nextFS.getPushCounterVar(false);
@@ -344,7 +343,7 @@ public class SplitterFusionState extends FusionState {
                 }
 
                 body.accept(new ChannelReplacer(incomingAccess, null, pushExpr));
-                
+
                 //loop the assign statement based on the weight of this incoming way
                 loops.addStatement(GenerateCCode.makeDoLoop(body, innerVar,
                         new JIntLiteral(node.weights[i])));
@@ -353,8 +352,9 @@ public class SplitterFusionState extends FusionState {
                 //the outgoing buffer of this way
                 JLocalVariableExpression outgoingBuffer = new JLocalVariableExpression(
                         null, downstream.getBufferVar(node, isInit));
-                
-                GenerateCCode.usedBufferIndex.add(downstream.getBufferVar(node, isInit));
+
+                GenerateCCode.usedBufferIndex.add(downstream.getBufferVar(node,
+                        isInit));
 
                 //now create the buffer assignment
 

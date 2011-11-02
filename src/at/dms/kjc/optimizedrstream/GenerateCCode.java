@@ -123,7 +123,7 @@ public class GenerateCCode {
         PullableTransform.findTransformableFilters(top);
         global.addAllStatements(PullableTransform.popIndexDeclarations);
 
-        functions.addAll(PullableTransform.functions);
+        functions.addAll(PullableTransform.tranformedWorkFunctions);
 
         //insert pop index init to steady loop
         for (JStatement st : PullableTransform.popIndexDeclarations) {

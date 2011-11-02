@@ -215,17 +215,20 @@ public class JoinerFusionState extends FusionState {
                 continue;
 
             JExpression incomingAccess;
-            
-          //FIXME: What should we do when the filter is both pushable and pullable?
-            
-            if (PullableTransform.pullableNodes.contains(node.incoming[i]) && ((SIRFilter)(node.incoming[i].contents)).getPopInt() != 1) {
-                incomingAccess = new JMethodCallExpression(null, ((SIRFilter) node.incoming[i].contents).getWork()
-                                    .getName(), null);
+
+            //FIXME: What should we do when the filter is both pushable and pullable?
+
+            if (PullableTransform.pullableNodes.contains(node.incoming[i])
+                    && !((PullableTransform.pushableEnable) && (node.incoming[i]
+                            .getFilter().getPopInt() == 1))) {
+                //            if (PullableTransform.pullableNodes.contains(node.incoming[i])) {
+                incomingAccess = new JMethodCallExpression(null,
+                        node.incoming[i].getFilter().getWork().getName(), null);
             } else {
-              //get the incoming buffer variable
-                JVariableDefinition incomingBuffer = getBufferVar(node.incoming[i],
-                        isInit);
-                
+                //get the incoming buffer variable
+                JVariableDefinition incomingBuffer = getBufferVar(
+                        node.incoming[i], isInit);
+
                 GenerateCCode.usedBufferIndex.add(incomingBuffer);
 
                 //now construct the incoming buffer access
@@ -235,7 +238,7 @@ public class JoinerFusionState extends FusionState {
                                 node.incomingWeights[i]),
                                 new JLocalVariableExpression(null, induction)),
                         new JLocalVariableExpression(null, innerVar));
-                
+
                 incomingAccess = new JArrayAccessExpression(null,
                         new JLocalVariableExpression(null, incomingBuffer),
                         incomingIndex);
@@ -254,8 +257,8 @@ public class JoinerFusionState extends FusionState {
                 if (nextNode.isFilter()) {
                     //first, test if the next node is 'simple' , e.g. pop 1 like Add actor
                     SIRFilter filter = (SIRFilter) nextNode.contents;
-                    if (filter.getPopInt() == 1) {
-                        GenerateCCode.visitedNodes.add(nextNode);
+                    if (PullableTransform.pushableEnable
+                            && filter.getPopInt() == 1) {
 
                         //blending the code of this downstream node with the current node.
                         blending = true;
@@ -264,14 +267,17 @@ public class JoinerFusionState extends FusionState {
 
                 if (blending) {
 
+                    GenerateCCode.visitedNodes.add(nextNode);
+
                     JBlock nextOldBody = new JBlock(null,
                             ((SIRFilter) nextNode.contents).getWork()
                                     .getStatements(), null);
 
-                    nextOldBody.addStatementFirst(new SIRBeginMarker(nextNode.getName()));
-                    nextOldBody.addStatement(new SIREndMarker(nextNode.getName()));
+                    nextOldBody.addStatementFirst(new SIRBeginMarker(nextNode
+                            .getName()));
+                    nextOldBody.addStatement(new SIREndMarker(nextNode
+                            .getName()));
 
-                    
                     JStatement nextBody = (JBlock) ObjectDeepCloner
                             .deepCopy(nextOldBody);
 
@@ -288,7 +294,7 @@ public class JoinerFusionState extends FusionState {
                         assert nextFS.getNode().ways == 1;
                         //get the downstream incoming buffer
                         pushBuffer = nextFS.getPushBufferVar(false);
-                        
+
                         GenerateCCode.usedBufferIndex.add(pushBuffer);
 
                         pushCounter = nextFS.getPushCounterVar(false);
@@ -346,7 +352,7 @@ public class JoinerFusionState extends FusionState {
                     JArrayAccessExpression outgoingAccess = new JArrayAccessExpression(
                             null, new JLocalVariableExpression(null,
                                     outgoingBuffer), outgoingIndex);
-                    
+
                     GenerateCCode.usedBufferIndex.add(outgoingBuffer);
 
                     //create the assignment expression
