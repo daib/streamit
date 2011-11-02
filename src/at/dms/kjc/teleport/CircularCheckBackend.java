@@ -14,7 +14,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import streamit.scheduler2.Schedule;
 import at.dms.kjc.JInterfaceDeclaration;
 import at.dms.kjc.StreamItDot;
 import at.dms.kjc.cluster.LatencyConstraints;
@@ -86,7 +85,7 @@ public class CircularCheckBackend {
      * Holds passed structures until they can be handeed off to
      * {@link StructureIncludeFile}.
      */
-    private static SIRStructure[] structures;
+    protected static SIRStructure[] structures;
 
     // /**
     // * Used to iterate over str structure ignoring flattening.
@@ -194,13 +193,15 @@ public class CircularCheckBackend {
 
         long startTime = (new Date()).getTime();
 
-        streamit.scheduler2.Scheduler scheduler = streamit.scheduler2.singleappearance.Scheduler
+        streamit.scheduler2.Scheduler scheduler = streamit.scheduler2.minlatency.Scheduler
                 .create(topStreamIter);
 
         scheduler.computeSchedule();
         //        scheduler.computeBufferUse();
-        Schedule initSched = scheduler.getOptimizedInitSchedule();
-        Schedule steadySched = scheduler.getOptimizedSteadySchedule();
+        scheduler.getOptimizedInitSchedule();
+        scheduler.getOptimizedSteadySchedule();
+        
+        System.err.print("num vertices " + numVertices(scheduler));
 
         if (debugging)
             scheduler.printReps();
@@ -261,7 +262,7 @@ public class CircularCheckBackend {
         System.exit(0);
     }
 
-    private static boolean zeroCycleDetection(Set<Edge> edges,
+    protected static boolean zeroCycleDetection(Set<Edge> edges,
             Set<Vertex> vertices) {
         int n = vertices.size();
 
@@ -364,7 +365,7 @@ public class CircularCheckBackend {
         }
     }
 
-    private static double topoSort(Set<Edge> edges, Set<Vertex> vertices) {
+    protected static double topoSort(Set<Edge> edges, Set<Vertex> vertices) {
 
         if (debugging) {
             CodegenPrintWriter p;
@@ -529,7 +530,7 @@ public class CircularCheckBackend {
         return gamma;
     }
 
-    private static Edge getEdge(Vertex u, Vertex v, Set<Edge> edges) {
+    protected static Edge getEdge(Vertex u, Vertex v, Set<Edge> edges) {
         for (Edge e : edges) {
             if (e.getSrc() == u && e.getDst() == v) {
                 return e;
@@ -538,7 +539,22 @@ public class CircularCheckBackend {
         return null;
     }
 
-    private static void addCausalityDependencyEdges(
+    private static int numVertices(streamit.scheduler2.Scheduler scheduler) {
+        int num = 0;
+        
+        HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+
+        for (Object key : strRepetitions.keySet()) {
+            if (!(key instanceof SIRFilter))
+                continue;
+            int[] reps = (int[]) strRepetitions.get(key);
+            num += reps[0];
+        }
+        
+        return num;
+    }
+    
+    protected static void addCausalityDependencyEdges(
             streamit.scheduler2.Scheduler scheduler,
             Set<Edge> edges, Set<Vertex> vertices) {
 
@@ -551,8 +567,11 @@ public class CircularCheckBackend {
             for (int i = 1; i < reps[0]; i++) {
                 Vertex v = getVertex((SIRStream) key, i, vertices);
                 Vertex u = getVertex((SIRStream) key, i + 1, vertices);
+                
+                if(u != null && v != null) {
                 Edge e = new Edge(u, v, 0);
                 edges.add(e);
+                }
             }
 
             Vertex u = getVertex((SIRStream) key, 1, vertices);
@@ -563,7 +582,7 @@ public class CircularCheckBackend {
 
     }
 
-    private static void addDataDependencyEdges(
+    protected static void addDataDependencyEdges(
             streamit.scheduler2.Scheduler scheduler,
             Set<Edge> edges, Set<Vertex> vertices) {
 
@@ -635,7 +654,7 @@ public class CircularCheckBackend {
 
     }
 
-    private static void addControlDependencyEdges(
+    protected static void addControlDependencyEdges(
             streamit.scheduler2.Scheduler scheduler,
             Set<Edge> edges, Set<Vertex> vertices) {
 
@@ -781,7 +800,7 @@ public class CircularCheckBackend {
     /*
      * 
      */
-    private static Set<Vertex> createVertices(
+    protected static Set<Vertex> createVertices(
             streamit.scheduler2.Scheduler scheduler) {
         Set<Vertex> vertices = new HashSet<Vertex>();
 
@@ -837,7 +856,7 @@ public class CircularCheckBackend {
     /**
     * Just some debugging output.
     */
-    private static void debugOutput(SIRStream str) {
+    protected static void debugOutput(SIRStream str) {
         streamit.scheduler2.constrained.Scheduler cscheduler = streamit.scheduler2.constrained.Scheduler
                 .createForSDEP(topStreamIter);
 
