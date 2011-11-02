@@ -35,11 +35,18 @@ import at.dms.kjc.sir.SIRPortalSender;
 import at.dms.kjc.sir.SIRSplitJoin;
 import at.dms.kjc.sir.SIRStream;
 import at.dms.kjc.sir.SIRStructure;
+import at.dms.kjc.sir.lowering.ArrayInitExpander;
 import at.dms.kjc.sir.lowering.ConstantProp;
+import at.dms.kjc.sir.lowering.ConstructSIRTree;
+import at.dms.kjc.sir.lowering.EnqueueToInitPath;
+import at.dms.kjc.sir.lowering.IntroduceMultiPops;
+import at.dms.kjc.sir.lowering.RenameAll;
+import at.dms.kjc.sir.lowering.RoundToFloor;
 import at.dms.kjc.sir.lowering.SimplifyArguments;
 import at.dms.kjc.sir.lowering.SimplifyPopPeekPush;
 import at.dms.kjc.sir.lowering.StaticsProp;
 import at.dms.kjc.sir.lowering.Unroller;
+import at.dms.kjc.sir.lowering.VarDeclRaiser;
 
 /**
  */
@@ -95,7 +102,7 @@ public class CircularCheckBackend {
             SIRInterfaceTable[] interfaceTables, SIRStructure[] structs,
             SIRHelper[] helpers, SIRGlobal global) {
 
-        System.out.println("Entry to CircularCheckBacken");
+        System.out.println("Entry to CircularCheckBackend");
 
         structures = structs;
 
@@ -133,11 +140,33 @@ public class CircularCheckBackend {
         ConstantProp.propagateAndUnroll(str, true);
         System.err.println(" done.");
 
-        // construct stream hierarchy from SIRInitStatements
-        //		ConstructSIRTree.doit(str);
+        // Introduce Multiple Pops where programmer
+        // didn't take advantage of them (after parameters are propagated).
+        IntroduceMultiPops.doit(str);
+        
+        // convert round(x) to floor(0.5+x) to avoid obscure errors
+        RoundToFloor.doit(str);
 
-        // this must be run now, Further passes expect unique names!!!
-        //        RenameAll.renameAllFilters(str);
+        // add initPath functions
+        EnqueueToInitPath.doInitPath(str);
+        
+        // construct stream hierarchy from SIRInitStatements
+        ConstructSIRTree.doit(str);
+
+        //this must be run now, Further passes expect unique names!!!
+        RenameAll.renameAllFilters(str);
+
+        //SIRPrinter printer1 = new SIRPrinter();
+        //str.accept(printer1);
+        //printer1.close();
+
+        //VarDecl Raise to move array assignments up
+        new VarDeclRaiser().raiseVars(str);
+
+
+        // expand array initializers loaded from a file
+        ArrayInitExpander.doit(str);
+        System.err.println(" done.");   // announce end of ConstantProp and Unroll
 
         // System.err.println("Analyzing Branches..");
         // new BlockFlattener().flattenBlocks(str);
@@ -165,7 +194,7 @@ public class CircularCheckBackend {
 
         long startTime = (new Date()).getTime();
 
-        streamit.scheduler2.constrained.Scheduler scheduler = streamit.scheduler2.constrained.Scheduler
+        streamit.scheduler2.Scheduler scheduler = streamit.scheduler2.singleappearance.Scheduler
                 .create(topStreamIter);
 
         scheduler.computeSchedule();
@@ -202,19 +231,32 @@ public class CircularCheckBackend {
 
         if (debugging)
             printGraph(edges);
+        
+        System.gc();
+        
+        System.err.println("\nStart checking ... with " + vertices.size() + " nodes");
 
         //checking for zero edges
         if (zeroCycleDetection(edges, vertices)) {
             System.out.println("Found a circular dependency");
             System.exit(1);
         }
-
-        //sorting
-        double gamma = topoSort(edges, vertices);
-
+        
         long endTime = (new Date()).getTime();
 
-        System.out.println("\nComputational time: " + (endTime - startTime) + " n vertices " + vertices.size());
+        System.out.println("\nCircular checking time: " + (endTime - startTime) + " n vertices " + vertices.size());
+
+        startTime = endTime;
+        
+        //sorting
+        System.err.println("\nStart sorting ...");
+        System.gc();
+        
+        double gamma = topoSort(edges, vertices);
+
+        endTime = (new Date()).getTime();
+
+        System.out.println("\nSorting time: " + (endTime - startTime) + " n vertices " + vertices.size());
 
         System.exit(0);
     }
@@ -497,7 +539,7 @@ public class CircularCheckBackend {
     }
 
     private static void addCausalityDependencyEdges(
-            streamit.scheduler2.constrained.Scheduler scheduler,
+            streamit.scheduler2.Scheduler scheduler,
             Set<Edge> edges, Set<Vertex> vertices) {
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
@@ -522,7 +564,7 @@ public class CircularCheckBackend {
     }
 
     private static void addDataDependencyEdges(
-            streamit.scheduler2.constrained.Scheduler scheduler,
+            streamit.scheduler2.Scheduler scheduler,
             Set<Edge> edges, Set<Vertex> vertices) {
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
@@ -594,7 +636,7 @@ public class CircularCheckBackend {
     }
 
     private static void addControlDependencyEdges(
-            streamit.scheduler2.constrained.Scheduler scheduler,
+            streamit.scheduler2.Scheduler scheduler,
             Set<Edge> edges, Set<Vertex> vertices) {
 
         SIRPortal[] portals = SIRPortal.getPortals();
@@ -740,7 +782,7 @@ public class CircularCheckBackend {
      * 
      */
     private static Set<Vertex> createVertices(
-            streamit.scheduler2.constrained.Scheduler scheduler) {
+            streamit.scheduler2.Scheduler scheduler) {
         Set<Vertex> vertices = new HashSet<Vertex>();
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
