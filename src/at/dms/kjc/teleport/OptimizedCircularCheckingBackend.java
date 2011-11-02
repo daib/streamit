@@ -158,12 +158,16 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
         //create graph
 
         //create vertices
-        Set<Vertex> vertices = createVertices(scheduler);
+        Set<SIRStream> streams = new HashSet<SIRStream>();
+        Set<Vertex> vertices = createVertices(scheduler, streams);
+
+        System.err.println("Num vertices " + vertices.size());
+
         Set<Edge> edges = new HashSet<Edge>();
 
-        addCausalityDependencyEdges(scheduler, edges, vertices);
+        addCausalityDependencyEdges(scheduler, edges, vertices, streams);
 
-        addDataDependencyEdges(scheduler, edges, vertices);
+        addDataDependencyEdges(scheduler, edges, vertices, streams);
 
         addControlDependencyEdges(scheduler, edges, vertices);
 
@@ -203,14 +207,14 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
     }
 
     protected static Set<Vertex> createVertices(
-            streamit.scheduler2.Scheduler scheduler) {
+            streamit.scheduler2.Scheduler scheduler, Set<SIRStream> streams) {
+
         Set<Vertex> vertices = new HashSet<Vertex>();
-        Set<SIRStream> created = new HashSet<SIRStream>();
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
         SIRPortal[] portals = SIRPortal.getPortals();
-        LatencyConstraints.detectConstraints(portals);
+        //        LatencyConstraints.detectConstraints(portals);
 
         for (int p = 0; p < portals.length; p++) {
 
@@ -218,8 +222,8 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
 
             for (SIRPortalSender sender : portal.getSenders()) {
                 SIRStream str = sender.getStream();
-                if (!created.contains(str)) {
-                    created.add(str);
+                if (!streams.contains(str)) {
+                    streams.add(str);
 
                     int[] reps = (int[]) strRepetitions.get(str);
 
@@ -235,7 +239,7 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
             }
 
             for (SIRStream str : portal.getReceivers()) {
-                if (!created.contains(str)) {
+                if (!streams.contains(str)) {
                     int[] reps = (int[]) strRepetitions.get(str);
 
                     for (int i = 0; i < reps[0]; i++) {
@@ -255,18 +259,12 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
 
     protected static void addCausalityDependencyEdges(
             streamit.scheduler2.Scheduler scheduler, Set<Edge> edges,
-            Set<Vertex> vertices) {
+            Set<Vertex> vertices, Set<SIRStream> streams) {
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
-        Set<SIRStream> added = new HashSet<SIRStream>();
 
-        for (Vertex vertex : vertices) {
-            SIRStream str = vertex.getStream();
-            if(added.contains(str))
-                continue;
-            
-            added.add(str);
-            
+        for (SIRStream str : streams) {
+
             int[] reps = (int[]) strRepetitions.get(str);
             for (int i = 1; i < reps[0]; i++) {
                 Vertex v = getVertex((SIRStream) str, i, vertices);
@@ -288,7 +286,7 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
 
     protected static void addDataDependencyEdges(
             streamit.scheduler2.Scheduler scheduler, Set<Edge> edges,
-            Set<Vertex> vertices) {
+            Set<Vertex> vertices, Set<SIRStream> streams) {
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
@@ -296,16 +294,13 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
         streamit.scheduler2.constrained.Scheduler cscheduler = streamit.scheduler2.constrained.Scheduler
                 .createForSDEP(topStreamIter);
 
-        Object[] vs = vertices.toArray();
+        Object[] strs = streams.toArray();
 
         //for each pair of vertices
-        for (int x = 0; x < vs.length; x++) {
-            for (int y = x + 1; y < vs.length; y++) {
-                SIRStream s1 = ((Vertex) vs[x]).getStream();
-                SIRStream s2 = ((Vertex) vs[y]).getStream();
-                
-                if(s1 == s2)
-                    continue;
+        for (int x = 0; x < strs.length; x++) {
+            for (int y = x + 1; y < strs.length; y++) {
+                SIRStream s1 = (SIRStream) strs[x];
+                SIRStream s2 = (SIRStream) strs[y];
 
                 streamit.scheduler2.iriter.Iterator s1Iter = IterFactory
                         .createFactory().createIter(s1);
