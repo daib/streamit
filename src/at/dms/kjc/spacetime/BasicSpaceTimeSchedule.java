@@ -28,12 +28,15 @@ public class BasicSpaceTimeSchedule {
     //the multiplicities of the slices in the primepump
     //Slice->Integer
     private HashMap<Slice, Integer> primePumpMult;
+    
+    private HashMap<Slice, Integer> steadyMult;
  
     /**
      * Constructor
      */
     public BasicSpaceTimeSchedule() {
         primePumpMult = new HashMap<Slice, Integer>();
+        steadyMult = new HashMap<Slice, Integer>();;
     }
     /**
      * @param is The initSchedule to set.
@@ -76,6 +79,18 @@ public class BasicSpaceTimeSchedule {
      */
     final public void setSchedule(LinkedList<Slice> schedule) {
         this.schedule = schedule.toArray(new Slice[0]);
+        
+        steadyMult.clear();
+        
+        for (int i = 0; i < schedule.size(); i++ ) {
+            Slice slice = schedule.get(i);
+            if(steadyMult.get(slice) == null) {
+                steadyMult.put(slice,1);
+            } else {
+                steadyMult.put(slice, steadyMult.get(slice) + 1);
+            }
+            
+        }
     }
     
     
@@ -144,4 +159,14 @@ public class BasicSpaceTimeSchedule {
         return getPrimePumpMult(f.sliceNode.getParent()) * f.steadyMult;
     }
 
+    
+    /** 
+     * @param slice
+     * @return Return the number of times this slice fires in the prime pump schedule.
+     */
+    final public int getSteadyMult(Slice slice) {
+        if (!steadyMult.containsKey(slice))
+            return 0;
+        return steadyMult.get(slice).intValue();
+    }
 }
