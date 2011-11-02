@@ -21,7 +21,7 @@ import at.dms.kjc.sir.SIRPushExpression;
 public class VariableDefinitionReplacer extends KjcEmptyVisitor {
 
     Set<JVariableDefinition> variables = new HashSet<JVariableDefinition>();
-    static public Set<JAssignmentExpression> firstAssignments = new HashSet<JAssignmentExpression>();
+    public Set<JAssignmentExpression> firstAssignments = new HashSet<JAssignmentExpression>();
 
     /**
      * prints a variable declaration statement

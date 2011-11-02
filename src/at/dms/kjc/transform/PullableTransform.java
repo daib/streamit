@@ -40,10 +40,16 @@ import at.dms.kjc.sir.SIRPushExpression;
 public class PullableTransform {
     public static List<FlatNode> pullableNodes = new LinkedList<FlatNode>();
     public static List<JStatement> popIndexDeclarations = new LinkedList<JStatement>();
-    /* any helper functions of the application */
-    static public Vector<JMethodDeclaration> functions = new Vector<JMethodDeclaration>();
+    static public Vector<JMethodDeclaration> tranformedWorkFunctions = new Vector<JMethodDeclaration>();
+
+    final public static boolean pushableEnable = true;
+    final public static boolean pullablEnable = true;
 
     public static void findTransformableFilters(FlatNode top) {
+        
+        if(!pullablEnable)
+            return;
+        
         //get a data-flow ordered traversal for the graph, i.e. a node 
         //can only fire if its upstream filters have fired
         Iterator<FlatNode> traversal = DataFlowTraversal.getTraversal(top)
@@ -54,14 +60,21 @@ public class PullableTransform {
 
             if (node.isFilter()) {
                 //check if this node is transformable
-                SIRFilter filter = (SIRFilter) node.contents;
-                if (filter.getPopInt() == 1) //FIXME: no need to generate code for pusable filters?
+                SIRFilter filter = node.getFilter();
+
+                if (filter.getIdent().startsWith("iDCT"))
                     continue;
-//                if (filter.getIdent().startsWith("iDCT"))
-//                    continue;
+                if (filter.getIdent().startsWith("ReversePixelOrder"))
+                    continue;
+
+                if (pushableEnable && filter.getPopInt() == 1) //FIXME: no need to generate code for pushable filters?
+                    continue;
+
                 List<JStatement> workStatements = filter.getWork()
                         .getStatements();
-                if (checkTranformableStatements(workStatements)) {
+                if (node.getFilter().getPushInt() == 1) {
+                    pullableNodes.add(node);
+                } else if (checkTranformableStatements(workStatements)) {
                     pullableNodes.add(node);
                 }
 
@@ -75,7 +88,7 @@ public class PullableTransform {
             JMethodDeclaration workMethod = (JMethodDeclaration) ObjectDeepCloner
                     .deepCopy(filter.getWork());
 
-            functions.add(pullableTransform(workMethod, node));
+            tranformedWorkFunctions.add(pullableTransform(workMethod, node));
         }
 
     }
@@ -139,15 +152,15 @@ public class PullableTransform {
                             }
 
                             //add loop around
-                            JWhileStatement enclosingWhile = new JWhileStatement(
-                                    null, new JBooleanLiteral(null, true),
-                                    body, null);
-                            JBlock newBody = new JBlock();
-                            newBody.addStatement(enclosingWhile);
+//                            JWhileStatement enclosingWhile = new JWhileStatement(
+//                                    null, new JBooleanLiteral(null, true),
+//                                    body, null);
+//                            JBlock newBody = new JBlock();
+//                            newBody.addStatement(enclosingWhile);
 
                             return new JMethodDeclaration(null, modifiers, self
                                     .getPush().getType(), ident, parameters,
-                                    exceptions, newBody, null, null);
+                                    exceptions, body, null, null);
                             //return self;
                         };
 
@@ -177,18 +190,19 @@ public class PullableTransform {
                                     }
                                 }
                             }
-                            
-                            for(JLocalVariable forIndexVar:forTranformer.indexVars) {
-                                if(forIndexVar.getIdent().equals(ident)) {
-                                    return new JVariableDefinition(null, modifiers
-                                            | Constants.ACC_STATIC, type, ident, null);
+
+                            for (JLocalVariable forIndexVar : forTranformer.indexVars) {
+                                if (forIndexVar.getIdent().equals(ident)) {
+                                    return new JVariableDefinition(null,
+                                            modifiers | Constants.ACC_STATIC,
+                                            type, ident, expr);
                                 }
                             }
-                            
+
                             return self;
-                            
-//                            return new JVariableDefinition(null, modifiers
-//                                    | Constants.ACC_STATIC, type, ident, null);
+
+                            //                            return new JVariableDefinition(null, modifiers
+                            //                                    | Constants.ACC_STATIC, type, ident, null);
                         }
 
                     });
