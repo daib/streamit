@@ -258,9 +258,15 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
             Set<Vertex> vertices) {
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+        Set<SIRStream> added = new HashSet<SIRStream>();
 
         for (Vertex vertex : vertices) {
             SIRStream str = vertex.getStream();
+            if(added.contains(str))
+                continue;
+            
+            added.add(str);
+            
             int[] reps = (int[]) strRepetitions.get(str);
             for (int i = 1; i < reps[0]; i++) {
                 Vertex v = getVertex((SIRStream) str, i, vertices);
@@ -297,6 +303,9 @@ public class OptimizedCircularCheckingBackend extends CircularCheckBackend {
             for (int y = x + 1; y < vs.length; y++) {
                 SIRStream s1 = ((Vertex) vs[x]).getStream();
                 SIRStream s2 = ((Vertex) vs[y]).getStream();
+                
+                if(s1 == s2)
+                    continue;
 
                 streamit.scheduler2.iriter.Iterator s1Iter = IterFactory
                         .createFactory().createIter(s1);
