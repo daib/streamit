@@ -363,6 +363,18 @@ longname		"newSimple"
 	default		"-1"
 	requireArgument
 	help		"New uni-processor / shared-memory multicore backend"
+	
+longname		"cx"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Composed in x direction"
+
+longname		"cy"
+	type		int
+	default		"-1"
+	requireArgument
+	help		"Composed in y direction"
 
 longname		"vectorize"
 	type		int
@@ -506,6 +518,11 @@ longname		"spacetime"
 	default		"false"
 	help		"Uses the spacetime partitioner."
 
+longname		"circular"
+	type		boolean
+	default		"false"
+	help		"Running circular checking algorithm."
+	
 longname		"cell"
 	type		int
 	default		"-1"
