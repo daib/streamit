@@ -72,6 +72,8 @@ public class UniBackEnd {
                 layout = new BasicGreedyLayout<UniProcessor>(schedule,
                         processors.toArray());
             else
+//                layout = new BasicGreedyLayout<UniProcessor>(schedule,
+//                        processors.toArray());
                 layout = new SWPipeLayout<UniProcessor, UniProcessors>(
                         schedule, processors);
             //                layout = new CompatibleFilterLayout<UniProcessor>(schedule,
@@ -127,7 +129,8 @@ public class UniBackEnd {
                     p.println("E2Runtime " + s + "_runtime_obj(\"" + s + "\");");
                 }
             }
-
+            p.println("#include <e2_support.h>");
+            
             p.println("#include <pthread.h>\npthread_barrier_t barr;");
             // write out C code
             EmitStandaloneCode codeEmitter = new EmitStandaloneCode(

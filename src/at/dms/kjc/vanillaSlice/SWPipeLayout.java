@@ -232,6 +232,7 @@ public class SWPipeLayout<T extends ComputeNode, Ts extends ComputeNodesI>
                 bottleNeckTile = i;
             }
         }
+        
         return commCost(tileCosts, (T) chip.getNthComputeNode(bottleNeckTile));
     }
 
@@ -278,11 +279,11 @@ public class SWPipeLayout<T extends ComputeNode, Ts extends ComputeNodesI>
                 InterSliceEdge edge = (InterSliceEdge) edges.next();
 
                 // System.out.println(" Checking if " + edge + " crosses.");
-                InterSliceBuffer buf = InterSliceBuffer.getBuffer(edge);
-
-                //nothing is transfered for this buffer.
-                if (buf.redundant())
-                    continue;
+//                InterSliceBuffer buf = InterSliceBuffer.getBuffer(edge);
+//
+//                //nothing is transfered for this buffer.
+//                if (buf.redundant())
+//                    continue;
 
                 OutputSliceNode output = edge.getSrc();
                 InputSliceNode input = edge.getDest();
@@ -291,6 +292,11 @@ public class SWPipeLayout<T extends ComputeNode, Ts extends ComputeNodesI>
                 T src = (T) assignment.get(output.getPrevFilter());
                 T dst = (T) assignment.get(input.getNextFilter());
 
+                //do not need to account for this cost as the communication is
+                //within a node
+                if(src == dst)
+                    continue;
+                
                 //get the the route and add the cost for each node on the route
                 Iterator<T> route = router.getRoute(src, dst).iterator();
 

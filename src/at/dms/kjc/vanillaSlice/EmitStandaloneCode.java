@@ -74,7 +74,7 @@ public class EmitStandaloneCode extends EmitCode {
 
         p.println("void* run_threads(void* ptr) {");
         p.println("\tlong int i = (long int)ptr;");
-        for (int i = 0; i < backendbits.getComputeNodes().size() - 1; i++) {
+        for (int i = 0; i < backendbits.getComputeNodes().size(); i++) {
             p.println("\tif(i == " + i + ") {\n\t\t_MAIN__" + i + "();\n\t}");
         }
         p.println("\treturn NULL;");
@@ -113,39 +113,83 @@ public class EmitStandaloneCode extends EmitCode {
                     + (backendbits.getComputeNodes().size() - 1) + "];");
 
         // compute width and length of the logical core
-        int numCores = 2 * CommonUtils.nextPow2(backendbits.getComputeNodes()
-                .size());
-        int log2 = (int) Math.ceil((Math.log10(numCores) / Math.log10(2)));
-        int w = (int) Math.pow(2, log2 / 2);
-        int l = numCores / w;
+        //        int numCores = 2 * CommonUtils.nextPow2(backendbits.getComputeNodes()
+        //                .size());
+        //        int log2 = (int) Math.ceil((Math.log10(numCores) / Math.log10(2)));
+        //        int w = (int) Math.pow(2, log2 / 2);
+        //        int l = numCores / w;
+        //
+        //        System.out.println("x = " + w + " y = " + l);
 
-        System.out.println("x = " + w + " y = " + l);
-
-        p.println("\tint attr;");
+        p.println("\tunsigned long flag;");
         //estimate the number of cores
-        for (int i = 0; i < backendbits.getComputeNodes().size() - 1; i++) {
-            long attr = 0x0020;
-            int firstCore = (i + 1) * 2;
 
-            int x = firstCore % w;
-            int y = firstCore / w;
+        int cx = 1;
+        int cy = 1;
 
-            for (int j = 0; j < 2; j++) {
-                for (int k = 0; k < 1; k++) {
-                    int index = (y + k) * w + j + x;
-                    attr |= (1 << index) << 16;
+        if (KjcOptions.cx >= 1) {
+            cx = KjcOptions.cx;
+        }
+
+        if (KjcOptions.cy >= 1) {
+            cy = KjcOptions.cy;
+        }
+
+        int w = KjcOptions.newSimple * cx;
+
+        int mainComputeNode = 0;
+        for (int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+            ComputeNode cn = backendbits.getComputeNodes().getNthComputeNode(i);
+
+//            long attr = 0x0020; //compose
+            //            int firstCore = (i + 1) * 2;
+
+            //            int x = firstCore % w;
+            //            int y = firstCore / w;
+            //
+            //            for (int j = 0; j < 2; j++) {
+            //                for (int k = 0; k < 1; k++) {
+            //                    int index = (y + k) * w + j + x;
+            //                    attr |= (1 << index) << 16;
+            //                }
+            //            }
+            
+            p.println("\tflag = 0;");
+            p.println("\tsetComposition(flag, COMPOSITION_CORES);");
+
+            int x = cn.getX() * cx;
+            int y = cn.getY() * cy;
+
+            String topology = null;
+            
+            for (int j = 0; j < cx; j++) {
+                for (int k = 0; k < cy; k++) {
+                    int index = (y + k) * w + (x + j);
+                    if(topology == null) {
+                        topology = "C"+index;
+                    } else 
+                        topology = topology + "|C" + index;
                 }
             }
 
-            p.println("\tattr = " + attr + ";");
-            p.println("\tpthread_create(&threads[" + i
-                    + "], (void*)&attr, &run_threads, (void*)" + i + ");");
+//            p.println("\tflag = " + attr + ";");
+            p.println("\tsetTopology(flag, " + topology + ");");
+
+            if (cn.getX() == 0 && cn.getY() == 0) {
+                mainComputeNode = i;
+                p.println("\tCompose(flag);");
+                //                continue;
+            } else
+                p.println("\tpthread_create(&threads[" + i
+                        + "], (void*)&flag, &run_threads, (void*)" + i + ");");
+            p.println();
         }
 
-        p.println("\t_MAIN__" + (backendbits.getComputeNodes().size() - 1)
-                + "();");
+        p.println("\t_MAIN__" + mainComputeNode + "();");
 
-        for (int i = 0; i < backendbits.getComputeNodes().size() - 1; i++) {
+        for (int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+            if (i == mainComputeNode)
+                continue;
             p.println("\tpthread_join(threads[" + i + "], NULL);");
         }
 
@@ -159,7 +203,7 @@ public class EmitStandaloneCode extends EmitCode {
         p.outdent();
         p.println("}");
     }
-    
+
     public void emitCodeForComputeNode(ComputeNode n, CodegenPrintWriter p) {
         codegen = new CPPCodeGen(p);
         emitCodeForComputeNode(n, p, codegen);
