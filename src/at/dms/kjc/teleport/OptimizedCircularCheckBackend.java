@@ -245,7 +245,7 @@ public class OptimizedCircularCheckBackend {
                 + " nodes");
 
         //checking for zero edges
-        if (zeroCycleDetection(edges, vertices)) {
+        if (nonPositiveCycleDetection(edges, vertices)) {
             System.out.println("Found a circular dependency");
             System.exit(1);
         }
@@ -311,12 +311,15 @@ public class OptimizedCircularCheckBackend {
                 
                 //traverse the subtree rooted at w
                 //using the Tarjan subtree disassembly method
-                //to check for a future negative cycle
+                //to check for a potential negative cycle
                 Vertex childV = child.get(w);
                 child.remove(w);
+                
                 while(childV != null) {
                     if(childV == v) {
-                        //there is a future negative cycle
+                        //there is a potential negative or zero cycle
+                        //print out that cycle
+                        
                         return true;
                     }
                     
@@ -329,7 +332,11 @@ public class OptimizedCircularCheckBackend {
                     childV = nextV;
                 }
                 
-                if (v.d + e.getWeight() < w.d) {
+                //NOTE: Here we replace < with <= to allow 
+                //both negative and zero cycle detection
+                //as G_p will contain a cycle when G contain a zero
+                //or negative cycle
+                if (v.d + e.getWeight() <= w.d) {
                     w.d = v.d + e.getWeight();
                     w.label = 0; //labeled
                     
