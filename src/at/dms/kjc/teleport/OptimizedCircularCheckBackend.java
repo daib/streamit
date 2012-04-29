@@ -303,50 +303,67 @@ public class OptimizedCircularCheckBackend {
         s.label = 0; //label
 
         while (!q.isEmpty()) {
-            Vertex v = q.remove();      //next labeled node
+            Vertex v = q.remove(); //next labeled node
             //scanning step
-            if(v.label == 0) //labeled
-            for (Edge e : v.outEdges) {
-                Vertex w = e.getDst();
-                
-                //traverse the subtree rooted at w
-                //using the Tarjan subtree disassembly method
-                //to check for a potential negative cycle
-                Vertex childV = child.get(w);
-                child.remove(w);
-                
-                while(childV != null) {
-                    if(childV == v) {
-                        //there is a potential negative or zero cycle
-                        //print out that cycle
-                        
-                        return true;
+            if (v.label == 0) //labeled
+                for (Edge e : v.outEdges) {
+                    Vertex w = e.getDst();
+
+                    //traverse the subtree rooted at w
+                    //using the Tarjan subtree disassembly method
+                    //to check for a potential negative cycle
+                    Vertex childV = child.get(w);
+                    child.remove(w);
+
+                    String path = "";
+                    if (debugging) {
+
+                        if (w.getStream() != null)
+                            path = "(" + w.getStream().getIdent() + ","
+                                    + w.getIndex() + ") -";
                     }
-                    
-                    childV.label = -1; //unreached
-                    
-                    Vertex nextV = child.get(childV);
-                    parent.remove(childV);
-                    child.remove(childV);
-                    
-                    childV = nextV;
+                    Vertex parentV = w;
+
+                    while (childV != null) {
+                        if (debugging)
+                            path = path
+                                    + getEdge(parentV, childV, null)
+                                            .getWeight() + "->" + "("
+                                    + childV.getStream().getIdent() + ","
+                                    + childV.getIndex() + ") -";
+                        if (childV == v) {
+                            //there is a potential negative or zero cycle
+                            //print out that cycle
+                            if (debugging)
+                                System.out.println(path);
+                            return true;
+                        }
+
+                        childV.label = -1; //unreached
+
+                        Vertex nextV = child.get(childV);
+                        parent.remove(childV);
+                        child.remove(childV);
+
+                        parentV = childV;
+                        childV = nextV;
+                    }
+
+                    //NOTE: Here we replace < with <= to allow 
+                    //both negative and zero cycle detection
+                    //as G_p will contain a cycle when G contain a zero
+                    //or negative cycle
+                    if (v.d + e.getWeight() <= w.d) {
+                        w.d = v.d + e.getWeight();
+                        w.label = 0; //labeled
+
+                        if (!q.contains(w)) //possible different FIFO options
+                            q.add(w);
+
+                        parent.put(w, v);
+                        child.put(v, w);
+                    }
                 }
-                
-                //NOTE: Here we replace < with <= to allow 
-                //both negative and zero cycle detection
-                //as G_p will contain a cycle when G contain a zero
-                //or negative cycle
-                if (v.d + e.getWeight() <= w.d) {
-                    w.d = v.d + e.getWeight();
-                    w.label = 0; //labeled
-                    
-                    if(!q.contains(w))   //possible different FIFO options
-                        q.add(w);
-                    
-                    parent.put(w, v);
-                    child.put(v, w);
-                }
-            }
             v.label = 1; //scanned
         }
 
@@ -1071,12 +1088,14 @@ public class OptimizedCircularCheckBackend {
         private int weight = 0;
 
         public Edge(Vertex src, Vertex dst) {
+            assert (src != dst);
             this.src = src;
             this.dst = dst;
             this.src.outEdges.add(this);
         }
 
         public Edge(Vertex src, Vertex dst, int weight) {
+            assert (src != dst);
             this.src = src;
             this.dst = dst;
             this.weight = weight;
