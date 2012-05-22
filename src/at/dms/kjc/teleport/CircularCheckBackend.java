@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -18,15 +19,16 @@ import at.dms.kjc.JInterfaceDeclaration;
 import at.dms.kjc.StreamItDot;
 import at.dms.kjc.cluster.LatencyConstraints;
 import at.dms.kjc.common.CodegenPrintWriter;
-import at.dms.kjc.common.StructureIncludeFile;
-import at.dms.kjc.flatgraph.FlatNode;
 import at.dms.kjc.iterator.IterFactory;
 import at.dms.kjc.linprog.LPSolve;
 import at.dms.kjc.sir.SIRFilter;
 import at.dms.kjc.sir.SIRGlobal;
 import at.dms.kjc.sir.SIRHelper;
 import at.dms.kjc.sir.SIRInterfaceTable;
-import at.dms.kjc.sir.SIRJoiner;
+import at.dms.kjc.sir.SIRLatency;
+import at.dms.kjc.sir.SIRLatencyMax;
+import at.dms.kjc.sir.SIRLatencyRange;
+import at.dms.kjc.sir.SIRLatencySet;
 import at.dms.kjc.sir.SIROperator;
 import at.dms.kjc.sir.SIRPipeline;
 import at.dms.kjc.sir.SIRPortal;
@@ -57,35 +59,8 @@ public class CircularCheckBackend {
     /**
      * Print out some debugging info if true.
      */
-    public static boolean debugging = false;
+    protected static boolean debugging = false;
 
-    /**
-     * Given a flatnode, map to the init execution count.
-     */
-    static HashMap<FlatNode, Integer> initExecutionCounts;
-    /**
-     * Given a flatnode, map to steady-state execution count.
-     * 
-     * <br/>
-     * Also read in several other modules.
-     */
-    static HashMap<FlatNode, Integer> steadyExecutionCounts;
-
-    /**
-     * Given a filter, map to original push/pop/peek rates
-     */
-    static HashMap<SIRFilter, Integer[]> originalRates;
-
-    /**
-     * Given a joiner, map to following filter
-     */
-    static HashMap<SIRJoiner, SIRFilter> joinerWork;
-
-    /**
-     * Holds passed structures until they can be handeed off to
-     * {@link StructureIncludeFile}.
-     */
-    protected static SIRStructure[] structures;
 
     // /**
     // * Used to iterate over str structure ignoring flattening.
@@ -102,8 +77,6 @@ public class CircularCheckBackend {
             SIRHelper[] helpers, SIRGlobal global) {
 
         System.out.println("Entry to CircularCheckBackend");
-
-        structures = structs;
 
         // make arguments to functions be three-address code so can replace max, min, abs
         // and possibly others with macros, knowing that there will be no side effects.
@@ -262,6 +235,10 @@ public class CircularCheckBackend {
         System.exit(0);
     }
 
+
+    /*
+     * O(n^3) 
+     */
     protected static boolean zeroCycleDetection(Set<Edge> edges,
             Set<Vertex> vertices) {
         int n = vertices.size();
@@ -531,32 +508,42 @@ public class CircularCheckBackend {
     }
 
     protected static Edge getEdge(Vertex u, Vertex v, Set<Edge> edges) {
-        for (Edge e : edges) {
-            if (e.getSrc() == u && e.getDst() == v) {
-                return e;
-            }
+        //        for (Edge e : edges) {
+        //            if (e.getSrc() == u && e.getDst() == v) {
+        //                return e;
+        //            }
+        //        }
+        for (Edge e : u.outEdges) {
+            if (e.getDst() == v)
+                return e; //FIXME: What happens if there are multiple edges
         }
         return null;
     }
 
-    private static int numVertices(streamit.scheduler2.Scheduler scheduler) {
+    protected static int numVertices(streamit.scheduler2.Scheduler scheduler) {
         int num = 0;
+        int totalNumVertices = 0;
         
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
         for (Object key : strRepetitions.keySet()) {
+            totalNumVertices += ((int[]) strRepetitions.get(key))[0];
+            
             if (!(key instanceof SIRFilter))
                 continue;
             int[] reps = (int[]) strRepetitions.get(key);
             num += reps[0];
         }
         
+        System.err.println("Total number of vertices " + totalNumVertices);
+        System.err.println("Total number of pruned vertices " + num);
+
         return num;
     }
-    
+
     protected static void addCausalityDependencyEdges(
-            streamit.scheduler2.Scheduler scheduler,
-            Set<Edge> edges, Set<Vertex> vertices) {
+            streamit.scheduler2.Scheduler scheduler, Set<Edge> edges,
+            Set<Vertex> vertices) {
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
@@ -567,10 +554,10 @@ public class CircularCheckBackend {
             for (int i = 1; i < reps[0]; i++) {
                 Vertex v = getVertex((SIRStream) key, i, vertices);
                 Vertex u = getVertex((SIRStream) key, i + 1, vertices);
-                
-                if(u != null && v != null) {
-                Edge e = new Edge(u, v, 0);
-                edges.add(e);
+
+                if (u != null && v != null) {
+                    Edge e = new Edge(u, v, 0);
+                    edges.add(e);
                 }
             }
 
@@ -583,8 +570,8 @@ public class CircularCheckBackend {
     }
 
     protected static void addDataDependencyEdges(
-            streamit.scheduler2.Scheduler scheduler,
-            Set<Edge> edges, Set<Vertex> vertices) {
+            streamit.scheduler2.Scheduler scheduler, Set<Edge> edges,
+            Set<Vertex> vertices) {
 
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
@@ -655,8 +642,8 @@ public class CircularCheckBackend {
     }
 
     protected static void addControlDependencyEdges(
-            streamit.scheduler2.Scheduler scheduler,
-            Set<Edge> edges, Set<Vertex> vertices) {
+            streamit.scheduler2.Scheduler scheduler, Set<Edge> edges,
+            Set<Vertex> vertices) {
 
         SIRPortal[] portals = SIRPortal.getPortals();
         LatencyConstraints.detectConstraints(portals);
@@ -675,8 +662,7 @@ public class CircularCheckBackend {
                     SIRStream src = sender.getStream();
                     SIRStream dst = receiver;
 
-                    int latency = LatencyConstraints.MinLatency(sender
-                            .getLatency());
+                    int latency = MinLatency(sender.getLatency());
 
                     streamit.scheduler2.iriter.Iterator srcIter = IterFactory
                             .createFactory().createIter(src);
@@ -807,6 +793,7 @@ public class CircularCheckBackend {
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
         for (Object key : strRepetitions.keySet()) {
+            
             if (!(key instanceof SIRFilter))
                 continue;
             int[] reps = (int[]) strRepetitions.get(key);
@@ -818,6 +805,7 @@ public class CircularCheckBackend {
                             + " " + v.getIndex());
             }
         }
+        
         return vertices;
     }
 
@@ -829,6 +817,42 @@ public class CircularCheckBackend {
         }
         System.out.println("Could not find " + str.getName() + " " + index);
         return null;
+    }
+
+    /**
+     * Returns min latency associated with a {@link SIRLatency} object
+     * @param latency the latency object
+     * @return the maximum latency as integer
+     */
+
+    private static int MinLatency(SIRLatency latency) {
+
+        if (latency instanceof SIRLatencyMax) {
+            return ((SIRLatencyMax) latency).getMax();
+        }
+
+        if (latency instanceof SIRLatencyRange) {
+            return ((SIRLatencyRange) latency).getMax();
+        }
+
+        if (latency instanceof SIRLatencySet) {
+            Iterator<Integer> it = ((SIRLatencySet) latency).iterator();
+
+            int min = 1000000;
+
+            while (it.hasNext()) {
+                Integer i = it.next();
+
+                if (i.intValue() < min)
+                    min = i.intValue();
+            }
+
+            return min;
+        }
+
+        // this should never be reached!
+
+        return 0;
     }
 
     static void printGraph(Set<Edge> edges) {
@@ -938,14 +962,19 @@ public class CircularCheckBackend {
         private int weight = 0;
 
         public Edge(Vertex src, Vertex dst) {
+            assert (src != dst);
             this.src = src;
             this.dst = dst;
+            this.src.outEdges.add(this);
         }
 
         public Edge(Vertex src, Vertex dst, int weight) {
+            assert (src != dst);
             this.src = src;
             this.dst = dst;
             this.weight = weight;
+            this.src.outEdges.add(this);
+            //this.dst.inEdges.add(this);
         }
 
         public void setWeight(int weight) {
@@ -971,13 +1000,20 @@ public class CircularCheckBackend {
     }
 
     static class Vertex {
-        SIRStream str;
-        int index;
+        SIRStream str; //stream
+        int index; //firing of actor
         double pi = Double.POSITIVE_INFINITY;
+        double d = Double.POSITIVE_INFINITY; //distance
+        int label = -1;
+        List<Edge> outEdges;
+
+        //List<Edge> inEdges;
 
         public Vertex(SIRStream str, int index) {
             this.str = str;
             this.index = index;
+            outEdges = new LinkedList<Edge>();
+            //            inEdges = new LinkedList<Edge>();
         }
 
         public SIRStream getStream() {
