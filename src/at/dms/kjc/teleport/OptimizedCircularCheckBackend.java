@@ -171,9 +171,9 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
         addCausalityDependencyEdges(scheduler, edges, vertices, streams);
 
-        addDataDependencyEdges(scheduler, edges, vertices, streams);
+//        addDataDependencyEdges(scheduler, edges, vertices, streams);
 
-        addControlDependencyEdges(scheduler, edges, vertices);
+//        addControlDependencyEdges(scheduler, edges, vertices);
 
         if (debugging)
             printGraph(edges);
@@ -353,6 +353,7 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
             for (SIRStream str : portal.getReceivers()) {
                 if (!streams.contains(str)) {
+                    streams.add(str);
                     int[] reps = (int[]) strRepetitions.get(str);
 
                     for (int i = 0; i < reps[0]; i++) {
