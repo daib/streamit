@@ -522,22 +522,16 @@ public class CircularCheckBackend {
 
     protected static int numVertices(streamit.scheduler2.Scheduler scheduler) {
         int num = 0;
-        int totalNumVertices = 0;
         
         HashMap strRepetitions = scheduler.getExecutionCounts()[1];
 
         for (Object key : strRepetitions.keySet()) {
-            totalNumVertices += ((int[]) strRepetitions.get(key))[0];
-            
             if (!(key instanceof SIRFilter))
                 continue;
             int[] reps = (int[]) strRepetitions.get(key);
             num += reps[0];
         }
         
-        System.err.println("Total number of vertices " + totalNumVertices);
-        System.err.println("Total number of pruned vertices " + num);
-
         return num;
     }
 

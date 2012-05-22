@@ -17,6 +17,7 @@ import at.dms.kjc.sir.SIRGlobal;
 import at.dms.kjc.sir.SIRHelper;
 import at.dms.kjc.sir.SIRInterfaceTable;
 import at.dms.kjc.sir.SIRPortal;
+import at.dms.kjc.sir.SIRPortalSender;
 import at.dms.kjc.sir.SIRStream;
 import at.dms.kjc.sir.SIRStructure;
 import at.dms.kjc.sir.lowering.ArrayInitExpander;
@@ -46,7 +47,7 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
             SIRInterfaceTable[] interfaceTables, SIRStructure[] structs,
             SIRHelper[] helpers, SIRGlobal global) {
 
-        System.out.println("Entry to CircularCheckBackend");
+        System.err.println("Entry to OptimizedCircularCheckBackend");
 
         // make arguments to functions be three-address code so can replace max, min, abs
         // and possibly others with macros, knowing that there will be no side effects.
@@ -143,7 +144,7 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
         scheduler.getOptimizedInitSchedule();
         scheduler.getOptimizedSteadySchedule();
 
-        numVertices(scheduler);
+        System.err.print("num vertices " + numVertices(scheduler));
 
         if (debugging)
             scheduler.printReps();
@@ -163,12 +164,14 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
         //create graph
 
         //create vertices
-        Set<Vertex> vertices = createVertices(scheduler);
+        Set<SIRStream> streams = new HashSet<SIRStream>();
+        Set<Vertex> vertices = createVertices(scheduler, streams);
+        ;
         Set<Edge> edges = new HashSet<Edge>();
 
-        addCausalityDependencyEdges(scheduler, edges, vertices);
+        addCausalityDependencyEdges(scheduler, edges, vertices, streams);
 
-        addDataDependencyEdges(scheduler, edges, vertices);
+        addDataDependencyEdges(scheduler, edges, vertices, streams);
 
         addControlDependencyEdges(scheduler, edges, vertices);
 
@@ -190,6 +193,9 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
         System.out.println("\nCircular checking time: " + (endTime - startTime)
                 + " n vertices " + vertices.size());
+        
+        System.err.println("\nCircular checking time: " + (endTime - startTime)
+                + " n vertices " + vertices.size());
 
         startTime = endTime;
 
@@ -205,6 +211,163 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
                 + " n vertices " + vertices.size());
 
         System.exit(0);
+    }
+
+    protected static void addCausalityDependencyEdges(
+            streamit.scheduler2.Scheduler scheduler, Set<Edge> edges,
+            Set<Vertex> vertices, Set<SIRStream> streams) {
+
+        HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+
+        for (SIRStream str : streams) {
+
+            int[] reps = (int[]) strRepetitions.get(str);
+            for (int i = 1; i < reps[0]; i++) {
+                Vertex v = getVertex((SIRStream) str, i, vertices);
+                Vertex u = getVertex((SIRStream) str, i + 1, vertices);
+
+                if (u != null && v != null) {
+                    Edge e = new Edge(u, v, 0);
+                    edges.add(e);
+                }
+            }
+
+            Vertex u = getVertex((SIRStream) str, 1, vertices);
+            Vertex v = getVertex((SIRStream) str, reps[0], vertices);
+            Edge e = new Edge(u, v, 1);
+            edges.add(e);
+        }
+
+    }
+
+    protected static void addDataDependencyEdges(
+            streamit.scheduler2.Scheduler scheduler, Set<Edge> edges,
+            Set<Vertex> vertices, Set<SIRStream> streams) {
+
+        HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+
+        streamit.scheduler2.SDEPData sdep;
+        streamit.scheduler2.constrained.Scheduler cscheduler = streamit.scheduler2.constrained.Scheduler
+                .createForSDEP(topStreamIter);
+
+        Object[] strs = streams.toArray();
+
+        //for each pair of vertices
+        for (int x = 0; x < strs.length; x++) {
+            for (int y = x + 1; y < strs.length; y++) {
+                SIRStream s1 = (SIRStream) strs[x];
+                SIRStream s2 = (SIRStream) strs[y];
+
+                streamit.scheduler2.iriter.Iterator s1Iter = IterFactory
+                        .createFactory().createIter(s1);
+                streamit.scheduler2.iriter.Iterator s2Iter = IterFactory
+                        .createFactory().createIter(s2);
+
+                try {
+                    streamit.scheduler2.iriter.Iterator srcIter, dstIter;
+
+                    SIRStream upstr, downstr; //downstream stream
+                    downstr = s2;
+                    upstr = s1;
+                    srcIter = s1Iter;
+                    dstIter = s2Iter;
+
+                    try {
+                        sdep = cscheduler.computeSDEP(s1Iter, s2Iter);
+
+                    } catch (streamit.scheduler2.constrained.NoPathException ex) {
+                        if (debugging)
+                            System.out.println(ex);
+                        sdep = cscheduler.computeSDEP(s2Iter, s1Iter);
+                        downstr = s1;
+                        upstr = s2;
+                        srcIter = s2Iter;
+                        dstIter = s1Iter;
+                    }
+
+                    int[] reps = (int[]) strRepetitions.get(downstr);
+
+                    if (debugging)
+                        for (int t = 0; t < Math.max(
+                                sdep.getNumSrcSteadyPhases(),
+                                sdep.getNumDstSteadyPhases()); t++) {
+                            int phase = sdep.getSrcPhase4DstPhase(t);
+                            int phaserev = sdep.getDstPhase4SrcPhase(t);
+
+                            System.out.println("sdep [" + t + "] = " + phase
+                                    + " reverse_sdep[" + t + "] = " + phaserev);
+                        }
+
+                    for (int i = 1; i <= reps[0]; i++) {
+                        Vertex u = getVertex(downstr, i, vertices);
+                        int srcPhase = sdep.getSrcPhase4DstPhase(i);
+                        int srcReps = ((int[]) strRepetitions.get(upstr))[0];
+                        int relativeExe = (srcPhase - 1) % srcReps + 1;
+                        int srcIteration = (srcPhase - 1) / srcReps;
+                        Vertex v = getVertex(upstr, relativeExe, vertices);
+                        Edge e = new Edge(u, v, -srcIteration);
+                        edges.add(e);
+                    }
+
+                } catch (streamit.scheduler2.constrained.NoPathException ex) {
+                    if (debugging)
+                        System.out.println(ex);
+
+                }
+            }
+
+        }
+    }
+
+    protected static Set<Vertex> createVertices(
+            streamit.scheduler2.Scheduler scheduler, Set<SIRStream> streams) {
+
+        Set<Vertex> vertices = new HashSet<Vertex>();
+
+        HashMap strRepetitions = scheduler.getExecutionCounts()[1];
+
+        SIRPortal[] portals = SIRPortal.getPortals();
+        //        LatencyConstraints.detectConstraints(portals);
+
+        for (int p = 0; p < portals.length; p++) {
+
+            SIRPortal portal = portals[p];
+
+            for (SIRPortalSender sender : portal.getSenders()) {
+                SIRStream str = sender.getStream();
+                if (!streams.contains(str)) {
+                    streams.add(str);
+
+                    int[] reps = (int[]) strRepetitions.get(str);
+
+                    for (int i = 0; i < reps[0]; i++) {
+                        Vertex v = new Vertex((SIRStream) str, i + 1);
+                        vertices.add(v);
+                        if (debugging)
+                            System.out.println("Vertex "
+                                    + v.getStream().getName() + " "
+                                    + v.getIndex());
+                    }
+                }
+            }
+
+            for (SIRStream str : portal.getReceivers()) {
+                if (!streams.contains(str)) {
+                    int[] reps = (int[]) strRepetitions.get(str);
+
+                    for (int i = 0; i < reps[0]; i++) {
+                        Vertex v = new Vertex((SIRStream) str, i + 1);
+                        vertices.add(v);
+                        if (debugging)
+                            System.out.println("Vertex "
+                                    + v.getStream().getName() + " "
+                                    + v.getIndex());
+                    }
+                }
+            }
+        }
+
+        return vertices;
     }
 
     /*
@@ -306,5 +469,4 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
         return false;
     }
 
-    
 }
