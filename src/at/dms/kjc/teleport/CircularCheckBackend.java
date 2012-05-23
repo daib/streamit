@@ -59,7 +59,7 @@ public class CircularCheckBackend {
     /**
      * Print out some debugging info if true.
      */
-    protected static boolean debugging = true;
+    protected static boolean debugging = false;
 
 
     // /**

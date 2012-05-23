@@ -37,6 +37,18 @@ import at.dms.kjc.sir.lowering.VarDeclRaiser;
  */
 public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
+    final static int WHITE = 0;
+    
+    final static int GREY = -1;
+    
+    final static int BLACK = 1;
+    
+    final static int SCANNED = 0;
+    
+    final static int LABELED = -1;
+    
+    final static int UNREACHED = 1;
+    
     // public static Simulator simulator;
     // get the execution counts from the scheduler
 
@@ -166,14 +178,14 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
         //create vertices
         Set<SIRStream> streams = new HashSet<SIRStream>();
         Set<Vertex> vertices = createVertices(scheduler, streams);
-        ;
+
         Set<Edge> edges = new HashSet<Edge>();
 
         addCausalityDependencyEdges(scheduler, edges, vertices, streams);
 
-//        addDataDependencyEdges(scheduler, edges, vertices, streams);
+        addDataDependencyEdges(scheduler, edges, vertices, streams);
 
-//        addControlDependencyEdges(scheduler, edges, vertices);
+        addControlDependencyEdges(scheduler, edges, vertices);
 
         if (debugging)
             printGraph(edges);
@@ -186,6 +198,10 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
         //checking for zero edges
         if (nonPositiveCycleDetection(edges, vertices)) {
             System.out.println("Found a circular dependency");
+            long endTime = (new Date()).getTime();
+
+            System.err.println("\nCircular checking time: " + (endTime - startTime)
+                    + " n vertices " + vertices.size());
             System.exit(1);
         }
 
@@ -193,7 +209,7 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
         System.out.println("\nCircular checking time: " + (endTime - startTime)
                 + " n vertices " + vertices.size());
-        
+
         System.err.println("\nCircular checking time: " + (endTime - startTime)
                 + " n vertices " + vertices.size());
 
@@ -384,6 +400,7 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
     protected static boolean nonPositiveCycleDetection(Set<Edge> edges,
             Set<Vertex> vertices) {
 
+        //check for negative cycles first
         //scanning algorithm
         //add an artificial source s
         Vertex s = new Vertex(null, 0);
@@ -400,73 +417,102 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
         Map<Vertex, Vertex> child = new HashMap<Vertex, Vertex>();
 
         q.add(s);
-        s.label = 0; //label
+        s.label = LABELED; //label
 
         while (!q.isEmpty()) {
             Vertex v = q.remove(); //next labeled node
             //scanning step
-            if (v.label == 0) //labeled
+            if (v.label == LABELED) //labeled
                 for (Edge e : v.outEdges) {
                     Vertex w = e.getDst();
 
-                    //traverse the subtree rooted at w
-                    //using the Tarjan subtree disassembly method
-                    //to check for a potential negative cycle
-                    Vertex childV = child.get(w);
-                    child.remove(w);
+                    //labeling operation
+                    if (v.d + e.getWeight() < w.d) {
+                        //traverse the subtree rooted at w
+                        //using the Tarjan subtree disassembly technique
+                        //to check for potential negative cycles
+                        Vertex childV = child.get(w); //FIXME: A parent could have multiple children
+                        child.remove(w);
 
-                    String path = "";
-                    if (debugging) {
+                        String path = "";
+                        if (debugging) {
 
-                        if (w.getStream() != null)
-                            path = "(" + w.getStream().getIdent() + ","
-                                    + w.getIndex() + ") -";
-                    }
-                    Vertex parentV = w;
+                            if (w.getStream() != null)
+                                path = "(" + w.getStream().getIdent() + ","
+                                        + w.getIndex() + ") -";
+                        }
+                        Vertex parentV = w;
 
-                    while (childV != null) {
-                        if (debugging)
-                            path = path
-                                    + getEdge(parentV, childV, null)
-                                            .getWeight() + "->" + "("
-                                    + childV.getStream().getIdent() + ","
-                                    + childV.getIndex() + ") -";
-                        if (childV == v) {
-                            //there is a potential negative or zero cycle
-                            //print out that cycle
+                        while (childV != null) {
                             if (debugging)
-                                System.out.println(path);
-                            return true;
+                                path = path
+                                        + getEdge(parentV, childV, null)
+                                                .getWeight() + "->" + "("
+                                        + childV.getStream().getIdent() + ","
+                                        + childV.getIndex() + ") -";
+                            if (childV == v) {
+                                //there is a potential negative or zero cycle
+                                //print out that cycle
+                                if (debugging)
+                                    System.out.println(path);
+                                return true;
+                            }
+
+                            childV.label = UNREACHED; //unreached
+
+                            Vertex nextV = child.get(childV);
+                            parent.remove(childV);
+                            child.remove(childV);
+
+                            parentV = childV;
+                            childV = nextV;
                         }
 
-                        childV.label = -1; //unreached
-
-                        Vertex nextV = child.get(childV);
-                        parent.remove(childV);
-                        child.remove(childV);
-
-                        parentV = childV;
-                        childV = nextV;
-                    }
-
-                    //NOTE: Here we replace < with <= to allow 
-                    //both negative and zero cycle detection
-                    //as G_p will contain a cycle when G contain a zero
-                    //or negative cycle
-                    if (v.d + e.getWeight() <= w.d) {
                         w.d = v.d + e.getWeight();
-                        w.label = 0; //labeled
+                        w.label = LABELED; //labeled
 
                         if (!q.contains(w)) //possible different FIFO options
                             q.add(w);
 
-                        parent.put(w, v);
-                        child.put(v, w);
+                        assert (!(child.containsKey(v)));
+                        parent.put(w, v); //parent of w is v
+                        child.put(v, w); //child of v is w
                     }
                 }
-            v.label = 1; //scanned
+            v.label = SCANNED; //scanned
         }
+        
+        //there is no negative cycles, check for zero cycles
+        for (Vertex v : vertices) {
+            v.label = WHITE; //mark vertex as not visited
+        }
+        
+        for (Vertex v : vertices) {
+            if(v.label == WHITE) {
+                if(visit(v)) {
+                    return true;        //there is a cycle
+                }
+            }
+        }
+        return false;
+    }
 
+    private static boolean visit(Vertex v) {
+        v.label = GREY;
+        for(Edge e:v.outEdges) {
+            Vertex w = e.getDst();
+            if(v.d + e.getWeight() == w.d) {//edge with zero reduction cost only
+                if(w.label == GREY) {
+                    return true;        //there is a cycle of zero cost
+                } else if (w.label == WHITE) {
+                    if(visit(w)) {
+                        return true;
+                    }
+                }
+                    
+            }
+        }
+        v.label = BLACK;
         return false;
     }
 
