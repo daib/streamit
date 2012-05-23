@@ -24,12 +24,17 @@ import at.dms.kjc.sir.SIRStream;
 import at.dms.kjc.sir.SIRStructure;
 import at.dms.kjc.sir.lowering.ArrayInitExpander;
 import at.dms.kjc.sir.lowering.ConstantProp;
+import at.dms.kjc.sir.lowering.ConstructSIRTree;
+import at.dms.kjc.sir.lowering.EnqueueToInitPath;
+import at.dms.kjc.sir.lowering.IntroduceMultiPops;
 import at.dms.kjc.sir.lowering.RenameAll;
+import at.dms.kjc.sir.lowering.RoundToFloor;
 import at.dms.kjc.sir.lowering.SimplifyArguments;
 import at.dms.kjc.sir.lowering.SimplifyPopPeekPush;
 import at.dms.kjc.sir.lowering.StaticsProp;
 import at.dms.kjc.sir.lowering.Unroller;
 import at.dms.kjc.sir.lowering.VarDeclRaiser;
+import at.dms.kjc.sir.lowering.fusion.Lifter;
 
 /**
  */
@@ -101,16 +106,16 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
         // Introduce Multiple Pops where programmer
         // didn't take advantage of them (after parameters are propagated).
-        //IntroduceMultiPops.doit(str);
+        IntroduceMultiPops.doit(str);
 
         // convert round(x) to floor(0.5+x) to avoid obscure errors
-        //RoundToFloor.doit(str);
+        RoundToFloor.doit(str);
 
         // add initPath functions
-        //EnqueueToInitPath.doInitPath(str);
+        EnqueueToInitPath.doInitPath(str);
 
         // construct stream hierarchy from SIRInitStatements
-        //        ConstructSIRTree.doit(str);
+        ConstructSIRTree.doit(str);
 
         //this must be run now, Further passes expect unique names!!!
         RenameAll.renameAllFilters(str);
@@ -133,7 +138,7 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
         SIRPortal.findMessageStatements(str);
 
         // canonicalize stream graph, reorganizing some splits and joins
-        //        Lifter.liftAggressiveSync(str);
+        Lifter.liftAggressiveSync(str);
 
         // Unroll and propagate maximally within each (not phased) filter.
         // Initially justified as necessary for IncreaseFilterMult which is

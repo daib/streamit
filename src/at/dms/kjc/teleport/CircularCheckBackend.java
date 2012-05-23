@@ -16,11 +16,13 @@ import java.util.Map;
 import java.util.Set;
 
 import at.dms.kjc.JInterfaceDeclaration;
+import at.dms.kjc.KjcOptions;
 import at.dms.kjc.StreamItDot;
 import at.dms.kjc.cluster.LatencyConstraints;
 import at.dms.kjc.common.CodegenPrintWriter;
 import at.dms.kjc.iterator.IterFactory;
 import at.dms.kjc.linprog.LPSolve;
+import at.dms.kjc.sir.SIRDynamicRateManager;
 import at.dms.kjc.sir.SIRFilter;
 import at.dms.kjc.sir.SIRGlobal;
 import at.dms.kjc.sir.SIRHelper;
@@ -77,6 +79,12 @@ public class CircularCheckBackend {
             SIRHelper[] helpers, SIRGlobal global) {
 
         System.out.println("Entry to CircularCheckBackend");
+
+        if (KjcOptions.dynamicRatesEverywhere) {
+            // force there to be only 1 static sub-graph by making all
+            // rates static for now.
+            SIRDynamicRateManager.pushConstantPolicy(1);
+        }
 
         // make arguments to functions be three-address code so can replace max, min, abs
         // and possibly others with macros, knowing that there will be no side effects.
