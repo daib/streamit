@@ -10,9 +10,11 @@ import java.util.Queue;
 import java.util.Set;
 
 import at.dms.kjc.JInterfaceDeclaration;
+import at.dms.kjc.KjcOptions;
 import at.dms.kjc.StreamItDot;
 import at.dms.kjc.cluster.LatencyConstraints;
 import at.dms.kjc.iterator.IterFactory;
+import at.dms.kjc.sir.SIRDynamicRateManager;
 import at.dms.kjc.sir.SIRGlobal;
 import at.dms.kjc.sir.SIRHelper;
 import at.dms.kjc.sir.SIRInterfaceTable;
@@ -22,11 +24,7 @@ import at.dms.kjc.sir.SIRStream;
 import at.dms.kjc.sir.SIRStructure;
 import at.dms.kjc.sir.lowering.ArrayInitExpander;
 import at.dms.kjc.sir.lowering.ConstantProp;
-import at.dms.kjc.sir.lowering.ConstructSIRTree;
-import at.dms.kjc.sir.lowering.EnqueueToInitPath;
-import at.dms.kjc.sir.lowering.IntroduceMultiPops;
 import at.dms.kjc.sir.lowering.RenameAll;
-import at.dms.kjc.sir.lowering.RoundToFloor;
 import at.dms.kjc.sir.lowering.SimplifyArguments;
 import at.dms.kjc.sir.lowering.SimplifyPopPeekPush;
 import at.dms.kjc.sir.lowering.StaticsProp;
@@ -38,17 +36,17 @@ import at.dms.kjc.sir.lowering.VarDeclRaiser;
 public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
     final static int WHITE = 0;
-    
+
     final static int GREY = -1;
-    
+
     final static int BLACK = 1;
-    
+
     final static int SCANNED = 0;
-    
+
     final static int LABELED = -1;
-    
+
     final static int UNREACHED = 1;
-    
+
     // public static Simulator simulator;
     // get the execution counts from the scheduler
 
@@ -60,6 +58,12 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
             SIRHelper[] helpers, SIRGlobal global) {
 
         System.err.println("Entry to OptimizedCircularCheckBackend");
+
+        if (KjcOptions.dynamicRatesEverywhere) {
+            // force there to be only 1 static sub-graph by making all
+            // rates static for now.
+            SIRDynamicRateManager.pushConstantPolicy(1);
+        }
 
         // make arguments to functions be three-address code so can replace max, min, abs
         // and possibly others with macros, knowing that there will be no side effects.
@@ -97,16 +101,16 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
         // Introduce Multiple Pops where programmer
         // didn't take advantage of them (after parameters are propagated).
-        IntroduceMultiPops.doit(str);
+        //IntroduceMultiPops.doit(str);
 
         // convert round(x) to floor(0.5+x) to avoid obscure errors
-        RoundToFloor.doit(str);
+        //RoundToFloor.doit(str);
 
         // add initPath functions
-        EnqueueToInitPath.doInitPath(str);
+        //EnqueueToInitPath.doInitPath(str);
 
         // construct stream hierarchy from SIRInitStatements
-        ConstructSIRTree.doit(str);
+        //        ConstructSIRTree.doit(str);
 
         //this must be run now, Further passes expect unique names!!!
         RenameAll.renameAllFilters(str);
@@ -148,7 +152,7 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
         long startTime = (new Date()).getTime();
 
-        streamit.scheduler2.Scheduler scheduler = streamit.scheduler2.minlatency.Scheduler
+        streamit.scheduler2.Scheduler scheduler = streamit.scheduler2.singleappearance.Scheduler
                 .create(topStreamIter);
 
         scheduler.computeSchedule();
@@ -200,8 +204,8 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
             System.out.println("Found a circular dependency");
             long endTime = (new Date()).getTime();
 
-            System.err.println("\nCircular checking time: " + (endTime - startTime)
-                    + " n vertices " + vertices.size());
+            System.err.println("\nCircular checking time: "
+                    + (endTime - startTime) + " n vertices " + vertices.size());
             System.exit(1);
         }
 
@@ -290,7 +294,6 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
                     try {
                         sdep = cscheduler.computeSDEP(s1Iter, s2Iter);
-
                     } catch (streamit.scheduler2.constrained.NoPathException ex) {
                         if (debugging)
                             System.out.println(ex);
@@ -301,6 +304,10 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
                         dstIter = s1Iter;
                     }
 
+                    //TODO: To optimize DGs, we check if there is 
+                    //an intermediate stream is also in the graph
+                    //by traverse from upstream to downstream
+                    //find the paths between up/down streams
                     int[] reps = (int[]) strRepetitions.get(downstr);
 
                     if (debugging)
@@ -481,16 +488,16 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
                 }
             v.label = SCANNED; //scanned
         }
-        
+
         //there is no negative cycles, check for zero cycles
         for (Vertex v : vertices) {
             v.label = WHITE; //mark vertex as not visited
         }
-        
+
         for (Vertex v : vertices) {
-            if(v.label == WHITE) {
-                if(visit(v)) {
-                    return true;        //there is a cycle
+            if (v.label == WHITE) {
+                if (visit(v)) {
+                    return true; //there is a cycle
                 }
             }
         }
@@ -499,17 +506,17 @@ public class OptimizedCircularCheckBackend extends CircularCheckBackend {
 
     private static boolean visit(Vertex v) {
         v.label = GREY;
-        for(Edge e:v.outEdges) {
+        for (Edge e : v.outEdges) {
             Vertex w = e.getDst();
-            if(v.d + e.getWeight() == w.d) {//edge with zero reduction cost only
-                if(w.label == GREY) {
-                    return true;        //there is a cycle of zero cost
+            if (v.d + e.getWeight() == w.d) {//edge with zero reduction cost only
+                if (w.label == GREY) {
+                    return true; //there is a cycle of zero cost
                 } else if (w.label == WHITE) {
-                    if(visit(w)) {
+                    if (visit(w)) {
                         return true;
                     }
                 }
-                    
+
             }
         }
         v.label = BLACK;
