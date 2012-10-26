@@ -1,18 +1,28 @@
 package at.dms.kjc.vanillaSlice;
 
-import at.dms.kjc.sir.*;
-import at.dms.kjc.*;
-import at.dms.kjc.backendSupport.*;
-import at.dms.kjc.slicegraph.*;
-import at.dms.kjc.spacetime.AnnealedLayout;
-import at.dms.kjc.spacetime.MultiplySteadyState;
-import at.dms.kjc.spacetime.RawChip;
-import at.dms.kjc.spacetime.RawTile;
-import at.dms.kjc.spacetime.SpaceTimeSchedule;
-import at.dms.kjc.common.CodegenPrintWriter;
-import at.dms.kjc.common.CommonUtils;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 
-import java.io.*;
+import at.dms.kjc.JInterfaceDeclaration;
+import at.dms.kjc.KjcOptions;
+import at.dms.kjc.backendSupport.BackEndFactory;
+import at.dms.kjc.backendSupport.BackEndScaffold;
+import at.dms.kjc.backendSupport.BasicGreedyLayout;
+import at.dms.kjc.backendSupport.CommonPasses;
+import at.dms.kjc.backendSupport.ComputeNode;
+import at.dms.kjc.backendSupport.DumpSlicesAndChannels;
+import at.dms.kjc.backendSupport.Layout;
+import at.dms.kjc.backendSupport.NoSWPipeLayout;
+import at.dms.kjc.backendSupport.SpaceTimeScheduleAndPartitioner;
+import at.dms.kjc.common.CodegenPrintWriter;
+import at.dms.kjc.sir.SIRGlobal;
+import at.dms.kjc.sir.SIRHelper;
+import at.dms.kjc.sir.SIRInterfaceTable;
+import at.dms.kjc.sir.SIRStream;
+import at.dms.kjc.sir.SIRStructure;
+import at.dms.kjc.slicegraph.Partitioner;
+import at.dms.kjc.spacetime.MultiplySteadyState;
 
 /**
  * The entry to the back end for a uniprocesor or cluster.
@@ -37,9 +47,11 @@ public class UniBackEnd {
             SIRInterfaceTable[] interfaceTables, SIRStructure[] structs,
             SIRHelper[] helpers, SIRGlobal global) {
 
+        System.out.println("Entering UniBackEnd ...");
+        
         int numCores = KjcOptions.newSimple * KjcOptions.newSimple;
-        int nRows = KjcOptions.newSimple;
-        int nCols = KjcOptions.newSimple;
+        int nRows = 1;//KjcOptions.newSimple;
+        int nCols = 1;//KjcOptions.newSimple;
 
         // The usual optimizations and transformation to slice graph
         CommonPasses commonPasses = new CommonPasses();
@@ -56,7 +68,7 @@ public class UniBackEnd {
 
         System.out.println("Multiplying Steady-State...");
         MultiplySteadyState.doit(partitioner.getSliceGraph());
-        
+
         //generate the schedule modeling values for each filter/slice 
         partitioner.calculateWorkStats();
 
@@ -66,18 +78,8 @@ public class UniBackEnd {
         // assign SliceNodes to processors
         Layout<UniProcessor> layout;
         if (KjcOptions.spacetime && !KjcOptions.noswpipe) {
-            //            layout = new BasicGreedyLayout<UniProcessor>(schedule,
-            //                    processors.toArray());
-            if (KjcOptions.profile)
-                layout = new BasicGreedyLayout<UniProcessor>(schedule,
-                        processors.toArray());
-            else
-//                layout = new BasicGreedyLayout<UniProcessor>(schedule,
-//                        processors.toArray());
-                layout = new SWPipeLayout<UniProcessor, UniProcessors>(
-                        schedule, processors);
-            //                layout = new CompatibleFilterLayout<UniProcessor>(schedule,
-            //                        processors.toArray());
+            layout = new BasicGreedyLayout<UniProcessor>(schedule,
+                    processors.toArray());
         } else {
             layout = new NoSWPipeLayout<UniProcessor, UniProcessors>(schedule,
                     processors);
@@ -123,15 +125,9 @@ public class UniBackEnd {
             CodegenPrintWriter p = new CodegenPrintWriter(new BufferedWriter(
                     new FileWriter(outputFileName, false)));
 
-            if (KjcOptions.profile) {
-                p.println("#include <E2Runtime.h>");
-                for (String s : CodeStoreHelperSharedMem.runtimeObjs) {
-                    p.println("E2Runtime " + s + "_runtime_obj(\"" + s + "\");");
-                }
-            }
-            p.println("#include <e2_support.h>");
-            
             p.println("#include <pthread.h>\npthread_barrier_t barr;");
+            p.println("#include <timer.h>");
+            p.println("#include <stdlib.h>");
             // write out C code
             EmitStandaloneCode codeEmitter = new EmitStandaloneCode(
                     uniBackEndBits);

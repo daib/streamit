@@ -196,17 +196,17 @@ public class SWPipeLayout<T extends ComputeNode, Ts extends ComputeNodesI>
 
             //some checks
             for (FilterSliceNode fsn : slice.getFilterNodes()) {
-                assert getFilterStart(fsn) <= (getFilterEnd(fsn) - spaceTime
-                        .getPartitioner().getFilterWorkSteadyMult(fsn)) :
-
-                fsn
-                        + " "
-                        + getFilterStart(fsn)
-                        + " <= "
-                        + getFilterEnd(fsn)
-                        + " - "
-                        + spaceTime.getPartitioner().getFilterWorkSteadyMult(
-                                fsn) + " (bottleneck: " + bottleNeck + ")";
+//                assert getFilterStart(fsn) <= (getFilterEnd(fsn) - spaceTime
+//                        .getPartitioner().getFilterWorkSteadyMult(fsn)) :
+//
+//                fsn
+//                        + " "
+//                        + getFilterStart(fsn)
+//                        + " <= "
+//                        + getFilterEnd(fsn)
+//                        + " - "
+//                        + spaceTime.getPartitioner().getFilterWorkSteadyMult(
+//                                fsn) + " (bottleneck: " + bottleNeck + ")";
             }
         }
 

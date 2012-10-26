@@ -3,7 +3,9 @@ package at.dms.kjc.vanillaSlice;
 
 //import java.util.*;
 //import at.dms.kjc.*;
+import at.dms.kjc.JEmittedTextExpression;
 import at.dms.kjc.JExpression;
+import at.dms.kjc.JExpressionStatement;
 import at.dms.kjc.JMethodCallExpression;
 import at.dms.kjc.KjcOptions;
 import at.dms.kjc.backendSupport.BackEndFactory;
@@ -121,7 +123,7 @@ public class EmitStandaloneCode extends EmitCode {
         //
         //        System.out.println("x = " + w + " y = " + l);
 
-        p.println("\tunsigned long flag;");
+//        p.println("\tunsigned long flag;");
         //estimate the number of cores
 
         int cx = 1;
@@ -138,66 +140,66 @@ public class EmitStandaloneCode extends EmitCode {
         int w = KjcOptions.newSimple * cx;
 
         int mainComputeNode = 0;
-        for (int i = 0; i < backendbits.getComputeNodes().size(); i++) {
-            ComputeNode cn = backendbits.getComputeNodes().getNthComputeNode(i);
-
-//            long attr = 0x0020; //compose
-            //            int firstCore = (i + 1) * 2;
-
-            //            int x = firstCore % w;
-            //            int y = firstCore / w;
-            //
-            //            for (int j = 0; j < 2; j++) {
-            //                for (int k = 0; k < 1; k++) {
-            //                    int index = (y + k) * w + j + x;
-            //                    attr |= (1 << index) << 16;
-            //                }
-            //            }
-            
-            p.println("\tflag = 0;");
-            p.println("\tsetComposition(flag, COMPOSITION_CORES);");
-
-            int x = cn.getX() * cx;
-            int y = cn.getY() * cy;
-
-            String topology = null;
-            
-            for (int j = 0; j < cx; j++) {
-                for (int k = 0; k < cy; k++) {
-                    int index = (y + k) * w + (x + j);
-                    if(topology == null) {
-                        topology = "C"+index;
-                    } else 
-                        topology = topology + "|C" + index;
-                }
-            }
-
-//            p.println("\tflag = " + attr + ";");
-            p.println("\tsetTopology(flag, " + topology + ");");
-
-            if (cn.getX() == 0 && cn.getY() == 0) {
-                mainComputeNode = i;
-                p.println("\tCompose(flag);");
-                //                continue;
-            } else
-                p.println("\tpthread_create(&threads[" + i
-                        + "], (void*)&flag, &run_threads, (void*)" + i + ");");
-            p.println();
-        }
+//        for (int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+//            ComputeNode cn = backendbits.getComputeNodes().getNthComputeNode(i);
+//
+////            long attr = 0x0020; //compose
+//            //            int firstCore = (i + 1) * 2;
+//
+//            //            int x = firstCore % w;
+//            //            int y = firstCore / w;
+//            //
+//            //            for (int j = 0; j < 2; j++) {
+//            //                for (int k = 0; k < 1; k++) {
+//            //                    int index = (y + k) * w + j + x;
+//            //                    attr |= (1 << index) << 16;
+//            //                }
+//            //            }
+//            
+//            p.println("\tflag = 0;");
+//            p.println("\tsetComposition(flag, COMPOSITION_CORES);");
+//
+//            int x = cn.getX() * cx;
+//            int y = cn.getY() * cy;
+//
+//            String topology = null;
+//            
+//            for (int j = 0; j < cx; j++) {
+//                for (int k = 0; k < cy; k++) {
+//                    int index = (y + k) * w + (x + j);
+//                    if(topology == null) {
+//                        topology = "C"+index;
+//                    } else 
+//                        topology = topology + "|C" + index;
+//                }
+//            }
+//
+////            p.println("\tflag = " + attr + ";");
+//            p.println("\tsetTopology(flag, " + topology + ");");
+//
+//            if (cn.getX() == 0 && cn.getY() == 0) {
+//                mainComputeNode = i;
+//                p.println("\tCompose(flag);");
+//                //                continue;
+//            } else
+//                p.println("\tpthread_create(&threads[" + i
+//                        + "], (void*)&flag, &run_threads, (void*)" + i + ");");
+//            p.println();
+//        }
 
         p.println("\t_MAIN__" + mainComputeNode + "();");
 
-        for (int i = 0; i < backendbits.getComputeNodes().size(); i++) {
-            if (i == mainComputeNode)
-                continue;
-            p.println("\tpthread_join(threads[" + i + "], NULL);");
-        }
+//        for (int i = 0; i < backendbits.getComputeNodes().size(); i++) {
+//            if (i == mainComputeNode)
+//                continue;
+//            p.println("\tpthread_join(threads[" + i + "], NULL);");
+//        }
 
-        if (KjcOptions.profile) {
-            for (String s : CodeStoreHelperSharedMem.runtimeObjs) {
-                p.println(s + "_runtime_obj.print_stats();");
-            }
-        }
+//        if (KjcOptions.profile) {
+//            for (String s : CodeStoreHelperSharedMem.runtimeObjs) {
+//                p.println(s + "_runtime_obj.print_stats();");
+//            }
+//        }
 
         p.println("return 0;");
         p.outdent();
@@ -206,6 +208,9 @@ public class EmitStandaloneCode extends EmitCode {
 
     public void emitCodeForComputeNode(ComputeNode n, CodegenPrintWriter p) {
         codegen = new CPPCodeGen(p);
+        n.getComputeCode().addInitStatement(new JExpressionStatement(new JEmittedTextExpression("TIME0")));
+        //add timing measurement code
+        n.getComputeCode().addCleanupStatement(new JExpressionStatement(new JEmittedTextExpression("TIME1(\"Running time\")")));
         emitCodeForComputeNode(n, p, codegen);
     }
 

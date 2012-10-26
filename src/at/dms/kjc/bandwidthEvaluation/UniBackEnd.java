@@ -42,6 +42,7 @@ public class UniBackEnd {
             SIRInterfaceTable[] interfaceTables, SIRStructure[] structs,
             SIRHelper[] helpers, SIRGlobal global) {
 
+        System.out.println("Enttering Bandwidth Evaluation Backend");
         int numCores = KjcOptions.newSimple * KjcOptions.newSimple;
         int nRows = KjcOptions.newSimple;
         int nCols = KjcOptions.newSimple;
@@ -73,10 +74,10 @@ public class UniBackEnd {
         if (KjcOptions.spacetime && !KjcOptions.noswpipe) {
             //            layout = new BasicGreedyLayout<UniProcessor>(schedule,
             //                    processors.toArray());
-            if (KjcOptions.profile)
-                layout = new BasicGreedyLayout<UniProcessor>(schedule,
-                        processors.toArray());
-            else
+//            if (KjcOptions.profile)
+//                layout = new BasicGreedyLayout<UniProcessor>(schedule,
+//                        processors.toArray());
+//            else
                 layout = new SWPipeLayout<UniProcessor, UniProcessors>(
                         schedule, processors);
             //                layout = new CompatibleFilterLayout<UniProcessor>(schedule,
@@ -135,6 +136,8 @@ public class UniBackEnd {
             }
         }
 
+        System.exit(0);
+        
         /*
          * Emit code to structs.h
          */
