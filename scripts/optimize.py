@@ -13,7 +13,7 @@ path = sys.argv[1]
 iterations = 100
 
 
-OneMhz = 1000000
+OneMhz = 1
 OneGhz = 1000 * OneMhz
 
 profiling_cpu_freq = 3 * OneGhz  # 3GHz
@@ -52,7 +52,7 @@ east = 2
 wire_config_opts = [[2.5, 1000 * OneMhz], [2.38, 950 * OneMhz], [2.27, 900 * OneMhz], 
                     [2.15, 850 * OneMhz], [2.02, 800 * OneMhz], [1.93, 760 * OneMhz], 
                     [1.84, 720 * OneMhz], [1.75, 680 * OneMhz], [1.66, 640 * OneMhz], 
-                    [1.57, 600 * OneMhz]]
+                    [1.57, 600 * OneMhz], [0.9, 125 * OneMhz]]
 
 #######################################################################################
 
@@ -80,7 +80,64 @@ def incoming_edge_id(x, y, dir, dim, ndirs):
 
     return id
 
-def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
+def edges_on_k_paths(srcX, srcY, dstX, dstY, k, dim, ndirs):
+    
+    edges = []
+    dir = -1
+     
+    #we will start with minimal paths first
+    if srcX < dstX:
+        dir = east
+        for x in range(srcX, dstX):
+            for y in range(min(srcY,dstY), max(srcY,dstY) + 1):
+                edge_id = (x * dim + y) * ndirs + dir
+                edges.append(edge_id)
+    elif srcX > dstX:
+        dir = west
+        for x in range(dstX + 1, srcX + 1):
+            for y in range(min(srcY,dstY), max(srcY,dstY) + 1):
+                edge_id = (x * dim + y) * ndirs + dir
+                edges.append(edge_id)
+    
+    
+    if srcY < dstY:
+        dir = north
+        for x in range(min(srcX, dstX), max(srcX, dstX) + 1):
+            for y in range(srcY,dstY):
+                edge_id = (x * dim + y) * ndirs + dir
+                edges.append(edge_id)
+    elif srcY > dstY:
+        dir = south
+        for x in range(min(srcX, dstX), max(srcX, dstX) + 1):
+            for y in range(dstY + 1, srcY + 1):
+                edge_id = (x * dim + y) * ndirs + dir
+                edges.append(edge_id)
+    
+    #return edge ids
+    return edges
+
+def edges_not_on_k_paths(srcX, srcY, dstX, dstY, k, dim, ndirs):
+    edges_excluded = []
+    
+    edges_included = edges_on_k_paths(srcX, srcY, dstX, dstY, k, dim, ndirs)
+    
+    edges_included.sort()
+
+    included_idx = -1
+    if len(edges_included) >= 0:
+        included_idx = edges_included.pop(0)
+    
+    for i in range(dim * dim * ndirs):
+        if i == included_idx:
+            if len(edges_included) > 0:
+                included_idx = edges_included.pop(0)
+            continue
+        
+        edges_excluded.append(i)
+    
+    return edges_excluded
+
+def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     
     debug = False
     
@@ -88,16 +145,10 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
     wire_freqs = []
     dirty_flows = copy.deepcopy(flows) # make a copy of the flows in case it is modified
     
-    #m = CPlexModel()
-    
     n_flows = len(dirty_flows)
     
     # flows demands
     nsent = copy.deepcopy([f[traffic_idx] for f in dirty_flows])
-    
-    #b = m.new((n_flows, dim * dim * ndirs), vtype = int)
-    #edge_freqs = m.new(dim * dim * ndirs, vtype = long)
-    #s = m.new((len(wire_config_opts), dim * dim * ndirs), vtype = bool)    # frequency selection variables
     
     b = []
     b_type = ''
@@ -141,20 +192,20 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
             for dir in range(0, ndirs):
                 edge_id = (x * dim + y) * ndirs + dir
                 #capacity constraint for each edge
-                #m.constrain((nsent * b[:, edge_id]) * ncycles <= bus_width * OneGhz * edge_freqs[edge_id])
+                #m.constrain((nsent * b[:, edge_id]) * OneGhz <= bus_width * ncycles * edge_freqs[edge_id]) 
                 var_names = []
                 coefs = []
-                coefs.extend([(item * ncycles) for item in nsent])
+                coefs.extend([(item * OneGhz) for item in nsent])
                 
                 for i in range(0, n_flows):
                     var_names.append(format_var('b', i, edge_id))
                     
                 var_names.append(format_var('edge_freqs', 0, edge_id))
-                coefs.append(-bus_width * OneGhz)
+                coefs.append(-bus_width * ncycles)
                 
                 if debug:
                     continue
-                    
+
                 rows.append([var_names,coefs])
                 my_rhs.append(0)
                 my_senses = my_senses + 'L'
@@ -330,9 +381,18 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
             
                 rows.append([var_names, coefs])
                 my_rhs.append(0)
-                my_senses = my_senses + 'E'   
+                my_senses = my_senses + 'E'
         
                 #m.constrain(edge_freqs[edge_id] <= freq_levels * s[:, edge_id])
+    #pruning the application
+    for i in range(n_flows):
+        f = dirty_flows[i]
+        edges_excluded = edges_not_on_k_paths(f[srcXIdx], f[srcYIdx], f[dstXIdx], f[dstYIdx], 0, dim, ndirs)
+        for e in edges_excluded:
+            rows.append([[format_var('b', i, e)], [1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+                
     colnames = []
     colnames.extend(b)
     colnames.extend(edge_freqs)
@@ -389,6 +449,7 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
 
     slack = my_prob.solution.get_linear_slacks()
     x     = my_prob.solution.get_values()
+    
 
     #for j in range(numrows):
     #    print "Row %d:  Slack = %10f" % (j, slack[j])
@@ -439,7 +500,8 @@ def write_traffic(name, traces):
 def comm_prof(dim):
     # use the streamit compiler to obtain intercore communication bandwidth in one iteration 
     commlog = str(dim) + "x" + str(dim) + "_comm.log"
-    #os.system("make -f Makefile.mk BACKEND=\'--spacetime --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
+    if not os.path.isfile(commlog):
+        os.system("make -f Makefile.mk BACKEND=\'--spacetime --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
     
     FILE = open(commlog, 'r')
     flows = []
@@ -457,20 +519,26 @@ def comm_prof(dim):
     return flows
 
 def time_prof(dim):
-    # compile from str to c
-    #os.system("make -f Makefile.mk BACKEND=\'--spacetime --newSimple " + str(dim) + " --i " + str(iterations) + "\'")
     
-    # compile the generated c program
-    #os.system("cp /home/dai/prog/compiler/streamit/tmp/Makefile ./")
-    #os.system("make")
+    dimstr = str(dim) + "x" + str(dim)
+    logfile = dimstr + "_time.log"
+    cfile = "str" + dimstr + '.cpp'
     
-    #store the files
-    #os.system("mv str.cpp str" + str(dim) + 'x' + str(dim) + '.cpp')
-    #os.system("mv stream stream"  + str(dim) + 'x' + str(dim))
+    if not os.path.isfile(cfile):
+        # compile from str to c
+        os.system("make -f Makefile.mk BACKEND=\'--spacetime --newSimple " + str(dim) + " --i " + str(iterations) + "\'")
+    
+        # compile the generated c program
+        os.system("cp /home/dai/prog/compiler/streamit/tmp/Makefile ./")
+        os.system("make")
+    
+        #store the files
+        os.system("mv str.cpp " + cfile)
+        os.system("mv stream stream"  + str(dim) + 'x' + str(dim))
     
     # run the program to obtain running time information
-    logfile = str(dim) + "x" + str(dim) + "_time.log"
-    os.system("./stream" + str(dim) + 'x' + str(dim) + " " + str(iterations) + " > " + logfile)
+    if not os.path.isfile(logfile):
+        os.system("./stream" + str(dim) + 'x' + str(dim) + " " + str(iterations) + " > " + logfile)
     
     ncycles = 0
     # parse log file for running time
@@ -551,14 +619,14 @@ for dir in os.listdir(path):
     
     os.system("pwd")
     
-    for dim in [4, 6, 8]:
+    for dim in [8]:
         
         ncycles = time_prof(dim)
         
         flows = comm_prof(dim)
         
         #generate ILP files
-        [routes, wire_freqs] = optimal_routes_freqs_direct(ncycles, flows, dim, directions)
+        [routes, wire_freqs] = optimal_routes_freqs(ncycles, flows, dim, directions)
         
         quit()
 
