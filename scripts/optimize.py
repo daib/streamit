@@ -82,7 +82,7 @@ def incoming_edge_id(x, y, dir, dim, ndirs):
 
 def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
     
-    debug = True
+    debug = False
     
     routes = []
     wire_freqs = []
@@ -239,11 +239,12 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                     #if this is a valid incoming edge
                     if e_in_id >= 0:
                         #do no go back
-                        e_back_id = (x * dim + y) * ndirs + (3-dir)
-                        rows.append([[format_var('b', i, e_in_id), format_var('b', i, e_back_id)],[1,1]])
-                        my_rhs.append(1)
-                        my_senses = my_senses + 'L'
-                        
+                        if dir < 2: # avoid duplication
+                            e_back_id = (x * dim + y) * ndirs + (3-dir)
+                            rows.append([[format_var('b', i, e_in_id), format_var('b', i, e_back_id)],[1,1]])
+                            my_rhs.append(1)
+                            my_senses = my_senses + 'L'
+                            
                         var_names.append(format_var('b', i, e_in_id))
                         coefs.append(-1)
                     
@@ -319,15 +320,17 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                 for i in range(len(wire_config_opts)):
                     var_names.append(format_var('s', i, edge_id))
                 
-                coefs = [1] * len(var_names)
-                coefs[0] = -1
+                #coefs = [1] * len(var_names)
+                coefs = [-1]
+                coefs.extend(copy.deepcopy(freq_levels))
+                
                 
                 if debug:
                     continue
             
                 rows.append([var_names, coefs])
                 my_rhs.append(0)
-                my_senses = my_senses + 'G'   
+                my_senses = my_senses + 'E'   
         
                 #m.constrain(edge_freqs[edge_id] <= freq_levels * s[:, edge_id])
     colnames = []
@@ -390,10 +393,8 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
     #for j in range(numrows):
     #    print "Row %d:  Slack = %10f" % (j, slack[j])
     for j in range(numcols):
-        print colnames[j] + " %d:  Value = %10f" % (j, x[j])
+        print colnames[j] + " %d:  Value = %d" % (j, x[j])
 
-    quit()
-    
     return [routes, wire_freqs]
 
 
@@ -559,6 +560,8 @@ for dir in os.listdir(path):
         #generate ILP files
         [routes, wire_freqs] = optimal_routes_freqs_direct(ncycles, flows, dim, directions)
         
+        quit()
+
         #generate wire config
         gen_wire_delays('wire_config.txt', wire_freqs)
         
