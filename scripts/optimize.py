@@ -1,12 +1,11 @@
-# /usr/bin/python
+#!/usr/bin/python
 
-import os
+import cplex
+from cplex.exceptions import CplexError
 import sys
+import os
 import re
 import copy
-import math
-from pycpx import CPlexModel
-import numpy as np
 
 #######################################################################################
 path = sys.argv[1]
@@ -76,6 +75,279 @@ def incoming_edge_id(x, y, dir, dim, ndirs):
     if id < 0 or id >= dim * dim * ndirs:
         id = -1
     return id
+
+def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
+    routes = []
+    wire_freqs = []
+    dirty_flows = copy.deepcopy(flows) # make a copy of the flows in case it is modified
+    
+    #m = CPlexModel()
+    
+    n_flows = len(dirty_flows)
+    
+    # flows demands
+    nsent = copy.deepcopy([f[traffic_idx] for f in dirty_flows])
+    
+    #b = m.new((n_flows, dim * dim * ndirs), vtype = int)
+    #edge_freqs = m.new(dim * dim * ndirs, vtype = long)
+    #s = m.new((len(wire_config_opts), dim * dim * ndirs), vtype = bool)    # frequency selection variables
+    
+    b = []
+    b_type = ''
+    edge_freqs = []
+    edge_freqs_type = ''
+    s = []
+    s_type = ''
+     
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                edge_freqs.append(format_var('edge_freqs', 0, edge_id))
+                edge_freqs_type = edge_freqs_type + 'L'
+                for i in range(n_flows):
+                    b.append(format_var('b', i, edge_id))
+                    b_type = b_type + 'I'
+                for i in range(len(wire_config_opts)):
+                    s.append(format_var('s', i, edge_id))
+                    s_type = s_type + 'I'
+    
+    
+    b_lb = [0] * len(b)
+    b_ub = [1] * len(b)
+    s_lb = [0] * len(s)
+    s_ub = [1] * len(s)
+    
+    freq_levels = [c[1] for c in wire_config_opts]
+    
+    edge_freqs_lb = [min(freq_levels)] * len(edge_freqs)
+    edge_freqs_ub = [max(freq_levels)] * len(edge_freqs)
+    
+    power_levels = [int(c[0] * c[0] * c[1]) for c in wire_config_opts]
+    
+    rows = []
+    my_rhs = []
+    my_senses = ''
+    
+    for x in range(0, dim):
+        for y in range(0, dim):
+            for dir in range(0, ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                #capacity constraint for each edge
+                #m.constrain((nsent * b[:, edge_id]) * ncycles <= bus_width * OneGhz * edge_freqs[edge_id])
+                var_names = []
+                coefs = []
+                coefs.extend([(item * ncycles) for item in nsent])
+                
+                for i in range(0, n_flows):
+                    var_names.append(format_var('b', i, edge_id))
+                    
+                var_names.append(format_var('edge_freqs', 0, edge_id))
+                coefs.append(-bus_width * OneGhz)
+                
+                rows.append([var_names,coefs])
+                my_rhs.append(0)
+                my_senses = my_senses + 'L'
+                    
+    
+    #unsplitable constraints and flow conservation
+    #for i in range(0, n_flows):
+    #    for x in range(0, dim):
+    #        for y in range(0, dim):
+    #            edgeSrcId = (x * dim + y) * ndirs
+    #            m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() <= 1)
+    
+    # unsplitable constraints and flow conservation
+    for x in range(0, dim):
+        for y in range(0, dim):
+            for i in range(0, n_flows):
+                #if this is the source of the flow
+                #there must be some out going edge
+                if x == dirty_flows[i][srcXIdx] and y == dirty_flows[i][srcYIdx]:
+                    edgeSrcId = (x * dim + y) * ndirs
+                    var_names = []
+                    coefs = [1] * ndirs
+                    for dir in range(ndirs):
+                        var_names.append(format_var('b', i, edgeSrcId + dir))
+                        
+                    rows.append([var_names, coefs])
+                    my_rhs.append(1)
+                    my_senses = my_senses + 'E'
+                    #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() == 1)
+                    continue
+                     
+                # if this is the destination for the flow
+                # we do not need flow conservation
+                # and all outgoing edge is invalid
+                if x == dirty_flows[i][dstXIdx] and y == dirty_flows[i][dstYIdx]:
+                    edgeSrcId = (x * dim + y) * ndirs
+                    var_names = []
+                    coefs = [1] * ndirs
+                    for dir in range(0, ndirs):
+                        var_names.append(format_var('b', i, edgeSrcId + dir))
+                    
+                    rows.append([var_names, coefs])
+                    my_rhs.append(0)
+                    my_senses = my_senses + 'E'
+                        #m.constrain(b[i, edgeSrcId + dir] == 0)
+                    #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() == 0)
+                    continue
+                
+                #this is an intermediate hop
+                for dir in range(0, ndirs):
+                    e_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                    #if this is a valid incoming edge
+                    if e_id >= 0:
+                        #possible outgoing edges
+                        #do no go back
+                        e_back_id = (x * dim + y) * ndirs + (3-dir)
+                        edgeSrcId = (x * dim + y) * ndirs
+                        var_names = []
+                        coefs = []
+                        for dir in range(ndirs):
+                            e_out_id = edgeSrcId + dir
+                            if e_out_id != e_back_id:
+                                var_names.append(format_var('b', i, e_out_id))
+                                coefs.append(1)
+                        var_names.append(format_var('b', i, e_id))
+                        coefs.append(-1)
+                        
+                        rows.append([var_names, coefs])
+                        my_rhs.append(0)
+                        my_senses = my_senses + 'E'
+                        #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
+                        
+    #edge conditions
+    for y in range(0, dim):
+        e_id_w = y * ndirs + west
+        e_id_e = ((dim-1) * dim + y) * ndirs + east
+        for i in range(n_flows):
+            #m.constrain(b[i, e_id_w] == 0)
+            #m.constrain(b[i, e_id_e] == 0)
+            
+            rows.append([[format_var('b', i, e_id_w)],[1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            rows.append([[format_var('b', i, e_id_e)],[1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            
+    for x in range(0, dim):
+        e_id_s = x * dim * ndirs + south
+        e_id_n = (x * dim + dim -1) * ndirs + north
+        for i in range(n_flows):
+            #m.constrain(b[i, e_id_n] == 0)
+            #m.constrain(b[i, e_id_s] == 0)
+            
+            rows.append([[format_var('b', i, e_id_n)],[1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            rows.append([[format_var('b', i, e_id_s)],[1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            
+    #minimal route
+    for i in range(0, n_flows):
+        fi = dirty_flows[i]
+        hop = abs(fi[srcXIdx] - fi[dstXIdx]) + abs(fi[srcYIdx] - fi[dstYIdx])
+        n_edges = dim * dim * ndirs
+        
+        var_names = []
+        for e in range(n_edges):
+            var_names.append(format_var('b', i, e))
+        coefs = [1] * len(var_names)
+        
+        rows.append([var_names, coefs])
+        my_rhs.append(hop)
+        my_senses = my_senses + 'L'             
+        #m.constrain(b[i,:].sum() <= hop)
+    
+        
+    #single frequency constraints
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                #each edge is allowed at most one freq
+                #m.constrain(s[:, edge_id].sum() <= 1)
+                var_names = []
+                for i in range(len(wire_config_opts)):
+                    var_names.append(format_var('s', i, edge_id))
+                coefs = [1] * len(var_names)
+                
+                rows.append([var_names, coefs])
+                my_rhs.append(1)
+                my_senses = my_senses + 'L'   
+        
+                var_names = [format_var('edge_freqs', 0, edge_id)]
+                for i in range(len(wire_config_opts)):
+                    var_names.append(format_var('s', i, edge_id))
+                coefs = [1].extend([-1] * len(var_names))
+                
+                rows.append([var_names, coefs])
+                my_rhs.append(0)
+                my_senses = my_senses + 'E'   
+        
+                #m.constrain(edge_freqs[edge_id] == freq_levels * s[:, edge_id])
+    var_names = []
+    var_names.extend(b)
+    var_names.extend(edge_freqs)
+    var_names.extend(s)
+    
+    var_lb = []
+    var_lb.extend(b_lb)
+    var_lb.extend(edge_freqs_lb)
+    var_lb.extend(s_lb)
+    
+    var_ub = []
+    var_ub.extend(b_ub)
+    var_ub.extend(edge_freqs_ub)
+    var_ub.extend(s_ub)
+    
+    #optimal goal
+    power_obj = [0] * (len(b) + len(edge_freqs))
+    
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                power_obj.extend(power_levels)
+    
+    my_prob = cplex.Cplex()
+              
+    my_prob.objective.set_sense(my_prob.objective.sense.minimize)
+
+    var_type = b_type + edge_freqs_type + s_type
+    my_prob.variables.add(obj = power_obj, lb = var_lb, ub = var_ub, types = var_type,
+                       names = var_names)
+
+    my_prob.linear_constraints.add(lin_expr = rows, senses = my_sense,
+                                rhs = my_rhs)
+
+    #m.minimize((power_levels * s).sum())
+    #m.minimize(b[0,:].sum())
+    print 'Solving the problem ...'
+    my_prob.solve()
+    print
+    # solution.get_status() returns an integer code
+    print "Solution status = " , my_prob.solution.get_status(), ":",
+    # the following line prints the corresponding string
+    print my_prob.solution.status[my_prob.solution.get_status()]
+    print "Solution value  = ", my_prob.solution.get_objective_value()
+
+    numcols = my_prob.variables.get_num()
+    numrows = my_prob.linear_constraints.get_num()
+
+    slack = my_prob.solution.get_linear_slacks()
+    x     = my_prob.solution.get_values()
+
+    for j in range(numrows):
+        print "Row %d:  Slack = %10f" % (j, slack[j])
+    for j in range(numcols):
+        print "Column %d:  Value = %10f" % (j, x[j])
+
+    quit()
+    
+    return [routes, wire_freqs]
 
 def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     routes = []
@@ -215,7 +487,6 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     #m.minimize(b[0,:].sum())
     
     #print m[edge_freqs]
-    print m[b]
 
     return [routes, wire_freqs]
 
@@ -379,7 +650,7 @@ for dir in os.listdir(path):
         flows = comm_prof(dim)
         
         #generate ILP files
-        [routes, wire_freqs] = optimal_routes_freqs(ncycles, flows, dim, directions)
+        [routes, wire_freqs] = optimal_routes_freqs_direct(ncycles, flows, 2, directions)
         
         #generate wire config
         gen_wire_delays('wire_config.txt', wire_freqs)
@@ -400,3 +671,4 @@ for dir in os.listdir(path):
         
     os.chdir("../../")
         
+
