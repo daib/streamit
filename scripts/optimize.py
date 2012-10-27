@@ -179,7 +179,7 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                     rows.append([var_names, coefs])
                     my_rhs.append(1)
                     my_senses = my_senses + 'E'
-                    #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() == 1)
+                    #m.constrain(b[i, edgeSoutrcId:(edgeSrcId+ndirs)].sum() == 1)
                     
                     #all incoming edges are invalid
                     for dir in range(0, ndirs):
@@ -197,7 +197,7 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                 # and all outgoing edge is invalid
                 if x == dirty_flows[i][dstXIdx] and y == dirty_flows[i][dstYIdx]:
                     edgeSrcId = (x * dim + y) * ndirs
-                    for dir in range(0, ndirs):
+                    for dir in range(ndirs):
                         rows.append([[format_var('b', i, edgeSrcId + dir)], [1]])
                         my_rhs.append(0)
                         my_senses = my_senses + 'E'
@@ -220,28 +220,33 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                     continue
                 
                 #this is an intermediate hop
-                for dir in range(0, ndirs):
-                    e_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                var_names = []
+                coefs = []
+                edgeSrcId = (x * dim + y) * ndirs
+                    
+                for dir in range(ndirs):
+                    #flows out
+                    var_names.append(format_var('b', i, edgeSrcId + dir))
+                    coefs.append(1)
+                    
+                    #flows in
+                    e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                    
                     #if this is a valid incoming edge
-                    if e_id >= 0:
-                        #possible outgoing edges
+                    if e_in_id >= 0:
                         #do no go back
                         e_back_id = (x * dim + y) * ndirs + (3-dir)
-                        edgeSrcId = (x * dim + y) * ndirs
-                        var_names = []
-                        coefs = []
-                        for dir in range(ndirs):
-                            e_out_id = edgeSrcId + dir
-                            if e_out_id != e_back_id:
-                                var_names.append(format_var('b', i, e_out_id))
-                                coefs.append(1)
-                            
-                        var_names.append(format_var('b', i, e_id))
-                        coefs.append(-1)
+                        rows.append([[format_var('b', i, e_in_id), format_var('b', i, e_back_id)],[1,-1]])
+                        my_rhs.append(1)
+                        my_senses = my_senses + 'L'
                         
-                        rows.append([var_names, coefs])
-                        my_rhs.append(0)
-                        my_senses = my_senses + 'E'
+                        var_names.append(format_var('b', i, e_in_id))
+                        coefs.append(-1)
+                    
+
+                rows.append([var_names, coefs])
+                my_rhs.append(0)
+                my_senses = my_senses + 'E'
                         #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
                         
     #edge conditions
@@ -548,7 +553,7 @@ for dir in os.listdir(path):
         flows = comm_prof(dim)
         
         #generate ILP files
-        [routes, wire_freqs] = optimal_routes_freqs_direct(ncycles, flows, 3, directions)
+        [routes, wire_freqs] = optimal_routes_freqs_direct(ncycles, flows, dim, directions)
         
         #generate wire config
         gen_wire_delays('wire_config.txt', wire_freqs)
