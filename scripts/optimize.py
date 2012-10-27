@@ -13,9 +13,10 @@ path = sys.argv[1]
 
 iterations = 100
 
-OneGhz = 1000000000
+
 OneMhz = 1000000
- 
+OneGhz = 1000 * OneMhz
+
 profiling_cpu_freq = 3 * OneGhz  # 3GHz
 assumed_cpu_freq = OneGhz
 
@@ -47,7 +48,6 @@ wire_config_opts = [[2.5, 1000 * OneMhz], [2.38, 950 * OneMhz], [2.27, 900 * One
                     [2.15, 850 * OneMhz], [2.02, 800 * OneMhz], [1.93, 760 * OneMhz], 
                     [1.84, 720 * OneMhz], [1.75, 680 * OneMhz], [1.66, 640 * OneMhz], 
                     [1.57, 600 * OneMhz]]
- 
 
 #######################################################################################
 
@@ -59,9 +59,9 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     m = CPlexModel()
     
     # flows demands
-    d = np.array(copy.deepcopy([f[traffic_idx] for f in dirty_flows]))
+    nsent = np.array(copy.deepcopy([f[traffic_idx] for f in dirty_flows]))
     
-    b = m.new((len(d), dim * dim * ndirs), vtype = bool)
+    b = m.new((len(nsent), dim * dim * ndirs), vtype = bool)
     
     f = m.new(dim * dim * ndirs, vtype = long)
     
@@ -76,17 +76,17 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
             for dir in range(0, ndirs):
                 edge_id = (x * dim + y) * ndirs + dir
                 #capacity constraints
-                m.constrain(d * b[:, edge_id] <= f[edge_id] * bus_width)
+                m.constrain((nsent * b[:, edge_id]) * ncycles <= bus_width * OneGhz * f[edge_id])
     
     #unsplitable constraints
-    for i in range(0, len(d)):
+    for i in range(0, len(nsent)):
         for x in range(0, dim):
             for y in range(0, dim):
                 edgeSrcId = (x * dim + y) * ndirs
                 m.constrain(b[i,edgeSrcId:(edgeSrcId+ndirs)].sum() == 1)
     
     #minimal routes
-    for i in range(0, len(d)):
+    for i in range(0, len(nsent)):
         fi = flows[i]
         hop = abs(fi[srcXIdx] - fi[dstXIdx]) + abs(fi[srcYIdx] - fi[dstYIdx])
         m.constrain(b[i,:].sum() <= hop)
