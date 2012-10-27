@@ -46,9 +46,9 @@ traffic_used_idx = 5
 
 # routing directions
 north = 0
-sounth = 3
+south = 3
 west = 1
-each = 2
+east = 2
 
 wire_config_opts = [[2.5, 1000 * OneMhz], [2.38, 950 * OneMhz], [2.27, 900 * OneMhz], 
                     [2.15, 850 * OneMhz], [2.02, 800 * OneMhz], [1.93, 760 * OneMhz], 
@@ -98,7 +98,7 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
             for dir in range(0, ndirs):
                 edge_id = (x * dim + y) * ndirs + dir
                 #capacity constraint for each edge
-                m.constrain((nsent * b[:, edge_id]) * ncycles <= bus_width * OneGhz * edge_freqs[edge_id])
+                #m.constrain((nsent * b[:, edge_id]) * ncycles <= bus_width * OneGhz * edge_freqs[edge_id])
                 for i in range(0, n_flows):
                     m.constrain(0 <= b[i,edge_id] <= 1)
     
@@ -136,15 +136,18 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                     e_id = incoming_edge_id(x, y, dir, dim, ndirs)
                     #if this is a valid incoming edge
                     if e_id >= 0:
-                        e_indices = []
+                        #e_indices = []
                         #possible outgoing edges
                         for dir1 in range(0, ndirs):
                             #do no go back
-                            if dir1 + dir == 4:
+                            if dir1 + dir == 3:
+                                e_out_id = (x * dim + y) * ndirs + dir1
+                                m.constrain(b[i, e_out_id] == 0)
                                 continue
-                            e_out_id = (x * dim + y) * ndirs + dir1 #outgoing_edge_id(x,y, dir, dim, ndirs)
-                            e_indices.append(e_out_id)
-                        m.constrain(b[i, e_indices].sum == b[i, e_id])
+                             #outgoing_edge_id(x,y, dir, dim, ndirs)
+                            #e_indices.append(e_out_id)
+                        edgeSrcId = (x * dim + y) * ndirs
+                        #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() == b[i, e_id])
                               
                 
     #minimal route
