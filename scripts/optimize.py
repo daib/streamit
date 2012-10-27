@@ -63,17 +63,21 @@ def format_var(name, idx1, idx2):
 def incoming_edge_id(x, y, dir, dim, ndirs):
     id = -1
     if dir == east:
-        id = ((x - 1) * dim + y) * ndirs
+        if x > 0:
+            id = ((x - 1) * dim + y) * ndirs
     elif dir == west:
-        id = ((x + 1) * dim + y) * ndirs
+        if x < dim - 1:
+            id = ((x + 1) * dim + y) * ndirs
     elif dir == north:
-        id = (x * dim + y - 1) * ndirs
+        if y > 0:
+            id = (x * dim + y - 1) * ndirs
     elif dir == south:
-        id =  (x * dim + y + 1) * ndirs
-        
-    id = id + dir
-    if id < 0 or id >= dim * dim * ndirs:
-        id = -1
+        if y < dim - 1:
+            id =  (x * dim + y + 1) * ndirs
+
+    if id >= 0:
+        id = id + dir        
+
     return id
 
 def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
@@ -164,9 +168,9 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
     #            m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() <= 1)
     
     # unsplitable constraints and flow conservation
-    for x in range(0, dim):
-        for y in range(0, dim):
-            for i in range(0, n_flows):
+    for x in range(dim):
+        for y in range(dim):
+            for i in range(n_flows):
                 #if this is the source of the flow
                 #there must be some out going edge
                 if x == dirty_flows[i][srcXIdx] and y == dirty_flows[i][srcYIdx]:
@@ -206,13 +210,13 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                     
                     #one incoming edge is true
                     var_names = []
-                    for dir in range(0, ndirs):
+                    for dir in range(ndirs):
                         e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
                         
                         if e_in_id >= 0:
                             var_names.append(format_var('b', i, e_in_id))
                     
-                    coef = [1] * len(var_names)
+                    coefs = [1] * len(var_names)
                     rows.append([var_names, coefs])
                     my_rhs.append(1)
                     my_senses = my_senses + 'E'
@@ -236,7 +240,7 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                     if e_in_id >= 0:
                         #do no go back
                         e_back_id = (x * dim + y) * ndirs + (3-dir)
-                        rows.append([[format_var('b', i, e_in_id), format_var('b', i, e_back_id)],[1,-1]])
+                        rows.append([[format_var('b', i, e_in_id), format_var('b', i, e_back_id)],[1,1]])
                         my_rhs.append(1)
                         my_senses = my_senses + 'L'
                         
