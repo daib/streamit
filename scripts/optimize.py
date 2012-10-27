@@ -57,6 +57,8 @@ wire_config_opts = [[2.5, 1000 * OneMhz], [2.38, 950 * OneMhz], [2.27, 900 * One
 
 #######################################################################################
 
+def format_var(name, idx1, idx2):
+    return name + '_' + str(idx1) + '_' + str(idx2)
 #dir is the direction of incomming edge
 
 def incoming_edge_id(x, y, dir, dim, ndirs):
@@ -102,9 +104,12 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
             for dir in range(0, ndirs):
                 edge_id = (x * dim + y) * ndirs + dir
                 #capacity constraint for each edge
-                #m.constrain((nsent * b[:, edge_id]) * ncycles <= bus_width * OneGhz * edge_freqs[edge_id])
+                m.constrain((nsent * b[:, edge_id]) * ncycles <= bus_width * OneGhz * edge_freqs[edge_id])
                 for i in range(0, n_flows):
                     m.constrain(0 <= b[i,edge_id] <= 1)
+                    
+                    print '0 <= ' + format_var('b', i, edge_id) + ' <= 1'
+                    
     
     #unsplitable constraints and flow conservation
     #for i in range(0, n_flows):
@@ -122,6 +127,13 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                 if x == dirty_flows[i][srcXIdx] and y == dirty_flows[i][srcYIdx]:
                     edgeSrcId = (x * dim + y) * ndirs
                     m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() == 1)
+                    
+                    line = '0'
+                    for j in range(edgeSrcId, edgeSrcId+ndirs):
+                        line = line + ' + ' + format_var('b', i, j)
+                    line = line + ' == 1'
+                    print line
+                     
                     continue
                      
                 # if this is the destination for the flow
@@ -131,6 +143,8 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                     edgeSrcId = (x * dim + y) * ndirs
                     for dir in range(0, ndirs):
                         m.constrain(b[i, edgeSrcId + dir] == 0)
+                        
+                        print format_var('b', i, edgeSrcId + dir) + ' == 0'
                     #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() == 0)
                     continue
                 
@@ -147,6 +161,12 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                         #e_indices.append(e_out_id)
                         edgeSrcId = (x * dim + y) * ndirs
                         m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
+                        
+                        line = '0'
+                        for j in range(edgeSrcId, edgeSrcId+ndirs):
+                            line = line + ' + ' + format_var('b', i, j)
+                        line = line + ' - ' + format_var('b', i, e_back_id) + ' == ' + format_var('b', i, e_id)
+                        print line
     
     #edge conditions
     for y in range(0, dim):
@@ -156,12 +176,18 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
             m.constrain(b[i, e_id_w] == 0)
             m.constrain(b[i, e_id_e] == 0)
             
+            print format_var('b', i, e_id_w) + ' == 0'
+            print format_var('b', i, e_id_e) + ' == 0'
+            
     for x in range(0, dim):
         e_id_s = x * dim * ndirs + south
         e_id_n = (x * dim + dim -1) * ndirs + north
         for i in range(n_flows):
             m.constrain(b[i, e_id_n] == 0)
             m.constrain(b[i, e_id_s] == 0)
+            
+            print format_var('b', i, e_id_n) + ' == 0'
+            print format_var('b', i, e_id_s) + ' == 0'
             
     #minimal route
     for i in range(0, n_flows):
@@ -176,11 +202,17 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
             for dir in range(0, ndirs):
                 edge_id = (x * dim + y) * ndirs + dir
                 #each edge is allowed at most one freq
-                #m.constrain(s[:, edge_id].sum() <= 1)
-                #m.constrain(edge_freqs[edge_id] == freq_levels * s[:, edge_id])
+                m.constrain(s[:, edge_id].sum() <= 1)
+                m.constrain(edge_freqs[edge_id] == freq_levels * s[:, edge_id])
+    
+    line = '0'
+    for i in range(0, dim * dim * ndirs):
+        line = line + ' + ' + format_var('b', 0, i) 
+    print line
     
     #optimal goal
     m.minimize((power_levels * s).sum())
+    #m.minimize(b[0,:].sum())
     
     #print m[edge_freqs]
     print m[b]
@@ -347,7 +379,7 @@ for dir in os.listdir(path):
         flows = comm_prof(dim)
         
         #generate ILP files
-        [routes, wire_freqs] = optimal_routes_freqs(ncycles, flows, 2, directions)
+        [routes, wire_freqs] = optimal_routes_freqs(ncycles, flows, dim, directions)
         
         #generate wire config
         gen_wire_delays('wire_config.txt', wire_freqs)
