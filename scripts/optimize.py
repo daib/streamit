@@ -4,12 +4,122 @@ import os
 import sys
 import re
 import copy
+import math
+from pycpx import CPlexModel
+import numpy as np
 
-def trace_to_file(name, trace):
+#######################################################################################
+path = sys.argv[1]
+
+iterations = 100
+
+OneGhz = 1000000000
+OneMhz = 1000000
+ 
+profiling_cpu_freq = 3 * OneGhz  # 3GHz
+assumed_cpu_freq = OneGhz
+
+os.chdir(path)
+
+start_time = 10 # start sending packets at cycle 10
+packet_flits = 6 # packet size in numbers of flits
+flit_size = 8 #flit size in numbers of bytes
+packet_bytes = packet_flits * flit_size
+max_packet_bytes = packet_flits * flit_size
+bus_width = flit_size
+
+directions = 5
+
+traffic_idx = 4
+traffic_used_idx = 5
+
+x_idx = 0
+y_idx = 1
+
+#flow indices
+srcXIdx = 0
+srcYIdx = 1
+
+dstXIdx = 2
+dstYIdx = 3
+
+wire_config_opts = [[2.5, 1000 * OneMhz], [2.38, 950 * OneMhz], [2.27, 900 * OneMhz], 
+                    [2.15, 850 * OneMhz], [2.02, 800 * OneMhz], [1.93, 760 * OneMhz], 
+                    [1.84, 720 * OneMhz], [1.75, 680 * OneMhz], [1.66, 640 * OneMhz], 
+                    [1.57, 600 * OneMhz]]
+ 
+
+#######################################################################################
+
+def optimal_routes_freqs(ncycles, flows, dim, ndirs):
+    routes = []
+    wire_freqs = []
+    dirty_flows = np.array(copy.deepcopy(flows)) # make a copy of the flows in case it is modified
+    
+    m = CPlexModel()
+    
+    # flows demands
+    d = np.array(copy.deepcopy([f[traffic_idx] for f in dirty_flows]))
+    
+    b = m.new((len(d), dim * dim * ndirs), vtype = bool)
+    
+    f = m.new(dim * dim * ndirs, vtype = long)
+    
+    f_levels = np.array([c[1] for c in wire_config_opts])
+    
+    power_levels = np.array([(c[0] * c[0] * c[1]) for c in wire_config_opts])
+    
+    s = m.new((len(wire_config_opts), dim * dim * ndirs), vtype = bool)    # frequency selection variables
+    
+    for x in range(0, dim):
+        for y in range(0, dim):
+            for dir in range(0, ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                #capacity constraints
+                m.constrain(d * b[:, edge_id] <= f[edge_id] * bus_width)
+    
+    #unsplitable constraints
+    for i in range(0, len(d)):
+        for x in range(0, dim):
+            for y in range(0, dim):
+                edgeSrcId = (x * dim + y) * ndirs
+                m.constrain(b[i,edgeSrcId:(edgeSrcId+ndirs)].sum() == 1)
+    
+    #minimal routes
+    for i in range(0, len(d)):
+        fi = flows[i]
+        hop = abs(fi[srcXIdx] - fi[dstXIdx]) + abs(fi[srcYIdx] - fi[dstYIdx])
+        m.constrain(b[i,:].sum() <= hop)
+        
+    #single frequency constraints
+    for x in range(0, dim):
+        for y in range(0, dim):
+            for dir in range(0, ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                
+                #each edge is allowed at most one freq
+                m.constrain(s[:, edge_id].sum() <= 1)
+                m.constrain(f[edge_id] == f_levels * s[:, edge_id])
+    
+    #optimal goal
+    m.minimize((power_levels * s).sum())
+    
+    return [routes, wire_freqs]
+
+def gen_wire_delays(name, wire_freqs, dim):
+    wire_delays = []
+    dirty_wire_freqs = copy.deepcopy(wire_freqs)
+    for wf in dirty_wire_freqs:
+        wire_delays.append([wf[0:2]].extend([1.0/x for x in wf[2:]]))
+        
+    #sort by id
+    list_to_file(name, wire_delays)
+    
+def list_to_file(name, ls):
     FILE = open(name, 'w')
-    for packet in trace:
+    for l in ls:
         line = ''
-        for item in packet:
+        for item in l:
             line = line + ' ' + str(item)
         line = line.strip()
         print>>FILE, line
@@ -23,19 +133,21 @@ def write_traffic(name, traces):
     os.chdir('./traffics')
     packets = []
     for trace in traces:
-        trace_to_file(name + '.' + str(trace[0]) + '.' + str(trace[1]), trace[2])
+        list_to_file(name + '.' + str(trace[0]) + '.' + str(trace[1]), trace[2])
         packets.extend(trace[2])
         
     packets.sort(key=lambda tup:tup[0])
-    trace_to_file(name, packets)
+    list_to_file(name, packets)
     
     os.chdir('../')
     
     
+# this function returns the flows info
+# a flow is a tuple of (srcX, srcY, dstX, dstY, bytes) 
 def comm_prof(dim):
     # use the streamit compiler to obtain intercore communication bandwidth in one iteration 
     commlog = str(dim) + "x" + str(dim) + "_com.log"
-    os.system("make -f Makefile.mk BACKEND=\'--spacetime --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
+    #os.system("make -f Makefile.mk BACKEND=\'--spacetime --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
     
     FILE = open(commlog, 'r')
     flows = []
@@ -54,15 +166,19 @@ def comm_prof(dim):
 
 def time_prof(dim):
     # compile from str to c
-    os.system("make -f Makefile.mk BACKEND=\'--spacetime --newSimple " + str(dim) + " --i " + str(iterations) + "\'")
+    #os.system("make -f Makefile.mk BACKEND=\'--spacetime --newSimple " + str(dim) + " --i " + str(iterations) + "\'")
     
     # compile the generated c program
-    os.system("cp /home/dai/prog/compiler/streamit/tmp/Makefile ./")
-    os.system("make")
+    #os.system("cp /home/dai/prog/compiler/streamit/tmp/Makefile ./")
+    #os.system("make")
+    
+    #store the files
+    #os.system("mv str.cpp str" + str(dim) + 'x' + str(dim) + '.cpp')
+    #os.system("mv stream stream"  + str(dim) + 'x' + str(dim))
     
     # run the program to obtain running time information
     logfile = str(dim) + "x" + str(dim) + "_time.log"
-    os.system("./stream > " + logfile)
+    os.system("./stream" + str(dim) + 'x' + str(dim) + " " + str(iterations) + " > " + logfile)
     
     ncycles = 0
     # parse log file for running time
@@ -80,6 +196,7 @@ def time_prof(dim):
 
 def traffic_gen(flows):
     traffics = []
+    dirty_flows = copy.deepcopy(flows) # make a copy of the flows in case it is modified
     #for each source node
     for x in range(0, dim):
         for y in range(0,dim):
@@ -92,9 +209,9 @@ def traffic_gen(flows):
             
             traffics.append([x,y,packets])
             
-            for f in flows:
+            for f in dirty_flows:
                 if f[0] == x and f[1] == y:
-                    flows.remove(f)
+                    dirty_flows.remove(f)
                     f.append(0)  #total traffic used for this flow
                     fs.append(f)
                     total_traffic += f[traffic_idx]
@@ -131,26 +248,7 @@ def traffic_gen(flows):
                             
     return traffics
 
-#######################################################################################
-path = sys.argv[1]
-
-iterations = 100
-
-OneGhz = 1000000000
- 
-profiling_cpu_freq = 3 * OneGhz  # 3GHz
-assumed_cpu_freq = OneGhz
-
-os.chdir(path)
-
-start_time = 10 # start sending packets at cycle 10
-packet_flits = 6 # packet size in numbers of flits
-flit_size = 8 #flit size in numbers of bytes
-packet_bytes = packet_flits * flit_size
-max_packet_bytes = packet_flits * flit_size
-
-traffic_idx = 4
-traffic_used_idx = 5
+############################################################################################
 
 for dir in os.listdir(path):
     
@@ -168,15 +266,16 @@ for dir in os.listdir(path):
         flows = comm_prof(dim)
         
         #generate ILP files
+        [routes, wire_freqs] = optimal_routes_freqs(ncycles, flows, dim, directions)
         
         #generate wire config
+        gen_wire_delays('wire_config.txt', wire_freqs)
         
         #generate routing config
         
-        #generate traffic
-        dirty_flows = copy.deepcopy(flows) # make a copy of the flows in case it is modified
         
-        traffics = traffic_gen(dirty_flows)
+        #generate traffic
+        traffics = traffic_gen(flows)
                                 
         write_traffic(dir, traffics)
         
