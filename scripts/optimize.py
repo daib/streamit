@@ -77,6 +77,9 @@ def incoming_edge_id(x, y, dir, dim, ndirs):
     return id
 
 def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
+    
+    debug = False
+    
     routes = []
     wire_freqs = []
     dirty_flows = copy.deepcopy(flows) # make a copy of the flows in case it is modified
@@ -120,7 +123,7 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
     
     freq_levels = [c[1] for c in wire_config_opts]
     
-    edge_freqs_lb = [min(freq_levels)] * len(edge_freqs)
+    edge_freqs_lb = [0] * len(edge_freqs)
     edge_freqs_ub = [max(freq_levels)] * len(edge_freqs)
     
     power_levels = [int(c[0] * c[0] * c[1]) for c in wire_config_opts]
@@ -145,6 +148,9 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                 var_names.append(format_var('edge_freqs', 0, edge_id))
                 coefs.append(-bus_width * OneGhz)
                 
+                if debug:
+                    continue
+                    
                 rows.append([var_names,coefs])
                 my_rhs.append(0)
                 my_senses = my_senses + 'L'
@@ -259,7 +265,7 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
         
         rows.append([var_names, coefs])
         my_rhs.append(hop)
-        my_senses = my_senses + 'L'             
+        my_senses = my_senses + 'E'             
         #m.constrain(b[i,:].sum() <= hop)
     
         
@@ -286,11 +292,14 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
                 coefs = [1] * len(var_names)
                 coefs[0] = -1
                 
+                if debug:
+                    continue
+            
                 rows.append([var_names, coefs])
                 my_rhs.append(0)
-                my_senses = my_senses + 'E'   
+                my_senses = my_senses + 'G'   
         
-                #m.constrain(edge_freqs[edge_id] == freq_levels * s[:, edge_id])
+                #m.constrain(edge_freqs[edge_id] <= freq_levels * s[:, edge_id])
     colnames = []
     colnames.extend(b)
     colnames.extend(edge_freqs)
@@ -307,13 +316,18 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
     var_ub.extend(s_ub)
     
     #optimal goal
-    power_obj = [0] * (len(b) + len(edge_freqs))
+    power_obj = []
+    if debug:
+        power_obj = [1] * len(b)
+        power_obj.extend([0] * (len(edge_freqs) + len(s)))
+    else:
+        power_obj = [0] * (len(b) + len(edge_freqs))
     
-    for x in range(dim):
-        for y in range(dim):
-            for dir in range(ndirs):
-                power_obj.extend(power_levels)
-    
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    power_obj.extend(power_levels)
+        
     my_prob = cplex.Cplex()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
@@ -323,8 +337,6 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
     my_prob.variables.add(obj = power_obj, lb = var_lb, ub = var_ub, types = var_type,
                        names = colnames)
 
-    rownames = []
-    
     my_prob.linear_constraints.add(lin_expr = rows, senses = my_senses,
                                 rhs = my_rhs)
 
@@ -348,7 +360,7 @@ def optimal_routes_freqs_direct(ncycles, flows, dim, ndirs):
     for j in range(numrows):
         print "Row %d:  Slack = %10f" % (j, slack[j])
     for j in range(numcols):
-        print "Column %d:  Value = %10f" % (j, x[j])
+        print colnames[j] + " %d:  Value = %10f" % (j, x[j])
 
     quit()
     
