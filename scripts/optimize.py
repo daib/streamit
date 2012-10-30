@@ -10,6 +10,8 @@ import copy
 #######################################################################################
 path = sys.argv[1]
 
+recompile = False
+
 iterations = 100
 
 
@@ -53,6 +55,18 @@ wire_config_opts = [[2.5, 1000 * OneMhz], [2.38, 950 * OneMhz], [2.27, 900 * One
                     [2.15, 850 * OneMhz], [2.02, 800 * OneMhz], [1.93, 760 * OneMhz], 
                     [1.84, 720 * OneMhz], [1.75, 680 * OneMhz], [1.66, 640 * OneMhz], 
                     [1.57, 600 * OneMhz], [0.9, 125 * OneMhz]]
+
+#wire_config_opts = [[2.50, 1000 * OneMhz], [2.20, 870 * OneMhz], [1.95, 750 * OneMhz],
+#                    [1.75, 640 * OneMhz], [1.58, 540 * OneMhz], [1.43, 450 * OneMhz],
+#                    [1.30, 370 * OneMhz], [1.19, 300 * OneMhz], [1.10, 240 * OneMhz],
+#                    [1.02, 190 * OneMhz]]
+
+#wire_config_opts = [[2.50, 1000 * OneMhz], [1.95, 750 * OneMhz],
+#                    [1.58, 540 * OneMhz],
+#                    [1.30, 370 * OneMhz], [1.10, 240 * OneMhz],
+#                    [0.9, 125 * OneMhz]]
+
+max_wire_freq = max([opt[1]  for opt in wire_config_opts])
 
 #######################################################################################
 
@@ -137,12 +151,96 @@ def edges_not_on_k_paths(srcX, srcY, dstX, dstY, k, dim, ndirs):
     
     return edges_excluded
 
+def convert_to_wire_delays(edge_freqs, dim, ndirs):
+    wire_delays = []
+    
+    vnoc_dir = [0] * 5
+    
+    vnoc_dir[4] = north
+    vnoc_dir[3] = south
+    vnoc_dir[2] = east
+    vnoc_dir[1] = west
+    
+    for x  in range(dim):
+        for y in range(dim):
+            edgeSrcId = (x * dim + y) * ndirs
+            # we need to convert to the vnoc direction
+            # can convert from frequency to delays
+                
+            #the format is:  node_address dirs
+            #                (x,y) local, 1, 2, 3, 4
+                
+            wire_delay = [x, y, 1]   #FIXME: compute minimal local link power?
+            for dir in range(1, ndirs + 1):
+                if(round(edge_freqs[edgeSrcId + vnoc_dir[dir]]) == 0):
+                    wire_delay.append(-1)   #this link is disabled
+                else:
+                    wire_delay.append(float(max_wire_freq)/round(edge_freqs[edgeSrcId + vnoc_dir[dir]]))
+                    
+            wire_delays.append(wire_delay)
+    return wire_delays
+
+def calculate_routes(b, dim, ndirs, flows, ncycles):
+    routes = []
+    
+    dirty_flows = copy.deepcopy(flows)
+    
+    vnoc_dir = [0] * ndirs
+    
+    vnoc_dir[north] = 4
+    vnoc_dir[south] = 3
+    vnoc_dir[east] = 2
+    vnoc_dir[west] = 1
+    
+    for i in range(len(dirty_flows)):
+        f = dirty_flows[i]
+        
+        # src and dst information
+        route = [f[srcXIdx], f[srcYIdx], f[dstXIdx], f[dstYIdx]]
+        
+        #vc
+        vc = -1 #any VC
+        if f[srcXIdx] < f[dstXIdx]:
+            if f[srcYIdx] <= f[dstYIdx]:
+                vc = 0
+        elif f[srcYIdx] > f[dstYIdx]:
+            vc = 1
+        route.append(vc)
+        
+        route.append(f[traffic_idx])
+        route.append(ncycles)
+        route.append('|')
+        
+        #trace from source to destination
+        currentX = f[srcXIdx]
+        currentY = f[srcYIdx]
+        
+        while currentX != f[dstXIdx] or currentY != f[dstYIdx]:
+            #base_id = ((currentX * dim + currentY) * ndirs) * len(dirty_flows) + i
+            base_id = ((currentX * dim + currentY) * ndirs) + i * dim * dim * ndirs
+            for dir in range(ndirs):
+                if round(b[base_id + dir]) == 1:
+                    route.append(vnoc_dir[dir])
+                    
+                    #move to the next node
+                    if dir == north:
+                        currentY = currentY + 1
+                    elif dir == south:
+                        currentY = currentY - 1
+                    elif dir == west:
+                        currentX = currentX - 1
+                    elif dir == east:
+                        currentX = currentX + 1
+                    break
+        
+        routes.append(route)
+        
+    return routes
+
 def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     
     debug = False
     
-    routes = []
-    wire_freqs = []
     dirty_flows = copy.deepcopy(flows) # make a copy of the flows in case it is modified
     
     n_flows = len(dirty_flows)
@@ -163,14 +261,21 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                 edge_id = (x * dim + y) * ndirs + dir
                 edge_freqs.append(format_var('edge_freqs', 0, edge_id))
                 edge_freqs_type = edge_freqs_type + 'I'
-                for i in range(n_flows):
-                    b.append(format_var('b', i, edge_id))
-                    b_type = b_type + 'B'
+                #for i in range(n_flows):
+                #    b.append(format_var('b', i, edge_id))
+                #    b_type = b_type + 'B'
                 for i in range(len(wire_config_opts)):
                     s.append(format_var('s', i, edge_id))
                     s_type = s_type + 'B'
     
-    
+    for i in range(n_flows):
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    edge_id = (x * dim + y) * ndirs + dir
+                    b.append(format_var('b', i, edge_id))
+                    b_type = b_type + 'B'
+                    
     b_lb = [0] * len(b)
     b_ub = [1] * len(b)
     s_lb = [0] * len(s)
@@ -187,9 +292,9 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     my_rhs = []
     my_senses = ''
     
-    for x in range(0, dim):
-        for y in range(0, dim):
-            for dir in range(0, ndirs):
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
                 edge_id = (x * dim + y) * ndirs + dir
                 #capacity constraint for each edge
                 #m.constrain((nsent * b[:, edge_id]) * OneGhz <= bus_width * ncycles * edge_freqs[edge_id]) 
@@ -455,8 +560,13 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     #    print "Row %d:  Slack = %10f" % (j, slack[j])
     for j in range(numcols):
         print colnames[j] + " %d:  Value = %d" % (j, x[j])
+    
+    #calculate wire frequencies and routes
+    wire_delays = convert_to_wire_delays(x[len(b):(len(b) + len(edge_freqs))], dim, ndirs)
+    
+    routes = calculate_routes(x[0:len(b)], dim, ndirs, flows, ncycles)
 
-    return [routes, wire_freqs]
+    return [routes, wire_delays]
 
 
 def gen_wire_delays(name, wire_freqs, dim):
@@ -473,7 +583,10 @@ def list_to_file(name, ls):
     for l in ls:
         line = ''
         for item in l:
-            line = line + ' ' + str(item)
+            if isinstance(item, str):
+                line = line + ' ' + item
+            else:
+                line = line + ' ' + str(item)
         line = line.strip()
         print>>FILE, line
         
@@ -500,7 +613,7 @@ def write_traffic(name, traces):
 def comm_prof(dim):
     # use the streamit compiler to obtain intercore communication bandwidth in one iteration 
     commlog = str(dim) + "x" + str(dim) + "_comm.log"
-    if not os.path.isfile(commlog):
+    if recompile or not os.path.isfile(commlog):
         os.system("make -f Makefile.mk BACKEND=\'--spacetime --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
     
     FILE = open(commlog, 'r')
@@ -524,7 +637,7 @@ def time_prof(dim):
     logfile = dimstr + "_time.log"
     cfile = "str" + dimstr + '.cpp'
     
-    if not os.path.isfile(cfile):
+    if recompile or not os.path.isfile(cfile):
         # compile from str to c
         os.system("make -f Makefile.mk BACKEND=\'--spacetime --newSimple " + str(dim) + " --i " + str(iterations) + "\'")
     
@@ -537,7 +650,7 @@ def time_prof(dim):
         os.system("mv stream stream"  + str(dim) + 'x' + str(dim))
     
     # run the program to obtain running time information
-    if not os.path.isfile(logfile):
+    if recompile or not os.path.isfile(logfile):
         os.system("./stream" + str(dim) + 'x' + str(dim) + " " + str(iterations) + " > " + logfile)
     
     ncycles = 0
@@ -619,22 +732,20 @@ for dir in os.listdir(path):
     
     os.system("pwd")
     
-    for dim in [8]:
+    for dim in [4]:
         
         ncycles = time_prof(dim)
         
         flows = comm_prof(dim)
         
         #generate ILP files
-        [routes, wire_freqs] = optimal_routes_freqs(ncycles, flows, dim, directions)
-        
-        quit()
+        [routes, wire_delays] = optimal_routes_freqs(ncycles/50, flows, dim, directions)
 
         #generate wire config
-        gen_wire_delays('wire_config.txt', wire_freqs)
+        list_to_file('wire_config.txt', wire_delays)
         
         #generate routing config
-        
+        list_to_file('traffic_config.txt', routes)
         
         #generate traffic
         traffics = traffic_gen(flows)
