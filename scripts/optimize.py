@@ -51,15 +51,15 @@ south = 3
 west = 1
 east = 2
 
-wire_config_opts = [[2.5, 1000 * OneMhz], [2.38, 950 * OneMhz], [2.27, 900 * OneMhz], 
-                    [2.15, 850 * OneMhz], [2.02, 800 * OneMhz], [1.93, 760 * OneMhz], 
-                    [1.84, 720 * OneMhz], [1.75, 680 * OneMhz], [1.66, 640 * OneMhz], 
-                    [1.57, 600 * OneMhz], [0.9, 125 * OneMhz]]
+#wire_config_opts = [[2.5, 1000 * OneMhz], [2.38, 950 * OneMhz], [2.27, 900 * OneMhz], 
+#                    [2.15, 850 * OneMhz], [2.02, 800 * OneMhz], [1.93, 760 * OneMhz], 
+#                    [1.84, 720 * OneMhz], [1.75, 680 * OneMhz], [1.66, 640 * OneMhz], 
+#                    [1.57, 600 * OneMhz], [0.9, 125 * OneMhz]]
 
-#wire_config_opts = [[2.50, 1000 * OneMhz], [2.20, 870 * OneMhz], [1.95, 750 * OneMhz],
-#                    [1.75, 640 * OneMhz], [1.58, 540 * OneMhz], [1.43, 450 * OneMhz],
-#                    [1.30, 370 * OneMhz], [1.19, 300 * OneMhz], [1.10, 240 * OneMhz],
-#                    [1.02, 190 * OneMhz]]
+wire_config_opts = [[2.50, 1000 * OneMhz], [2.20, 870 * OneMhz], [1.95, 750 * OneMhz],
+                    [1.75, 640 * OneMhz], [1.58, 540 * OneMhz], [1.43, 450 * OneMhz],
+                    [1.30, 370 * OneMhz], [1.19, 300 * OneMhz], [1.10, 240 * OneMhz],
+                    [1.02, 190 * OneMhz]]
 
 #wire_config_opts = [[2.50, 1000 * OneMhz], [1.95, 750 * OneMhz],
 #                    [1.58, 540 * OneMhz],
@@ -270,15 +270,20 @@ def calculate_optimal_wire_delays(b, dim, ndirs, flows, ncycles):
                         total_traffic = total_traffic + dirty_flows[i][traffic_idx]
                 #find the minimal suitable frequency for the amount of traffic
                 freq_levels = [c[1] for c in wire_config_opts]
+                freq_levels.append(0)
                 
                 freq_levels.sort()
                 
                 for freq in freq_levels:
-                    if  bus_width * ncycles * freq >= total_traffic:
-                        wire_delay.append(float(max_wire_freq)/freq)
+                    if  bus_width * ncycles * freq >= total_traffic * max_wire_freq:
+                        if freq == 0:
+                            wire_delay.append(-1)
+                        else:
+                            wire_delay.append(float(max_wire_freq)/freq)
+                            print 'Edge ' + str(edge_id) + ' utilization ' + str(float(total_traffic * max_wire_freq)/(bus_width * ncycles * freq))
                         break
                     
-            wire_delays.append()
+            wire_delays.append(wire_delay)
             
     return wire_delays
                         
@@ -998,7 +1003,7 @@ def time_prof(dim):
     
     return ncycles
 
-def traffic_gen(flows):
+def traffic_gen(flows, ncycles):
     traffics = []
     dirty_flows = copy.deepcopy(flows) # make a copy of the flows in case it is modified
     #for each source node
@@ -1006,49 +1011,38 @@ def traffic_gen(flows):
         for y in range(0,dim):
             # find flows that have this node as the source node
             fs = []
-            total_traffic = 0 #total traffic in bytes from this node in one iteration
-            smallest_traffic = float('inf')
             
             packets = []    #packets from this source
             
             traffics.append([x,y,packets])
             
             for f in dirty_flows:
-                if f[0] == x and f[1] == y:
-                    dirty_flows.remove(f)
-                    f.append(0)  #total traffic used for this flow
+                if f[srcXIdx] == x and f[srcYIdx] == y:
+                    #f.append(0)  #total traffic used for this flow
                     fs.append(f)
-                    total_traffic += f[traffic_idx]
-                    if smallest_traffic > f[traffic_idx]:
-                        smallest_traffic = f[traffic_idx]
-            
-            iter = 0
-            while len(fs) > 0:
-                iter = iter + 1
-                current_time = iter + start_time
-                # sequentially send traffic for each flow
-                for f in fs:
-                    # get the traffic fraction of this flow
-                    max_allow = packet_bytes * f[traffic_idx] * iter / smallest_traffic    # max traffic amount till now for this flow
-                    traffic_left = f[traffic_idx] - f[traffic_used_idx] # the amount of traffic left till now
                     
-                    if traffic_left < packet_bytes:   # if the amount of traffic left smaller than one packet
-                        if traffic_left > 0:
-                            packet = copy.deepcopy(f[0:4])
-                            packet.insert(0,current_time)
-                            packet.append(traffic_left)
-                            packets.append(packet)
-                        fs.remove(f)
-                    else:
-                        # convert this amount traffic to numbers of packets
-                        npackets = (max_allow - f[traffic_used_idx]) / packet_bytes
+            for f in fs:
+                dirty_flows.remove(f)
+                interval = packet_bytes * ncycles/f[traffic_idx];
+                current_time = 0;
+                traffic_left = f[traffic_idx] * 100;
+                
+                while traffic_left >= packet_bytes:
+                    packet = copy.deepcopy(f[0:4])
+                    packet.insert(0,current_time)
+                    packet.append(packet_bytes/flit_size)
+                    packets.append(packet)
                     
-                        for n in range(0, npackets):
-                            packet = copy.deepcopy(f[0:4])
-                            packet.insert(0,current_time)
-                            packet.append(packet_bytes)
-                            packets.append(packet)
-                            f[traffic_used_idx] = f[traffic_used_idx] + packet_bytes
+                    current_time =  current_time + interval;
+                    traffic_left = traffic_left - packet_bytes
+                    
+                if traffic_left > 0:
+                    packet = copy.deepcopy(f[0:4])
+                    packet.insert(0,current_time)
+                    packet.append(int(round(float(traffic_left + 0.5)/flit_size)))
+                    packets.append(packet)
+                    
+            packets.sort(key=lambda tup:tup[0])
                             
     return traffics
 
@@ -1069,9 +1063,10 @@ for dir in os.listdir(path):
         
         flows = comm_prof(dim)
         
+        ncycles = ncycles/20
         #generate ILP files
         #[routes, wire_delays] = optimal_routes_freqs(ncycles/50, flows, dim, directions)
-        [routes, wire_delays] = minimize_used_links(ncycles/20, flows, dim, directions)
+        [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
 
         #generate wire config
         list_to_file('wire_config.txt', wire_delays)
@@ -1080,7 +1075,7 @@ for dir in os.listdir(path):
         list_to_file('traffic_config.txt', routes)
         
         #generate traffic
-        traffics = traffic_gen(flows)
+        traffics = traffic_gen(flows, ncycles)
                                 
         write_traffic(dir, traffics)
         
