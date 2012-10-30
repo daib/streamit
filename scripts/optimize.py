@@ -238,6 +238,50 @@ def calculate_routes(b, dim, ndirs, flows, ncycles):
         
     return routes
 
+def calculate_optimal_wire_delays(b, dim, ndirs, flows, ncycles):
+    wire_delays = []
+    
+    vnoc_dir = [0] * 5
+    
+    vnoc_dir[4] = north
+    vnoc_dir[3] = south
+    vnoc_dir[2] = east
+    vnoc_dir[1] = west
+    
+    dirty_flows = copy.deepcopy(flows)
+    
+    for x  in range(dim):
+        for y in range(dim):
+            # we need to convert to the vnoc direction
+            # can convert from frequency to delays
+                
+            #the format is:  node_address dirs
+            #                (x,y) local, 1, 2, 3, 4
+                
+            wire_delay = [x, y, 1]   #FIXME: compute minimal local link power?
+            
+            for d in range(1, ndirs + 1):
+                dir = vnoc_dir[d]
+                edge_id = (x * dim + y) * ndirs + dir
+                total_traffic = 0
+                for i in range(len(dirty_flows)):
+                    #if the flow goes through the link
+                    if round(b[i * dim * dim * ndirs + edge_id]) == 1:
+                        total_traffic = total_traffic + dirty_flows[i][traffic_idx]
+                #find the minimal suitable frequency for the amount of traffic
+                freq_levels = [c[1] for c in wire_config_opts]
+                
+                freq_levels.sort()
+                
+                for freq in freq_levels:
+                    if  bus_width * ncycles * freq >= total_traffic:
+                        wire_delay.append(float(max_wire_freq)/freq)
+                        break
+                    
+            wire_delays.append()
+            
+    return wire_delays
+                        
 def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     
     debug = False
@@ -570,6 +614,292 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     return [routes, wire_delays]
 
 
+def minimize_used_links(ncycles, flows, dim, ndirs):
+    
+    debug = False
+    
+    dirty_flows = copy.deepcopy(flows) # make a copy of the flows in case it is modified
+    
+    n_flows = len(dirty_flows)
+    
+    # flows demands
+    nsent = copy.deepcopy([f[traffic_idx] for f in dirty_flows])
+    
+    b = []
+    b_type = ''
+    used_edges = []
+    used_edges_type = ''
+     
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                used_edges.append(format_var('used_edges', 0, edge_id))
+                used_edges_type = used_edges_type + 'B'
+    
+    for i in range(n_flows):
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    edge_id = (x * dim + y) * ndirs + dir
+                    b.append(format_var('b', i, edge_id))
+                    b_type = b_type + 'B'
+                    
+    b_lb = [0] * len(b)
+    b_ub = [1] * len(b)
+    used_edges_lb = [0] * len(used_edges)
+    used_edges_ub = [1] * len(used_edges)
+    
+    rows = []
+    my_rhs = []
+    my_senses = ''
+    
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                #capacity constraint for each edge
+                #m.constrain((nsent * b[:, edge_id])  <= bus_width * ncycles]) 
+                var_names = []
+                coefs = []
+                coefs.extend(nsent)
+                
+                for i in range(n_flows):
+                    var_names.append(format_var('b', i, edge_id))
+                    
+                if debug:
+                    continue
+
+                rows.append([var_names,coefs])
+                my_rhs.append(bus_width * ncycles)
+                my_senses = my_senses + 'L'
+                    
+    
+    #unsplitable constraints and flow conservation
+    #for i in range(0, n_flows):
+    #    for x in range(0, dim):
+    #        for y in range(0, dim):
+    #            edgeSrcId = (x * dim + y) * ndirs
+    #            m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() <= 1)
+    
+    # unsplitable constraints and flow conservation
+    for x in range(dim):
+        for y in range(dim):
+            for i in range(n_flows):
+                #if this is the source of the flow
+                #there must be some out going edge
+                if x == dirty_flows[i][srcXIdx] and y == dirty_flows[i][srcYIdx]:
+                    edgeSrcId = (x * dim + y) * ndirs
+                    var_names = []
+                    coefs = [1] * ndirs
+                    for dir in range(ndirs):
+                        var_names.append(format_var('b', i, edgeSrcId + dir))
+                        
+                    rows.append([var_names, coefs])
+                    my_rhs.append(1)
+                    my_senses = my_senses + 'E'
+                    #m.constrain(b[i, edgeSoutrcId:(edgeSrcId+ndirs)].sum() == 1)edge_freqs
+                    
+                    #all incoming edges are invalid
+                    for dir in range(0, ndirs):
+                        e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                        
+                        if e_in_id >= 0:
+                            rows.append([[format_var('b', i, e_in_id)], [1]])
+                            my_rhs.append(0)
+                            my_senses = my_senses + 'E'
+                    
+                    continue
+                     
+                # if this is the destination for the flow
+                # we do not need flow conservation
+                # and all outgoing edge is invalid
+                if x == dirty_flows[i][dstXIdx] and y == dirty_flows[i][dstYIdx]:
+                    edgeSrcId = (x * dim + y) * ndirs
+                    for dir in range(ndirs):
+                        rows.append([[format_var('b', i, edgeSrcId + dir)], [1]])
+                        my_rhs.append(0)
+                        my_senses = my_senses + 'E'
+                        #m.constrain(b[i, edgeSrcId + dir] == 0)
+                    #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() == 0)
+                    
+                    #one incoming edge is true
+                    var_names = []
+                    for dir in range(ndirs):
+                        e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                        
+                        if e_in_id >= 0:
+                            var_names.append(format_var('b', i, e_in_id))
+                    
+                    coefs = [1] * len(var_names)
+                    rows.append([var_names, coefs])
+                    my_rhs.append(1)
+                    my_senses = my_senses + 'E'
+                    
+                    continue
+                
+                #this is an intermediate hop
+                var_names = []
+                coefs = []
+                edgeSrcId = (x * dim + y) * ndirs
+                    
+                for dir in range(ndirs):
+                    #flows out
+                    var_names.append(format_var('b', i, edgeSrcId + dir))
+                    coefs.append(1)
+                    
+                    #flows in
+                    e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                    
+                    #if this is a valid incoming edge
+                    if e_in_id >= 0:
+                        #do no go back
+                        if dir < 2: # avoid duplication
+                            e_back_id = (x * dim + y) * ndirs + (3-dir)
+                            rows.append([[format_var('b', i, e_in_id), format_var('b', i, e_back_id)],[1,1]])
+                            my_rhs.append(1)
+                            my_senses = my_senses + 'L'
+                            
+                        var_names.append(format_var('b', i, e_in_id))
+                        coefs.append(-1)
+                    
+
+                rows.append([var_names, coefs])
+                my_rhs.append(0)
+                my_senses = my_senses + 'E'
+                        #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
+                        
+    #edge conditions
+    for y in range(dim):
+        e_id_w = y * ndirs + west
+        e_id_e = ((dim-1) * dim + y) * ndirs + east
+        for i in range(n_flows):
+            #m.constrain(b[i, e_id_w] == 0)
+            #m.constrain(b[i, e_id_e] == 0)
+
+            rows.append([[format_var('b', i, e_id_w)],[1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            rows.append([[format_var('b', i, e_id_e)],[1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            
+    for x in range(0, dim):
+        e_id_s = x * dim * ndirs + south
+        e_id_n = (x * dim + dim -1) * ndirs + north
+        for i in range(n_flows):
+            #m.constrain(b[i, e_id_n] == 0)
+            #m.constrain(b[i, e_id_s] == 0)
+
+            rows.append([[format_var('b', i, e_id_n)],[1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            rows.append([[format_var('b', i, e_id_s)],[1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            
+    #minimal route
+    for i in range(0, n_flows):
+        fi = dirty_flows[i]
+        hop = abs(fi[srcXIdx] - fi[dstXIdx]) + abs(fi[srcYIdx] - fi[dstYIdx])
+        n_edges = dim * dim * ndirs
+        
+        var_names = []
+        for e in range(n_edges):
+            var_names.append(format_var('b', i, e))
+        coefs = [1] * len(var_names)
+        
+        rows.append([var_names, coefs])
+        my_rhs.append(hop)
+        my_senses = my_senses + 'E'             
+        #m.constrain(b[i,:].sum() <= hop)
+    
+    # constraints for used links
+    # if there is flow using a link, the link is marked as used
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                
+
+                for i in range(n_flows):
+                    if debug:
+                        continue
+            
+                    rows.append([[format_var('used_edges', 0, edge_id), format_var('b', i, edge_id)], [1, -1]])
+                    my_rhs.append(0)
+                    my_senses = my_senses + 'G'
+        
+    #pruning the application
+    for i in range(n_flows):
+        f = dirty_flows[i]
+        edges_excluded = edges_not_on_k_paths(f[srcXIdx], f[srcYIdx], f[dstXIdx], f[dstYIdx], 0, dim, ndirs)
+        for e in edges_excluded:
+            rows.append([[format_var('b', i, e)], [1]])
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+                
+    colnames = []
+    colnames.extend(b)
+    colnames.extend(used_edges)
+    
+    var_lb = []
+    var_lb.extend(b_lb)
+    var_lb.extend(used_edges_lb)
+    
+    var_ub = []
+    var_ub.extend(b_ub)
+    var_ub.extend(used_edges_ub)
+    
+    #optimal goal
+    link_obj = []
+    
+    link_obj = [0] * len(b)
+    
+    link_obj.extend([1] * len(used_edges))
+        
+    my_prob = cplex.Cplex()
+              
+    my_prob.objective.set_sense(my_prob.objective.sense.minimize)
+
+    var_type = b_type + used_edges_type
+    
+    my_prob.variables.add(obj = link_obj, lb = var_lb, ub = var_ub, types = var_type,
+                       names = colnames)
+
+    my_prob.linear_constraints.add(lin_expr = rows, senses = my_senses,
+                                rhs = my_rhs)
+
+    #m.minimize((power_levels * s).sum())
+    #m.minimize(b[0,:].sum())
+    print 'Solving the problem ...'
+    my_prob.solve()
+    print
+    # solution.get_status() returns an integer code
+    print "Solution status = " , my_prob.solution.get_status(), ":",
+    # the following line prints the corresponding string
+    print my_prob.solution.status[my_prob.solution.get_status()]
+    print "Solution value  = ", my_prob.solution.get_objective_value()
+
+    numcols = my_prob.variables.get_num()
+    numrows = my_prob.linear_constraints.get_num()
+
+    slack = my_prob.solution.get_linear_slacks()
+    x     = my_prob.solution.get_values()
+    
+
+    #for j in range(numrows):
+    #    print "Row %d:  Slack = %10f" % (j, slack[j])
+    for j in range(numcols):
+        print colnames[j] + " %d:  Value = %d" % (j, x[j])
+    
+    #calculate wire frequencies and routes
+    wire_delays = calculate_optimal_wire_delays(x[0:len(b)], dim, ndirs, flows, ncycles)
+    
+    routes = calculate_routes(x[0:len(b)], dim, ndirs, flows, ncycles)
+
+    return [routes, wire_delays]
+
 def gen_wire_delays(name, wire_freqs, dim):
     wire_delays = []
     dirty_wire_freqs = copy.deepcopy(wire_freqs)
@@ -733,14 +1063,15 @@ for dir in os.listdir(path):
     
     os.system("pwd")
     
-    for dim in [4]:
+    for dim in [8]:
         
         ncycles = time_prof(dim)
         
         flows = comm_prof(dim)
         
         #generate ILP files
-        [routes, wire_delays] = optimal_routes_freqs(ncycles/50, flows, dim, directions)
+        #[routes, wire_delays] = optimal_routes_freqs(ncycles/50, flows, dim, directions)
+        [routes, wire_delays] = minimize_used_links(ncycles/20, flows, dim, directions)
 
         #generate wire config
         list_to_file('wire_config.txt', wire_delays)
@@ -757,7 +1088,6 @@ for dir in os.listdir(path):
         os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE')
         
         #collect data
-        
         
     os.chdir("../../")
         
