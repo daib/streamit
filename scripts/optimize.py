@@ -196,7 +196,7 @@ def calculate_routes(b, dim, ndirs, flows, ncycles):
         f = dirty_flows[i]
         
         # src and dst information
-        route = [f[srcXIdx], f[srcYIdx], f[dstXIdx], f[dstYIdx]]
+        route = ['(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' +  str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
         
         #vc
         vc = -1 #any VC
@@ -233,6 +233,7 @@ def calculate_routes(b, dim, ndirs, flows, ncycles):
                         currentX = currentX + 1
                     break
         
+        route.append('')
         routes.append(route)
         
     return routes
@@ -587,8 +588,8 @@ def list_to_file(name, ls):
                 line = line + ' ' + item
             else:
                 line = line + ' ' + str(item)
-        line = line.strip()
-        print>>FILE, line
+        #line = line.strip()
+        print>>FILE, line[1:]
         
     FILE.close()
     
@@ -752,6 +753,7 @@ for dir in os.listdir(path):
                                 
         write_traffic(dir, traffics)
         
+        quit()
         #invoke simulation
         os.system('vnoc ' + dir)
         
