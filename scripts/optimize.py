@@ -700,18 +700,18 @@ def traffic_gen(flows):
                 for f in fs:
                     # get the traffic fraction of this flow
                     max_allow = packet_bytes * f[traffic_idx] * iter / smallest_traffic    # max traffic amount till now for this flow
-                    traffic_left = max_allow - f[traffic_used_idx] # the amount of traffic left till now
+                    traffic_left = f[traffic_idx] - f[traffic_used_idx] # the amount of traffic left till now
                     
-                    if f[traffic_idx] - max_allow < packet_bytes:   # if the amount of traffic left smaller than one packet
-                        if f[traffic_idx] - max_allow > 0:
+                    if traffic_left < packet_bytes:   # if the amount of traffic left smaller than one packet
+                        if traffic_left > 0:
                             packet = copy.deepcopy(f[0:4])
                             packet.insert(0,current_time)
-                            packet.append(f[traffic_idx] - max_allow)
+                            packet.append(traffic_left)
                             packets.append(packet)
                         fs.remove(f)
                     else:
                         # convert this amount traffic to numbers of packets
-                        npackets = traffic_left / packet_bytes
+                        npackets = (max_allow - f[traffic_used_idx]) / packet_bytes
                     
                         for n in range(0, npackets):
                             packet = copy.deepcopy(f[0:4])
@@ -753,9 +753,8 @@ for dir in os.listdir(path):
                                 
         write_traffic(dir, traffics)
         
-        quit()
         #invoke simulation
-        os.system('vnoc ' + dir)
+        os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE')
         
         #collect data
         
