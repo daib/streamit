@@ -394,7 +394,8 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     edge_freqs_lb = [0] * len(edge_freqs)
     edge_freqs_ub = [max(freq_levels)] * len(edge_freqs)
     
-    power_levels = [int(c[0] * c[0] * c[1]) for c in wire_config_opts]
+    power_levels = [(link.calc_dynamic_energy(channel_width_bits/2, opt[0]) / (channel_width * ncycles * opt[1]) * opt[1] + link.get_static_power(opt[0])) for opt in wire_config_opts[1:]]
+    power_levels.insert(0, 0)
     
     rows = []
     my_rhs = []
@@ -1133,8 +1134,11 @@ def dp_routing(ncycles, flows, dim, ndirs):
                     for nd in next_layer:
                         if nd[node_X_id] == next_node[node_X_id] and nd[node_Y_id] == next_node[node_Y_id]:
                             if nd[node_cost_id] > cost:
-                            # this is more optimal route
+                                # this is more optimal route
                                 nd[node_cost_id] = cost
+                                nd[node_cost_id +  1] = node[node_X_id]
+                                nd[node_cost_id +  2] = node[node_Y_id]
+                                nd[node_cost_id +  3] = next_node[2]
                             exists = True
                     if not exists:
                         next_layer.append([next_node[node_X_id], next_node[node_Y_id], cost, node[node_X_id], node[node_Y_id], next_node[2]]) #include last node address  
@@ -1365,7 +1369,7 @@ for dir in os.listdir(path):
         
         flows = comm_prof(dim)
         
-        ncycles = ncycles
+        ncycles = ncycles/10
         #generate ILP files
         #[routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
         #[routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
