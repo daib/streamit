@@ -975,7 +975,79 @@ def power_cost(traffic_amount, ncycles):
             return power
             break
     return -1
+def xy_routing(ncycles, flows, dim, ndirs):
+    
+    vnoc_dir = [0] * ndirs
+    
+    vnoc_dir[north] = 4
+    vnoc_dir[south] = 3
+    vnoc_dir[east] = 2
+    vnoc_dir[west] = 1
+    
+     #make a copy of the flows in case we advertently modify it
+    dirty_flows = copy.deepcopy(flows)
+    
+    edge_traffic = [0] * (dim * dim * ndirs) 
+    #gradually route flows through the network
+    #such that each time a new flow is added
+    #the power increment is minimal
+    routes = []
+    for f in dirty_flows:
+        currentX = f[srcXIdx]
+        currentY = f[srcYIdx]
+        
+        dstX = f[dstXIdx]
+        dstY = f[dstYIdx]
+        
+        route = ['(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' +  str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
+         #vc
+        vc = -1 #any VC
+        if f[srcXIdx] < f[dstXIdx]:
+            if f[srcYIdx] <= f[dstYIdx]:
+                vc = 0
+        elif f[srcYIdx] > f[dstYIdx]:
+            vc = 1
+        route.append(vc)
+        
+        route.append(f[traffic_idx])
+        route.append(ncycles)
+        route.append('|')
+        
+        while currentX != dstX or currentY != dstY:
+            
+            nextX = currentX
+            nextY = currentY
+            
+            if currentX < dstX:
+                dir = east
+                nextX = currentX + 1
+            elif currentX > dstX:
+                dir = west
+                nextX = currentX - 1
+            elif currentY < dstY:
+                dir = north
+                nextY = currentY + 1
+            elif currentY > dstY:
+                dir = south
+                nextY = currentY - 1
 
+            #update traffic on the edge
+            edge_id = (currentX * dim + currentY) * ndirs + dir
+            edge_traffic[edge_id] = edge_traffic[edge_id] + f[traffic_idx]
+             
+            route.append(vnoc_dir[dir])
+            
+            currentX = nextX
+            currentY = nextY  
+            
+        route.append(' ')
+        
+        routes.append(route)
+        
+    wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
+    
+    return [routes, wire_delays]
+    
 def dp_routing(ncycles, flows, dim, ndirs):
     
     vnoc_dir = [0] * ndirs
@@ -1293,11 +1365,12 @@ for dir in os.listdir(path):
         
         flows = comm_prof(dim)
         
-        ncycles = ncycles/20
+        ncycles = ncycles
         #generate ILP files
-        #[routes, wire_delays] = optimal_routes_freqs(ncycles/50, flows, dim, directions)
-        [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
-        #[routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
+        #[routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
+        #[routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
+        [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
+        #[routes, wire_delays] = xy_routing(ncycles, flows, dim, directions)
 
         #generate wire config
         list_to_file('wire_config.txt', wire_delays)
