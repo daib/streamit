@@ -6,6 +6,7 @@ import sys
 import os
 import re
 import copy
+import random
 
 #######################################################################################
 path = sys.argv[1]
@@ -66,6 +67,8 @@ wire_config_opts = [[2.50, 1000 * OneMhz], [2.20, 870 * OneMhz], [1.95, 750 * On
                     [1.30, 370 * OneMhz], [1.19, 300 * OneMhz], [1.10, 240 * OneMhz],
                     [1.02, 190 * OneMhz], [0, 0]]
 
+#wire_config_opts = [[2.50, 1000 * OneMhz], [0, 0]]
+
 #wire_config_opts = [[2.50, 1000 * OneMhz], [1.95, 750 * OneMhz],
 #                    [1.58, 540 * OneMhz],
 #                    [1.30, 370 * OneMhz], [1.10, 240 * OneMhz],
@@ -78,7 +81,7 @@ freq_levels = [c[1] for c in wire_config_opts]
 
 from orion_power import Link
 
-link_len =  1000.0E-6
+link_len =  0.001
 link = Link(link_len, channel_width_bits)
 
 #######################################################################################
@@ -971,11 +974,15 @@ def power_cost(traffic_amount, ncycles):
         if  channel_width * ncycles * freq >= traffic_amount * max_wire_freq:
             if freq == 0:
                 return 0
-            power = link.calc_dynamic_energy(channel_width_bits/2, opt[0]) * float(traffic_amount * max_wire_freq)/ (channel_width * ncycles * freq) * freq
+            power = link.calc_dynamic_energy(channel_width_bits/2, opt[0]) * float(traffic_amount * max_wire_freq)/ (channel_width * ncycles)
             power = power + link.get_static_power(opt[0])
             return power
             break
     return -1
+
+def utilization(traffic_amount, ncycles):
+    return float(traffic_amount/channel_width * ncycles)
+
 def xy_routing(ncycles, flows, dim, ndirs):
     
     vnoc_dir = [0] * ndirs
@@ -1049,6 +1056,22 @@ def xy_routing(ncycles, flows, dim, ndirs):
     
     return [routes, wire_delays]
     
+def sort_flows_by_routing_freedom(flows):
+    for f in flows:
+        deltaX = abs(f[srcXIdx] - f[dstXIdx])
+        deltaY = abs(f[srcYIdx] - f[dstYIdx])
+        n_routes = 1
+        divisor = 1
+        for i in range(1, deltaX + 1):
+            n_routes = n_routes * (deltaY + i)
+            divisor = divisor * i
+        n_routes = n_routes/divisor
+        f.insert(0,n_routes)
+    flows.sort(key=lambda tup:tup[0])
+    for f in flows:
+        f.pop(0)
+    return flows
+
 def dp_routing(ncycles, flows, dim, ndirs):
     
     vnoc_dir = [0] * ndirs
@@ -1067,6 +1090,9 @@ def dp_routing(ncycles, flows, dim, ndirs):
     
     #make a copy of the flows in case we advertently modify it
     dirty_flows = copy.deepcopy(flows)
+    
+    #sort the flows by traffic freedom
+    dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
     
     edge_traffic = [0] * (dim * dim * ndirs) 
     #gradually route flows through the network
@@ -1090,6 +1116,10 @@ def dp_routing(ncycles, flows, dim, ndirs):
             #derive nodes that is one hop from the current layer's node
             current_layer = node_layers[-1]
             
+            if len(current_layer) == 0:
+                print 'Cannot route, exiting ...'
+                quit()
+                
             for node in current_layer:
                 if node[node_X_id] == dstX and node[node_Y_id] == dstY:
                     finished = True
@@ -1127,18 +1157,19 @@ def dp_routing(ncycles, flows, dim, ndirs):
                     if power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) < 0:
                         continue
                     
-                    #cost of this route
+                    #cost of increasing traffic on this edge
                     cost = power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles) + node[node_cost_id]
+                    #cost = utilization(edge_traffic[edge_id] + f[traffic_idx], ncycles) + node[node_cost_id]
                     exists = False
                     
-                    for nd in next_layer:
-                        if nd[node_X_id] == next_node[node_X_id] and nd[node_Y_id] == next_node[node_Y_id]:
-                            if nd[node_cost_id] > cost:
+                    for nn in next_layer:
+                        if nn[node_X_id] == next_node[node_X_id] and nn[node_Y_id] == next_node[node_Y_id]:
+                            if nn[node_cost_id] > cost or (nn[node_cost_id] == cost and random.randint(0, 1) == 1):
                                 # this is more optimal route
-                                nd[node_cost_id] = cost
-                                nd[node_cost_id +  1] = node[node_X_id]
-                                nd[node_cost_id +  2] = node[node_Y_id]
-                                nd[node_cost_id +  3] = next_node[2]
+                                nn[node_cost_id] = cost
+                                nn[node_cost_id + 1] = node[node_X_id]
+                                nn[node_cost_id + 2] = node[node_Y_id]
+                                nn[node_cost_id + 3] = next_node[2]
                             exists = True
                     if not exists:
                         next_layer.append([next_node[node_X_id], next_node[node_Y_id], cost, node[node_X_id], node[node_Y_id], next_node[2]]) #include last node address  
@@ -1168,13 +1199,13 @@ def dp_routing(ncycles, flows, dim, ndirs):
         dirs = []
         while len(node_layers) > 1:
             current_layer = node_layers.pop()
-            for nd in current_layer:
-                if nd[node_X_id] == currentX and nd[node_Y_id] == currentY:
-                    dir  = nd[5]
+            for node in current_layer:
+                if node[node_X_id] == currentX and node[node_Y_id] == currentY:
+                    dir  = node[node_cost_id + 3]
                     dirs.insert(0, vnoc_dir[dir])
                     
-                    currentX = nd[3]
-                    currentY = nd[4]
+                    currentX = node[node_cost_id + 1]
+                    currentY = node[node_cost_id + 2]
                     
                     edge_id = (currentX * dim + currentY) * ndirs + dir
                     
@@ -1305,7 +1336,7 @@ def traffic_gen(flows, ncycles):
                 dirty_flows.remove(f)
                 interval = packet_bytes * ncycles/f[traffic_idx];
                 current_time = 0;
-                traffic_left = f[traffic_idx] * 100;
+                traffic_left = f[traffic_idx] * 5;
                 
                 while traffic_left >= packet_bytes:
                     packet = copy.deepcopy(f[0:4])
@@ -1346,7 +1377,9 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
                     if abs(opt[1] - freq) < 20:
                         freq = opt[1] * 1000000/OneMhz
                         vdd = opt[0]
-                        power = power + link.calc_dynamic_energy(channel_width_bits/2, vdd) * utilization * freq + link.get_static_power(vdd)
+                        p_dyn = link.calc_dynamic_energy(channel_width_bits/2, vdd) * utilization * freq
+                        p_static = link.get_static_power(vdd)
+                        power = power + p_dyn + p_static
                         break
     FILE.close()
     
@@ -1369,7 +1402,7 @@ for dir in os.listdir(path):
         
         flows = comm_prof(dim)
         
-        ncycles = ncycles/10
+        ncycles = ncycles/25
         #generate ILP files
         #[routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
         #[routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
@@ -1390,7 +1423,7 @@ for dir in os.listdir(path):
         #invoke simulation
         logfile = dir + str(dim) + 'x' + str(dim) + '_sim.log'
         
-        os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE > ' + logfile)
+        os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' vc_n: 8 routing: TABLE > ' + logfile)
         
         #collect data
         
