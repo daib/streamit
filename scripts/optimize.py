@@ -1250,6 +1250,32 @@ def traffic_gen(flows, ncycles):
                             
     return traffics
 
+def logfile_to_power(logfile, wire_delays, dim, ndirs):
+    FILE = open(logfile, 'r')
+    power = 0
+    
+    for line in FILE.readlines():
+        m = re.search('Wire\s*\((\d+)\s*,\s*(\d+)\)\s*(\d+)\s+(\d+.?\d*)\s+(\d+.?\d*)', line)
+        if m != None:
+            x = int(m.group(1))
+            y = int(m.group(2))
+            dir = int(m.group(3))
+            utilization = float(m.group(5))
+            
+            if utilization > 0:
+                wire_delay = wire_delays[x * dim + y][dir + 2]
+                freq = int(round(OneGhz / wire_delay))
+            
+                for opt in wire_config_opts:
+                    if abs(opt[1] - freq) < 20:
+                        freq = opt[1] * 1000000/OneMhz
+                        vdd = opt[0]
+                        power = power + link.calc_dynamic_energy(channel_width_bits/2, vdd) * utilization * freq + link.get_static_power(vdd)
+                        break
+    FILE.close()
+    
+    print 'Total power consumption ' + str(power)
+    
 ############################################################################################
 
 for dir in os.listdir(path):
@@ -1270,7 +1296,8 @@ for dir in os.listdir(path):
         ncycles = ncycles/20
         #generate ILP files
         #[routes, wire_delays] = optimal_routes_freqs(ncycles/50, flows, dim, directions)
-        [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
+        [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
+        #[routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
 
         #generate wire config
         list_to_file('wire_config.txt', wire_delays)
@@ -1282,11 +1309,18 @@ for dir in os.listdir(path):
         traffics = traffic_gen(flows, ncycles)
                                 
         write_traffic(dir, traffics)
-        quit() 
+
         #invoke simulation
-        os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE')
+        logfile = dir + str(dim) + 'x' + str(dim) + '_sim.log'
+        
+        os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE > ' + logfile)
         
         #collect data
+        
+        logfile_to_power(logfile, wire_delays, dim, directions)
+        
+        quit()
+        
         
     os.chdir("../../")
         
