@@ -295,7 +295,7 @@ def calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles):
                         break
                 if not exists:
                     print 'Traffic is too much for the link'
-                    quit()
+                    #quit()
                     wire_delay.append(1)
                     
             wire_delays.append(wire_delay)
@@ -1086,6 +1086,18 @@ def sort_flows_by_routing_freedom(flows):
         f.pop(0)
     return flows
 
+#testing flow-sorting function
+def sort_flows(flows):
+    for f in flows:
+        deltaX = abs(f[srcXIdx] - f[dstXIdx])
+        deltaY = abs(f[srcYIdx] - f[dstYIdx])
+        distance = deltaX + deltaY
+        f.insert(0, distance)
+    flows.sort(key=lambda tup:tup[0])
+    for f in flows:
+        f.pop(0)
+    return flows
+
 def dp_routing(ncycles, flows, dim, ndirs):
     
     vnoc_dir = [0] * ndirs
@@ -1241,6 +1253,9 @@ def dp_routing(ncycles, flows, dim, ndirs):
     return [routes, wire_delays]
 
 def dijkstra_routing(ncycles, flows, dim, ndirs):
+    
+    minimal_route = True
+    
     vnoc_dir = [0] * ndirs
     
     vnoc_dir[north] = 4 
@@ -1256,6 +1271,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
     
     #sort the flows by traffic freedom
     dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
+    #dirty_flows = sort_flows(dirty_flows)
     
     edge_traffic = [0] * (dim * dim * ndirs) 
     #gradually route flows through the network
@@ -1300,15 +1316,24 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
             
             #next vertices
             next_vertices = []
-            
-            if u_x < dim - 1:
-                next_vertices.append([u_x + 1, u_y, east])
-            if u_x > 0:
-                next_vertices.append([u_x - 1, u_y, west])
-            if u_y < dim - 1:
-                next_vertices.append([u_x, u_y + 1, north])
-            if u_y > 0:
-                next_vertices.append([u_x, u_y - 1, south])
+            if minimal_route:
+                if u_x < f[dstXIdx]:
+                    next_vertices.append([u_x + 1, u_y, east])
+                if u_x > f[dstXIdx]:
+                    next_vertices.append([u_x - 1, u_y, west])
+                if u_y < f[dstYIdx]:
+                    next_vertices.append([u_x, u_y + 1, north])
+                if u_y > f[dstYIdx]:
+                    next_vertices.append([u_x, u_y - 1, south])
+            else:
+                if u_x < dim - 1:
+                    next_vertices.append([u_x + 1, u_y, east])
+                if u_x > 0:
+                    next_vertices.append([u_x - 1, u_y, west])
+                if u_y < dim - 1:
+                    next_vertices.append([u_x, u_y + 1, north])
+                if u_y > 0:
+                    next_vertices.append([u_x, u_y - 1, south])
                 
             for v in next_vertices:
                 v_id = v[0] * dim + v[1]
@@ -1498,7 +1523,10 @@ def traffic_gen(flows, ncycles):
                 if traffic_left > 0:
                     packet = copy.deepcopy(f[0:4])
                     packet.insert(0,current_time)
-                    packet.append(int(round(float(traffic_left + 0.5)/flit_size)))
+                    n_bytes = int(round(float(traffic_left + 0.5)/flit_size))
+                    if n_bytes <= 1:
+                        n_bytes = 2
+                    packet.append(n_bytes)
                     packets.append(packet)
                     
             packets.sort(key=lambda tup:tup[0])
@@ -1539,7 +1567,7 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
     
 ############################################################################################
 
-for dir in os.listdir(path)[9:]:
+for dir in os.listdir(path)[4:]:
     
     if os.path.isfile('./dir'):
         continue
@@ -1548,20 +1576,25 @@ for dir in os.listdir(path)[9:]:
     
     os.system("pwd")
     
+    optimize = True
+    
     for dim in [8]:
         
         ncycles = time_prof(dim)
         
         flows = comm_prof(dim)
         
-        ncycles = ncycles/42
+        ncycles = ncycles/15
+        print ncycles
         
         #generate ILP files
+        if optimize:
         #[routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
         #[routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
-        #[routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
-        [routes, wire_delays] = dijkstra_routing(ncycles, flows, dim, directions)
-        #[routes, wire_delays] = xy_routing(ncycles, flows, dim, directions)
+            #[routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
+            [routes, wire_delays] = dijkstra_routing(ncycles, flows, dim, directions)
+        else:
+            [routes, wire_delays] = xy_routing(ncycles, flows, dim, directions)
 
         #generate wire config
         list_to_file('wire_config.txt', wire_delays)
@@ -1577,8 +1610,10 @@ for dir in os.listdir(path)[9:]:
         #invoke simulation
         logfile = dir + str(dim) + 'x' + str(dim) + '_sim.log'
         
-        os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' vc_n: 8 routing: TABLE > ' + logfile)
-        
+        if optimize:
+            os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE vc_n: 8 > ' + logfile)
+        else:
+            os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: XY vc_n: 8 > ' + logfile)
         #collect data
         
         logfile_to_power(logfile, wire_delays, dim, directions)
