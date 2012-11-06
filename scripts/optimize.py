@@ -65,7 +65,7 @@ east = 2
 wire_config_opts = [[2.50, 1000 * OneMhz], [2.20, 870 * OneMhz], [1.95, 750 * OneMhz],
                     [1.75, 640 * OneMhz], [1.58, 540 * OneMhz], [1.43, 450 * OneMhz],
                     [1.30, 370 * OneMhz], [1.19, 300 * OneMhz], [1.10, 240 * OneMhz],
-                    [1.02, 190 * OneMhz], [0, 0]]
+                    [1.02, 190 * OneMhz], [0,0]]
 
 #wire_config_opts = [[2.50, 1000 * OneMhz], [0, 0]]
 
@@ -1248,10 +1248,6 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
     vnoc_dir[east] = 2
     vnoc_dir[west] = 1
     
-    node_cost_id = 2
-    node_X_id = 0
-    node_Y_id = 1
-    
     wire_delays = []
     routes = []
     
@@ -1304,6 +1300,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
             
             #next vertices
             next_vertices = []
+            
             if u_x < dim - 1:
                 next_vertices.append([u_x + 1, u_y, east])
             if u_x > 0:
@@ -1316,6 +1313,9 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
             for v in next_vertices:
                 v_id = v[0] * dim + v[1]
                 if not (v_id in visited):
+                    #forbids 180 deg turns
+                    if previous_dir[u] != -1 and previous_dir[u] == 3 - v[2]:
+                        continue
                     edge_id = u * ndirs + v[2]
                     #if this link can not afford the additional traffic
                     if power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) < 0:
@@ -1365,7 +1365,8 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
         
         route.append(' ')
         routes.append(route)
-        #new compute routes and delays
+    
+    #new wire delays
     wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)      
         
     return [routes, wire_delays]
