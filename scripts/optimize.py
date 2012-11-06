@@ -290,10 +290,12 @@ def calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles):
                             wire_delay.append(-1)
                         else:
                             wire_delay.append(float(max_wire_freq)/freq)
-                            print 'Edge ' + str(x) + ',' + str(y) + ' ' + str(dir) + ' utilization ' + str(float(total_traffic * max_wire_freq)/(channel_width * ncycles * freq))
+                            #print 'Edge ' + str(x) + ',' + str(y) + ' ' + str(dir) + ' utilization ' + str(float(total_traffic * max_wire_freq)/(channel_width * ncycles * freq))
                         exists = True
                         break
                 if not exists:
+                    print 'Traffic is too much for the link'
+                    quit()
                     wire_delay.append(1)
                     
             wire_delays.append(wire_delay)
@@ -340,7 +342,7 @@ def calculate_optimal_wire_delays(b, dim, ndirs, flows, ncycles):
                             wire_delay.append(-1)
                         else:
                             wire_delay.append(float(max_wire_freq)/freq)
-                            print 'Edge ' + str(x) + ',' + str(y) + ' ' + str(dir) + ' utilization ' + str(float(total_traffic * max_wire_freq)/(channel_width * ncycles * freq))
+                            #print 'Edge ' + str(x) + ',' + str(y) + ' ' + str(dir) + ' utilization ' + str(float(total_traffic * max_wire_freq)/(channel_width * ncycles * freq))
                         exists = True
                         break
                 if not exists:
@@ -520,7 +522,19 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                 rows.append([var_names, coefs])
                 my_rhs.append(0)
                 my_senses = my_senses + 'E'
-                        #m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
+
+                var_names = []
+                coefs = []
+                edgeSrcId = (x * dim + y) * ndirs
+                    
+                for dir in range(ndirs):
+                    #flows out
+                    var_names.append(format_var('b', i, edgeSrcId + dir))
+                    coefs.append(1)
+                 
+                rows.append([var_names, coefs])
+                my_rhs.append(1)
+                my_senses = my_senses + 'L'
                         
     #edge conditions
     for y in range(dim):
@@ -975,7 +989,7 @@ def power_cost(traffic_amount, ncycles):
             if freq == 0:
                 return 0
             power = link.calc_dynamic_energy(channel_width_bits/2, opt[0]) * float(traffic_amount * max_wire_freq)/ (channel_width * ncycles)
-            power = power + link.get_static_power(opt[0])
+            #power = power + link.get_static_power(opt[0])
             return power
             break
     return -1
@@ -1164,7 +1178,9 @@ def dp_routing(ncycles, flows, dim, ndirs):
                     
                     for nn in next_layer:
                         if nn[node_X_id] == next_node[node_X_id] and nn[node_Y_id] == next_node[node_Y_id]:
-                            if nn[node_cost_id] > cost or (nn[node_cost_id] == cost and random.randint(0, 1) == 1):
+                            prev_edge_id = (nn[node_cost_id + 1] * dim + nn[node_cost_id + 2]) * ndirs + 3 - nn[node_cost_id + 3]
+                            
+                            if nn[node_cost_id] > cost or (nn[node_cost_id] == cost and edge_traffic[edge_id] < edge_traffic[prev_edge_id]):
                                 # this is more optimal route
                                 nn[node_cost_id] = cost
                                 nn[node_cost_id + 1] = node[node_X_id]
@@ -1223,7 +1239,138 @@ def dp_routing(ncycles, flows, dim, ndirs):
     wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)      
         
     return [routes, wire_delays]
+
+def dijkstra_routing(ncycles, flows, dim, ndirs):
+    vnoc_dir = [0] * ndirs
     
+    vnoc_dir[north] = 4 
+    vnoc_dir[south] = 3
+    vnoc_dir[east] = 2
+    vnoc_dir[west] = 1
+    
+    node_cost_id = 2
+    node_X_id = 0
+    node_Y_id = 1
+    
+    wire_delays = []
+    routes = []
+    
+    #make a copy of the flows in case we advertently modify it
+    dirty_flows = copy.deepcopy(flows)
+    
+    #sort the flows by traffic freedom
+    dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
+    
+    edge_traffic = [0] * (dim * dim * ndirs) 
+    #gradually route flows through the network
+    #such that each time a new flow is added
+    #the power increment is minimal
+    for f in dirty_flows:
+        dst = f[dstXIdx] * dim + f[dstYIdx]
+        src = f[srcXIdx] * dim + f[srcYIdx]
+        
+        dist = [float('inf')] * dim * dim
+        
+        previous = [-1] * dim * dim
+        previous_dir = [-1] * dim * dim
+        
+        dist[src] = 0
+
+        Q = range(dim * dim)
+        visited = set([])
+        
+        while len(Q) > 0:
+            min_val = float('inf')
+            min_idx = 0
+            
+            for i in range(len(Q)):
+                if dist[Q[i]] < min_val:
+                    min_val = dist[Q[i]]
+                    min_idx = i
+            
+            u = Q[min_idx]
+            del Q[min_idx]
+            
+            #reach the source
+            if u == dst:
+                break
+            
+            visited.add(u)
+            if dist[u] == float('inf'):
+                print 'Error: Cannot route'
+                break
+            u_x = u/dim
+            u_y = u%dim
+            
+            #next vertices
+            next_vertices = []
+            if u_x < dim - 1:
+                next_vertices.append([u_x + 1, u_y, east])
+            if u_x > 0:
+                next_vertices.append([u_x - 1, u_y, west])
+            if u_y < dim - 1:
+                next_vertices.append([u_x, u_y + 1, north])
+            if u_y > 0:
+                next_vertices.append([u_x, u_y - 1, south])
+                
+            for v in next_vertices:
+                v_id = v[0] * dim + v[1]
+                if not (v_id in visited):
+                    edge_id = u * ndirs + v[2]
+                    #if this link can not afford the additional traffic
+                    if power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) < 0:
+                        continue
+                    
+                    #cost of increasing traffic on this edge
+                    alt = dist[u] + power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
+                    
+                    if alt < dist[v_id]:
+                        dist[v_id] = alt
+                        previous[v_id] = u
+                        previous_dir[v_id] = v[2]
+        
+         #commit the route
+        # src and dst information
+        route = ['(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' +  str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
+        
+        #vc
+        vc = -1 #any VC
+        if f[srcXIdx] < f[dstXIdx]:
+            if f[srcYIdx] <= f[dstYIdx]:
+                vc = 0
+        elif f[srcYIdx] > f[dstYIdx]:
+            vc = 1
+        route.append(vc)
+        
+        route.append(f[traffic_idx])
+        route.append(ncycles)
+        route.append('|')
+        
+        dirs = []
+        
+        u = dst
+        
+        while previous_dir[u] != -1:
+            edge_id = previous[u] * ndirs + previous_dir[u]
+                    
+            #commit the traffic
+            edge_traffic[edge_id] = edge_traffic[edge_id] + f[traffic_idx]
+                    
+            dirs.insert(0, vnoc_dir[previous_dir[u]])
+            u = previous[u]
+        
+        assert(u == src)
+        
+        route.extend(dirs)
+        
+        route.append(' ')
+        routes.append(route)
+        #new compute routes and delays
+    wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)      
+        
+    return [routes, wire_delays]
+
+            
     
 def list_to_file(name, ls):
     FILE = open(name, 'w')
@@ -1379,15 +1526,19 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
                         vdd = opt[0]
                         p_dyn = link.calc_dynamic_energy(channel_width_bits/2, vdd) * utilization * freq
                         p_static = link.get_static_power(vdd)
-                        power = power + p_dyn + p_static
+                        power = power + p_dyn # + p_static
                         break
+                    
+        m = re.search('Current time:\s*(\d+.?\d*)', line)
+        if m != None:
+            running_time = m.group(1)            
     FILE.close()
     
-    print 'Total power consumption ' + str(power)
+    print 'Total power consumption ' + str(power) + ' time ' + running_time + ' total power ' + str(power * float(running_time))
     
 ############################################################################################
 
-for dir in os.listdir(path):
+for dir in os.listdir(path)[9:]:
     
     if os.path.isfile('./dir'):
         continue
@@ -1402,11 +1553,13 @@ for dir in os.listdir(path):
         
         flows = comm_prof(dim)
         
-        ncycles = ncycles/25
+        ncycles = ncycles/42
+        
         #generate ILP files
         #[routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
         #[routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
-        [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
+        #[routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
+        [routes, wire_delays] = dijkstra_routing(ncycles, flows, dim, directions)
         #[routes, wire_delays] = xy_routing(ncycles, flows, dim, directions)
 
         #generate wire config
