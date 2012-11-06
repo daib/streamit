@@ -1349,7 +1349,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
                     #cost of increasing traffic on this edge
                     alt = dist[u] + power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
                     
-                    if alt < dist[v_id]:
+                    if alt < dist[v_id] or alt == dist[v_id] and edge_traffic[edge_id] < edge_traffic[previous[v_id] * ndirs + previous_dir[v_id]]:
                         dist[v_id] = alt
                         previous[v_id] = u
                         previous_dir[v_id] = v[2]
@@ -1567,6 +1567,9 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
     
 ############################################################################################
 
+optimize = True
+n_vc = 8
+    
 for dir in os.listdir(path)[4:]:
     
     if os.path.isfile('./dir'):
@@ -1576,7 +1579,6 @@ for dir in os.listdir(path)[4:]:
     
     os.system("pwd")
     
-    optimize = True
     
     for dim in [8]:
         
@@ -1611,9 +1613,9 @@ for dir in os.listdir(path)[4:]:
         logfile = dir + str(dim) + 'x' + str(dim) + '_sim.log'
         
         if optimize:
-            os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE vc_n: 8 > ' + logfile)
+            os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
         else:
-            os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: XY vc_n: 8 > ' + logfile)
+            os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
         #collect data
         
         logfile_to_power(logfile, wire_delays, dim, directions)
