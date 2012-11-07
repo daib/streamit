@@ -1537,6 +1537,7 @@ def traffic_gen(flows, ncycles):
 def logfile_to_power(logfile, wire_delays, dim, ndirs):
     FILE = open(logfile, 'r')
     power = 0
+    rt_power = 0
     
     for line in FILE.readlines():
         m = re.search('Wire\s*\((\d+)\s*,\s*(\d+)\)\s*(\d+)\s+(\d+.?\d*)\s+(\d+.?\d*)', line)
@@ -1583,16 +1584,15 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
                         #print l
                         m = re.search('Power\s*=\s*(\d+.?\d*(E|e)(\+|-)\d*)', l)
                         if m != None:
-                            rt_power = float(m.group(1))
-                    power = power + rt_power
+                            rt_power = rt_power + float(m.group(1))
                     break       
     FILE.close()
     
-    print 'Total power consumption ' + str(power) + ' time ' + running_time + ' total power ' + str(power * float(running_time))
+    print 'Total power consumption ' + str(power) + ' time ' + running_time + ' total power ' + str(power * float(running_time) + rt_power)
     
 ############################################################################################
 
-optimize = False
+optimize = True
 n_vc = 8
 buffer_size = 12
     
