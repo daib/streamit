@@ -42,6 +42,9 @@ y_idx = 1
 freq_idx = 1
 vdd_idx = 0
 
+in_edge_idx = 1
+out_edge_idx = 0
+
 # flow indices
 srcXIdx = 0
 srcYIdx = 1
@@ -1261,30 +1264,33 @@ def min_freq_vdd(total_traffic, ncycles):
             return opt
     return [-1, -1]
 
-def estimate_router_freq_Vdd_traffic(u, edge_traffic, ncycles, dim, ndirs):
+#FIXME need to include traffic from the source
+def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs):
     max_vdd = 0
     max_freq = 0 
     u_x = u / dim
     u_y = u % dim
     total_traffic = 0
     
+    traffics = []
+    
     for dir in range(ndirs):
         edge_id = u * ndirs + dir
-        [vdd, freq] = min_freq_vdd(edge_traffic[edge_id], ncycles)
-        if max_freq < freq:
-            max_freq = freq
-            max_vdd =vdd
-        
-        total_traffic = total_traffic + edge_traffic[edge_id]
+        traffics.append(edge_traffic[edge_id])
         
         in_edge_id = incoming_edge_id(u_x, u_y, dir, dim, ndirs)
         
-        [vdd, freq] = min_freq_vdd(edge_traffic[in_edge_id], ncycles)
+        traffics.append(edge_traffic[in_edge_id])
+    traffics.append(local_edges_traffic[u * 2 + out_edge_idx])
+    traffics.append(local_edges_traffic[u * 2 + in_edge_idx])
+    
+    for traffic in traffics:
+        [vdd, freq] = min_freq_vdd(traffic, ncycles)
         if max_freq < freq:
             max_freq = freq
             max_vdd =vdd
+        total_traffic = total_traffic + traffic
         
-        total_traffic = total_traffic + edge_traffic[in_edge_id]
     avg_traffic = float(total_traffic)/ncycles/(ndirs + 1) #average traffic per one input port
     return [max_vdd, max_freq, avg_traffic]
 
@@ -1297,13 +1303,13 @@ def orion_router_estimation(arguments):
             rt_power = float(m.group(1))
     return rt_power       
  
-def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, ncycles, dim, ndirs):
+def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, local_edges_traffic, ncycles, dim, ndirs):
     #temporaty commit the traffic
     dirty_edge_traffic = copy.deepcopy(edge_traffic)
     dirty_edge_traffic[edge_id] = dirty_edge_traffic[edge_id] + added_traffic
     
     #estimate u freq
-    [vdd, freq, avg_traffic] = estimate_router_freq_Vdd_traffic(u, dirty_edge_traffic, ncycles, dim, ndirs)
+    [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(u, dirty_edge_traffic, local_edges_traffic, ncycles, dim, ndirs)
     
     arguments = str(vdd) + ' ' + str(freq) + ' ' + str(ndirs + 1) + ' ' + str(ndirs + 1) + ' ' + str(flit_size) + ' ' + str(n_vc) + ' ' +str(buffer_size) + ' -' + str(avg_traffic)
     for i in range(3, 10):
@@ -1311,7 +1317,7 @@ def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, ncycl
 
     rt_power = orion_router_estimation(arguments)
     
-    [vdd, freq, avg_traffic] = estimate_router_freq_Vdd_traffic(v, dirty_edge_traffic, ncycles, dim, ndirs)
+    [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(v, dirty_edge_traffic, local_edges_traffic, ncycles, dim, ndirs)
     
     arguments = str(vdd) + ' ' + str(freq) + ' ' + str(ndirs + 1) + ' ' + str(ndirs + 1) + ' ' + str(flit_size) + ' ' + str(n_vc) + ' ' +str(buffer_size) + ' -' + str(avg_traffic)
     for i in range(3, 10):
@@ -1341,6 +1347,10 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
     # sort the flows by traffic freedom
     dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
     # dirty_flows = sort_flows(dirty_flows)
+    local_edges_traffic = [0] * dim * dim * 2
+    for f in dirty_flows:
+        local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] = local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] + f[traffic_idx]
+        local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] = local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] + f[traffic_idx]
     
     edge_traffic = [0] * (dim * dim * ndirs) 
     # gradually route flows through the network
@@ -1418,7 +1428,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
                     # cost of increasing traffic on this edge
                     alt = dist[u] + power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
                     # cost of increasing routers' freqs on this edge to meet the traffic demand 
-                    alt = alt + estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, ncycles, dim, ndirs)
+                    alt = alt + estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edges_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edges_traffic, ncycles, dim, ndirs)
                     
                     if alt < dist[v_id] or alt == dist[v_id] and edge_traffic[edge_id] < edge_traffic[previous[v_id] * ndirs + previous_dir[v_id]]:
                         dist[v_id] = alt
@@ -1658,7 +1668,7 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
 ############################################################################################
 
 optimize = True
-n_vc = 8
+n_vc = 4
 buffer_size = 12
     
 for dir in os.listdir(path)[4:]:
