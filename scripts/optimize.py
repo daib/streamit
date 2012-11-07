@@ -1285,13 +1285,13 @@ def estimate_router_freq_Vdd_traffic(u, edge_traffic, ncycles, dim, ndirs):
             max_vdd =vdd
         
         total_traffic = total_traffic + edge_traffic[in_edge_id]
-    avg_traffic = float(total_traffic)/ncycles
+    avg_traffic = float(total_traffic)/ncycles/(ndirs + 1) #average traffic per one input port
     return [max_vdd, max_freq, avg_traffic]
 
 def orion_router_estimation(arguments):
     p = subprocess.Popen('orion2rt ' + arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     for l in p.stdout.readlines():
-        print l
+        #print l
         m = re.search('Power\s*=\s*(\d+.?\d*(E|e)(\+|-)\d*)', l)
         if m != None:
             rt_power = float(m.group(1))
