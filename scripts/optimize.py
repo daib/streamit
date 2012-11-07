@@ -39,6 +39,9 @@ directions = 4
 x_idx = 0
 y_idx = 1
 
+freq_idx = 1
+vdd_idx = 0
+
 # flow indices
 srcXIdx = 0
 srcYIdx = 1
@@ -66,7 +69,7 @@ east = 2
 wire_config_opts = [[2.50, 1000 * OneMhz], [2.20, 870 * OneMhz], [1.95, 750 * OneMhz],
                     [1.75, 640 * OneMhz], [1.58, 540 * OneMhz], [1.43, 450 * OneMhz],
                     [1.30, 370 * OneMhz], [1.19, 300 * OneMhz], [1.10, 240 * OneMhz],
-                    [1.02, 190 * OneMhz], [0, 0]]
+                    [1.02, 190 * OneMhz]]
 
 # wire_config_opts = [[2.50, 1000 * OneMhz], [0, 0]]
 
@@ -1252,6 +1255,71 @@ def dp_routing(ncycles, flows, dim, ndirs):
     wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)      
         
     return [routes, wire_delays]
+def min_freq_vdd(total_traffic, ncycles):
+    for opt in wire_config_opts:
+        if channel_width * ncycles * opt[freq_idx] >= total_traffic * max_wire_freq:
+            return opt
+    return [-1, -1]
+
+def estimate_router_freq_Vdd_traffic(u, edge_traffic, ncycles, dim, ndirs):
+    max_vdd = 0
+    max_freq = 0 
+    u_x = u / dim
+    u_y = u % dim
+    total_traffic = 0
+    
+    for dir in range(ndirs):
+        edge_id = u * ndirs + dir
+        [vdd, freq] = min_freq_vdd(edge_traffic[edge_id], ncycles)
+        if max_freq < freq:
+            max_freq = freq
+            max_vdd =vdd
+        
+        total_traffic = total_traffic + edge_traffic[edge_id]
+        
+        in_edge_id = incoming_edge_id(u_x, u_y, dir, dim, ndirs)
+        
+        [vdd, freq] = min_freq_vdd(edge_traffic[in_edge_id], ncycles)
+        if max_freq < freq:
+            max_freq = freq
+            max_vdd =vdd
+        
+        total_traffic = total_traffic + edge_traffic[in_edge_id]
+    avg_traffic = float(total_traffic)/ncycles
+    return [max_vdd, max_freq, avg_traffic]
+
+def orion_router_estimation(arguments):
+    p = subprocess.Popen('orion2rt ' + arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    for l in p.stdout.readlines():
+        print l
+        m = re.search('Power\s*=\s*(\d+.?\d*(E|e)(\+|-)\d*)', l)
+        if m != None:
+            rt_power = float(m.group(1))
+    return rt_power       
+ 
+def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, ncycles, dim, ndirs):
+    #temporaty commit the traffic
+    dirty_edge_traffic = copy.deepcopy(edge_traffic)
+    dirty_edge_traffic[edge_id] = dirty_edge_traffic[edge_id] + added_traffic
+    
+    #estimate u freq
+    [vdd, freq, avg_traffic] = estimate_router_freq_Vdd_traffic(u, dirty_edge_traffic, ncycles, dim, ndirs)
+    
+    arguments = str(vdd) + ' ' + str(freq) + ' ' + str(ndirs + 1) + ' ' + str(ndirs + 1) + ' ' + str(flit_size) + ' ' + str(n_vc) + ' ' +str(buffer_size) + ' -' + str(avg_traffic)
+    for i in range(3, 10):
+        arguments = arguments + ' 0'
+
+    rt_power = orion_router_estimation(arguments)
+    
+    [vdd, freq, avg_traffic] = estimate_router_freq_Vdd_traffic(v, dirty_edge_traffic, ncycles, dim, ndirs)
+    
+    arguments = str(vdd) + ' ' + str(freq) + ' ' + str(ndirs + 1) + ' ' + str(ndirs + 1) + ' ' + str(flit_size) + ' ' + str(n_vc) + ' ' +str(buffer_size) + ' -' + str(avg_traffic)
+    for i in range(3, 10):
+        arguments = arguments + ' 0'
+    
+    rt_power = rt_power + orion_router_estimation(arguments)
+    
+    return rt_power
 
 def dijkstra_routing(ncycles, flows, dim, ndirs):
     
@@ -1349,6 +1417,8 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
                     
                     # cost of increasing traffic on this edge
                     alt = dist[u] + power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
+                    # cost of increasing routers' freqs on this edge to meet the traffic demand 
+                    alt = alt + estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, ncycles, dim, ndirs)
                     
                     if alt < dist[v_id] or alt == dist[v_id] and edge_traffic[edge_id] < edge_traffic[previous[v_id] * ndirs + previous_dir[v_id]]:
                         dist[v_id] = alt
@@ -1579,16 +1649,11 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
                     for i in range(3, 10):
                         arguments = arguments + ' ' + m.group(i)
                     #print arguments
-                    p = subprocess.Popen('orion2rt ' + arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                    for l in p.stdout.readlines():
-                        #print l
-                        m = re.search('Power\s*=\s*(\d+.?\d*(E|e)(\+|-)\d*)', l)
-                        if m != None:
-                            rt_power = rt_power + float(m.group(1))
+                    rt_power = rt_power + orion_router_estimation(arguments)
                     break       
     FILE.close()
     
-    print 'Total power consumption ' + str(power) + ' time ' + running_time + ' total power ' + str(power * float(running_time) + rt_power)
+    print 'Link energy (per second) ' + str(power) + ' router energy ' + str(rt_power) + ' time ' + running_time + ' total power link energy ' + str(power * float(running_time))
     
 ############################################################################################
 
