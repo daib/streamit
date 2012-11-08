@@ -7,6 +7,7 @@ import os
 import re
 import copy
 import random
+import math
 from orion2 import *
 
 #######################################################################################
@@ -1016,7 +1017,7 @@ def power_cost(traffic_amount, ncycles):
     return -1
 
 def utilization(traffic_amount, ncycles):
-    return float(traffic_amount / channel_width * ncycles)
+    return float(traffic_amount) / (channel_width * ncycles)
 
 def xy_routing(ncycles, flows, dim, ndirs):
     
@@ -1110,8 +1111,27 @@ def sort_flows_by_routing_freedom(flows):
         n_routes = n_routes / divisor
         f.insert(0, n_routes)
     flows.sort(key=lambda tup:tup[0])
+    
+    #for f in flows:
+    #    f.pop(0)
+    
+    #sort by traffic
+    n_routes = flows[0][0]
+    start_index = 0
+    current_index = 0
     for f in flows:
-        f.pop(0)
+        f_routes = f.pop(0)
+        current_index = current_index + 1
+        
+        if f_routes > n_routes:
+            #sort from start_index
+            segment = flows[start_index:current_index]
+            segment.sort(key=lambda tup:tup[4])
+            segment.reverse()
+            flows[start_index:current_index] = segment
+            start_index = current_index
+            n_routes = f_routes
+        
     return flows
 
 # testing flow-sorting function
@@ -1349,6 +1369,49 @@ def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, local
     
     return rt_power
 
+def multipath_routing(ncycles, flows, dim, ndirs):
+    #make a copy of the flows in case we advertently modify it
+    dirty_flows = copy.deepcopy(flows)
+    
+    # sort the flows by traffic freedom
+    for f in dirty_flows:
+        deltaX = abs(f[srcXIdx] - f[dstXIdx])
+        deltaY = abs(f[srcYIdx] - f[dstYIdx])
+        n_routes = 1
+        divisor = 1
+        for i in range(1, deltaX + 1):
+            n_routes = n_routes * (deltaY + i)
+            divisor = divisor * i
+        n_routes = n_routes / divisor
+        f.insert(0, n_routes)
+    dirty_flows.sort(key=lambda tup:tup[0])
+    
+    splitted_flows = []
+    #do not split flow by more than the number of paths it has
+    for f in dirty_flows:
+        n_routes = f.pop(0)
+        
+        min_n_routes = 2 #min(2, int(round(float(f[traffic_idx]) / (packet_bytes * 4))))
+        #min_n_routes = max(min_n_routes, 1)
+        if(f[traffic_idx]/min_n_routes < packet_bytes * 5):
+            min_n_routes = 1
+        
+        if n_routes > min_n_routes:
+            n_routes = min_n_routes
+        if n_routes > 1:
+            print f
+        #split the flow by at most the number of routes
+        traffic_per_route = f[traffic_idx] / n_routes
+        traffic_left = f[traffic_idx] % n_routes
+        for i in range(n_routes):
+            f_child = copy.deepcopy(f)
+            splitted_flows.append(f_child)
+            if i < traffic_left:
+                f_child[traffic_idx] = traffic_per_route + 1
+            else:
+                f_child[traffic_idx] = traffic_per_route
+    return dijkstra_routing(ncycles, splitted_flows, dim, ndirs)
+
 def dijkstra_routing(ncycles, flows, dim, ndirs):
     
     minimal_route = True
@@ -1450,7 +1513,9 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
                     # cost of increasing traffic on this edge
                     link_power_increase = power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
                     # cost of increasing routers' freqs on this edge to meet the traffic demand
-                    rt_power_increase = estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edges_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edges_traffic, ncycles, dim, ndirs) 
+                    rt_power_increase = 0 #estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edges_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edges_traffic, ncycles, dim, ndirs) 
+                    
+                    #link_power_increase = 1.0/(utilization(f[traffic_idx], ncycles) + 1 - utilization(edge_traffic[edge_id], ncycles))
                     
                     alt = dist[u] + link_power_increase + rt_power_increase
                     
@@ -1720,6 +1785,7 @@ for dir in os.listdir(path)[4:]:
         # [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
             # [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
             [routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
+            #[routes, wire_delays, router_delays] = multipath_routing(ncycles, flows, dim, directions)
         else:
             [routes, wire_delays, router_delays] = xy_routing(ncycles, flows, dim, directions)
 
