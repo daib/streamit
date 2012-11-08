@@ -260,6 +260,16 @@ def calculate_routes(b, dim, ndirs, flows, ncycles):
         routes.append(route)
         
     return routes
+
+def calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles):
+    router_delays = []
+    for x in range(dim):
+        for y in range(dim):
+            u = x * dim + y
+            [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs)
+            router_delays.append([x, y, float(OneGhz)/freq])
+    return router_delays
+
 def calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles):
     wire_delays = []
     
@@ -1016,6 +1026,12 @@ def xy_routing(ncycles, flows, dim, ndirs):
      # make a copy of the flows in case we advertently modify it
     dirty_flows = copy.deepcopy(flows)
     
+    local_edges_traffic = [0] * (dim * dim * 2)
+    for f in dirty_flows:
+        local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] = local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] + f[traffic_idx]
+        local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] = local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] + f[traffic_idx]
+    
+    
     edge_traffic = [0] * (dim * dim * ndirs) 
     # gradually route flows through the network
     # such that each time a new flow is added
@@ -1075,7 +1091,8 @@ def xy_routing(ncycles, flows, dim, ndirs):
         
     wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
     
-    return [routes, wire_delays]
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
+    return [routes, wire_delays, router_delays]
     
 def sort_flows_by_routing_freedom(flows):
     for f in flows:
@@ -1264,7 +1281,6 @@ def min_freq_vdd(total_traffic, ncycles):
             return opt
     return [-1, -1]
 
-#FIXME need to include traffic from the source
 def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs):
     max_vdd = 0
     max_freq = 0 
@@ -1347,7 +1363,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
     # sort the flows by traffic freedom
     dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
     # dirty_flows = sort_flows(dirty_flows)
-    local_edges_traffic = [0] * dim * dim * 2
+    local_edges_traffic = [0] * (dim * dim * 2)
     for f in dirty_flows:
         local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] = local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] + f[traffic_idx]
         local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] = local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] + f[traffic_idx]
@@ -1428,7 +1444,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
                     # cost of increasing traffic on this edge
                     alt = dist[u] + power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
                     # cost of increasing routers' freqs on this edge to meet the traffic demand 
-                    alt = alt + estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edges_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edges_traffic, ncycles, dim, ndirs)
+                    #alt = alt + estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edges_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edges_traffic, ncycles, dim, ndirs)
                     
                     if alt < dist[v_id] or alt == dist[v_id] and edge_traffic[edge_id] < edge_traffic[previous[v_id] * ndirs + previous_dir[v_id]]:
                         dist[v_id] = alt
@@ -1473,9 +1489,10 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
         routes.append(route)
     
     # new wire delays
-    wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)      
-        
-    return [routes, wire_delays]
+    wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
+          
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
+    return [routes, wire_delays, router_delays]
 
             
     
@@ -1695,10 +1712,11 @@ for dir in os.listdir(path)[4:]:
         # [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
         # [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
             # [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
-            [routes, wire_delays] = dijkstra_routing(ncycles, flows, dim, directions)
+            [routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
         else:
-            [routes, wire_delays] = xy_routing(ncycles, flows, dim, directions)
+            [routes, wire_delays, router_delays] = xy_routing(ncycles, flows, dim, directions)
 
+        list_to_file('router_config.txt', router_delays)
         # generate wire config
         list_to_file('wire_config.txt', wire_delays)
         
