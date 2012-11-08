@@ -7,7 +7,7 @@ import os
 import re
 import copy
 import random
-import subprocess
+from orion2 import *
 
 #######################################################################################
 path = sys.argv[1]
@@ -1005,11 +1005,11 @@ def minimize_used_links(ncycles, flows, dim, ndirs):
 def power_cost(traffic_amount, ncycles):
     
     for opt in wire_config_opts:
-        freq = opt[1]
+        freq = opt[freq_idx]
         if  channel_width * ncycles * freq >= traffic_amount * max_wire_freq:
             if freq == 0:
                 return 0
-            power = link.calc_dynamic_energy(channel_width_bits / 2, opt[0]) * float(traffic_amount * max_wire_freq) / (channel_width * ncycles)
+            power = link.calc_dynamic_energy(channel_width_bits / 2, opt[vdd_idx]) * float(traffic_amount * max_wire_freq * 1000000/OneMhz) / (channel_width * ncycles)
             # power = power + link.get_static_power(opt[0])
             return power
             break
@@ -1317,13 +1317,13 @@ def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycl
     return [max_vdd, max_freq, avg_traffic]
 
 def orion_router_estimation(arguments):
-    p = subprocess.Popen('orion2rt ' + arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    for l in p.stdout.readlines():
+    #p = subprocess.Popen('orion2rt ' + arguments, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    #for l in p.stdout.readlines():
         #print l
-        m = re.search('Power\s*=\s*(\d+.?\d*(E|e)(\+|-)\d*)', l)
-        if m != None:
-            rt_power = float(m.group(1))
-    return rt_power       
+    #    m = re.search('Power\s*=\s*(\d+.?\d*(E|e)(\+|-)\d*)', l)
+    #    if m != None:
+    #        rt_power = float(m.group(1))
+    return calculate_power(arguments)       
  
 def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, local_edges_traffic, ncycles, dim, ndirs):
     #temporaty commit the traffic
@@ -1448,9 +1448,11 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
                         continue
                     
                     # cost of increasing traffic on this edge
-                    alt = dist[u] + power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
-                    # cost of increasing routers' freqs on this edge to meet the traffic demand 
-                    #alt = alt + estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edges_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edges_traffic, ncycles, dim, ndirs)
+                    link_power_increase = power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
+                    # cost of increasing routers' freqs on this edge to meet the traffic demand
+                    rt_power_increase = estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edges_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edges_traffic, ncycles, dim, ndirs) 
+                    
+                    alt = dist[u] + link_power_increase + rt_power_increase
                     
                     if alt < dist[v_id] or alt == dist[v_id] and edge_traffic[edge_id] < edge_traffic[previous[v_id] * ndirs + previous_dir[v_id]]:
                         dist[v_id] = alt
