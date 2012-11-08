@@ -1032,8 +1032,8 @@ def xy_routing(ncycles, flows, dim, ndirs):
     
     local_edges_traffic = [0] * (dim * dim * 2)
     for f in dirty_flows:
-        local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] = local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] + f[traffic_idx]
-        local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] = local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] + f[traffic_idx]
+        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
+        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
     
     
     edge_traffic = [0] * (dim * dim * ndirs) 
@@ -1313,7 +1313,7 @@ def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycl
             max_vdd =vdd
         total_traffic = total_traffic + traffic
         
-    avg_traffic = float(total_traffic)/(ncycles * channel_width)/(ndirs + 1)/2 #average traffic per one input port
+    avg_traffic = float(total_traffic)/(ncycles * channel_width * max_freq / OneGhz)/(ndirs + 1)/2 #average traffic per one input port
     return [max_vdd, max_freq, avg_traffic]
 
 def orion_router_estimation(arguments):
@@ -1371,8 +1371,8 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
     # dirty_flows = sort_flows(dirty_flows)
     local_edges_traffic = [0] * (dim * dim * 2)
     for f in dirty_flows:
-        local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] = local_edges_traffic[(f[srcXIdx] * dim  + f[srcYIdx] * 2 + out_edge_idx)] + f[traffic_idx]
-        local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] = local_edges_traffic[(f[dstXIdx] * dim  + f[dstYIdx] * 2 + in_edge_idx)] + f[traffic_idx]
+        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
+        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
     
     edge_traffic = [0] * (dim * dim * ndirs) 
     # gradually route flows through the network
