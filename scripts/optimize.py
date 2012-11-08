@@ -1295,8 +1295,9 @@ def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycl
         traffics.append(edge_traffic[edge_id])
         
         in_edge_id = incoming_edge_id(u_x, u_y, dir, dim, ndirs)
-        
-        traffics.append(edge_traffic[in_edge_id])
+        if in_edge_id >= 0:
+            traffics.append(edge_traffic[in_edge_id])
+    
     traffics.append(local_edges_traffic[u * 2 + out_edge_idx])
     traffics.append(local_edges_traffic[u * 2 + in_edge_idx])
     
@@ -1307,7 +1308,7 @@ def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycl
             max_vdd =vdd
         total_traffic = total_traffic + traffic
         
-    avg_traffic = float(total_traffic)/ncycles/(ndirs + 1) #average traffic per one input port
+    avg_traffic = float(total_traffic)/(ncycles * channel_width)/(ndirs + 1)/2 #average traffic per one input port
     return [max_vdd, max_freq, avg_traffic]
 
 def orion_router_estimation(arguments):
