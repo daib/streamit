@@ -36,6 +36,8 @@ channel_width_bits = channel_width * 8
 
 directions = 4
 
+router_speed_scale = 0.8
+
 x_idx = 0
 y_idx = 1
 
@@ -1279,9 +1281,10 @@ def dp_routing(ncycles, flows, dim, ndirs):
     return [routes, wire_delays]
 def min_freq_vdd(total_traffic, ncycles):
     for opt in wire_config_opts:
-        if channel_width * ncycles * opt[freq_idx] >= total_traffic * max_wire_freq:
+        if channel_width * ncycles * opt[freq_idx] * router_speed_scale >= total_traffic * max_wire_freq:
             return opt
     #return [-1, -1]
+    return wire_config_opts[-1]
 
 def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs):
     max_vdd = 0
@@ -1699,7 +1702,6 @@ for dir in os.listdir(path)[4:]:
     os.chdir('./' + dir + '/streamit')
     
     os.system("pwd")
-    
     
     for dim in [8]:
         
