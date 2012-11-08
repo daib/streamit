@@ -56,7 +56,8 @@ dstXIdx = 2
 dstYIdx = 3
 
 traffic_idx = 4
-traffic_used_idx = 5
+flow_id_idx = 5
+traffic_used_idx = 6
 
 # routing directions
 north = 0
@@ -1384,17 +1385,17 @@ def multipath_routing(ncycles, flows, dim, ndirs):
             divisor = divisor * i
         n_routes = n_routes / divisor
         f.insert(0, n_routes)
-    dirty_flows.sort(key=lambda tup:tup[0])
     
     splitted_flows = []
+    manipulated_flows = []
     #do not split flow by more than the number of paths it has
     for f in dirty_flows:
         n_routes = f.pop(0)
         
-        min_n_routes = 2 #min(2, int(round(float(f[traffic_idx]) / (packet_bytes * 4))))
-        #min_n_routes = max(min_n_routes, 1)
-        if(f[traffic_idx]/min_n_routes < packet_bytes * 5):
-            min_n_routes = 1
+        min_n_routes = 1#int(round(float(f[traffic_idx]) / (packet_bytes * 10)))
+        min_n_routes = max(min_n_routes, 1)
+#        if(f[traffic_idx]/min_n_routes < packet_bytes * 5):
+#            min_n_routes = 1
         
         if n_routes > min_n_routes:
             n_routes = min_n_routes
@@ -1405,12 +1406,19 @@ def multipath_routing(ncycles, flows, dim, ndirs):
         traffic_left = f[traffic_idx] % n_routes
         for i in range(n_routes):
             f_child = copy.deepcopy(f)
+            f_child.append(i)
             splitted_flows.append(f_child)
             if i < traffic_left:
                 f_child[traffic_idx] = traffic_per_route + 1
             else:
                 f_child[traffic_idx] = traffic_per_route
-    return dijkstra_routing(ncycles, splitted_flows, dim, ndirs)
+            f_copied = copy.deepcopy(f_child)
+            f_copied.append(n_routes)
+            manipulated_flows.append(f_copied)
+
+    result = dijkstra_routing(ncycles, splitted_flows, dim, ndirs)
+    result.append(manipulated_flows)
+    return result
 
 def dijkstra_routing(ncycles, flows, dim, ndirs):
     
@@ -1526,7 +1534,9 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
         
          # commit the route
         # src and dst information
-        route = ['(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
+        if len(f) <= flow_id_idx:
+            f.append(0)
+        route = [f[-1], '(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
         
         # vc
         vc = -1  # any VC
@@ -1678,26 +1688,30 @@ def traffic_gen(flows, ncycles):
                     
             for f in fs:
                 dirty_flows.remove(f)
+                if(len(f) <= flow_id_idx):
+                    f.extend([0,1])
                 interval = packet_bytes * ncycles / f[traffic_idx];
-                current_time = 0;
+                current_time = int(round(float(interval) * f[flow_id_idx]/f[-1]));
                 traffic_left = f[traffic_idx] * 5;
                 
                 while traffic_left >= packet_bytes:
-                    packet = copy.deepcopy(f[0:4])
+                    packet = copy.deepcopy(f[0:traffic_idx])
                     packet.insert(0, current_time)
                     packet.append(packet_bytes / flit_size)
+                    packet.append(f[flow_id_idx])
                     packets.append(packet)
                     
                     current_time = current_time + interval;
                     traffic_left = traffic_left - packet_bytes
                     
                 if traffic_left > 0:
-                    packet = copy.deepcopy(f[0:4])
+                    packet = copy.deepcopy(f[0:traffic_idx])
                     packet.insert(0, current_time)
                     n_bytes = int(round(float(traffic_left + 0.5) / flit_size))
                     if n_bytes <= 1:
                         n_bytes = 2
                     packet.append(n_bytes)
+                    packet.append(f[flow_id_idx])
                     packets.append(packet)
                     
             packets.sort(key=lambda tup:tup[0])
@@ -1784,8 +1798,8 @@ for dir in os.listdir(path)[4:]:
         # [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
         # [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
             # [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
-            [routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
-            #[routes, wire_delays, router_delays] = multipath_routing(ncycles, flows, dim, directions)
+            #[routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
+            [routes, wire_delays, router_delays, flows] = multipath_routing(ncycles, flows, dim, directions)
         else:
             [routes, wire_delays, router_delays] = xy_routing(ncycles, flows, dim, directions)
 
