@@ -268,6 +268,7 @@ def calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndir
             u = x * dim + y
             [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs)
             router_delays.append([x, y, float(OneGhz)/freq])
+            #router_delays.append([x, y, 1])
     return router_delays
 
 def calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles):
@@ -307,6 +308,7 @@ def calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles):
                             wire_delay.append(-1)
                         else:
                             wire_delay.append(float(max_wire_freq) / freq)
+                            #wire_delay.append(1)
                             # print 'Edge ' + str(x) + ',' + str(y) + ' ' + str(dir) + ' utilization ' + str(float(total_traffic * max_wire_freq)/(channel_width * ncycles * freq))
                         exists = True
                         break
@@ -1279,7 +1281,7 @@ def min_freq_vdd(total_traffic, ncycles):
     for opt in wire_config_opts:
         if channel_width * ncycles * opt[freq_idx] >= total_traffic * max_wire_freq:
             return opt
-    return [-1, -1]
+    #return [-1, -1]
 
 def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs):
     max_vdd = 0
@@ -1673,7 +1675,7 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
                     vdd = opt[0]
                     
                     #compute router power using orion 2
-                    arguments = str(vdd) + ' ' + str(freq) + ' ' + str(ndirs + 1) + ' ' + str(ndirs + 1) + ' ' + str(flit_size) + ' ' + str(n_vc) + ' ' +str(buffer_size) + ' ' + str(running_time)
+                    arguments = str(vdd) + ' ' + str(freq) + ' ' + str(ndirs + 1) + ' ' + str(ndirs + 1) + ' ' + str(flit_size) + ' ' + str(n_vc) + ' ' +str(buffer_size) + ' ' + str(float(running_time) * freq/OneGhz)
                     for i in range(3, 10):
                         arguments = arguments + ' ' + m.group(i)
                     #print arguments
