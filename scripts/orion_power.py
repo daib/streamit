@@ -5,20 +5,86 @@ import math
 class TechParameter:
     
     def __init__(self):
-        #32 nm technology
-        self.m_BufferDriveResistance      = 10.4611e+03
-        self.m_BufferInputCapacitance     = 2.4e-15
-        self.m_BufferPMOSOffCurrent       = 792.4e-09
-        self.m_BufferNMOSOffCurrent       = 405.1e-09
+        LVT = 0
+        NVT = 1
+        HVT = 2
+        LOCAL = 0
+        INTERMEDIATE = 1
+        GLOBAL = 2
         
+        self.m_tech_node = 32
+        self.m_transistor_type = NVT
+        self.m_wire_layer_type = GLOBAL
+        
+        if self.m_tech_node == 65:
+            self.m_BufferDriveResistance     = 6.77182e+03;
+            self.m_BufferIntrinsicDelay        = 3.31822e-11;
+            if self.m_transistor_type == LVT:
+                self.m_BufferPMOSOffCurrent        = 317.2e-09;
+                self.m_BufferNMOSOffCurrent        = 109.7e-09;
+                self.m_BufferInputCapacitance    = 1.3e-15;
+                self.m_ClockCap                  = 2.6e-14;
+            elif self.m_transistor_type == NVT:
+                self.m_BufferPMOSOffCurrent      = 113.1e-09;
+                self.m_BufferNMOSOffCurrent      = 67.3e-09;
+                self.m_BufferInputCapacitance    = 2.6e-15;
+                self.m_ClockCap                  = 1.56e-14;
+            elif self.m_transistor_type == HVT:
+                self.m_BufferPMOSOffCurrent      = 35.2e-09;
+                self.m_BufferNMOSOffCurrent      = 18.4e-09;
+                self.m_BufferInputCapacitance    = 7.8e-15;
+                self.m_ClockCap                  = 0.9e-15;
+        elif self.m_tech_node == 32:
+            #32 nm technology
+            self.m_BufferDriveResistance      = 10.4611e+03
+            self.m_BufferInputCapacitance     = 2.4e-15
+            if self.m_transistor_type == LVT:
+                self.m_BufferPMOSOffCurrent       = 1630.08e-09;
+                self.m_BufferNMOSOffCurrent       = 563.74e-09;
+                self.m_BufferInputCapacitance     = 1.2e-15;
+                self.m_ClockCap                   = 2.2e-14;
+            elif self.m_transistor_type == NVT:
+                self.m_BufferPMOSOffCurrent       = 792.4e-09;
+                self.m_BufferNMOSOffCurrent       = 405.1e-09;
+                self.m_BufferInputCapacitance     = 2.4e-15;
+                self.m_ClockCap                   = 1.44e-14;
+            elif self.m_transistor_type == HVT:
+                self.m_BufferPMOSOffCurrent       = 129.9e-09;
+                self.m_BufferNMOSOffCurrent       = 66.4e-09;
+                self.m_BufferInputCapacitance     = 7.2e-15;
+                self.m_ClockCap                   = 0.53e-15;
         #global
-        self.m_WireMinWidth            = 48e-9
-        self.m_WireMinSpacing          = 48e-9
-        self.m_WireMetalThickness      = 120e-9
-        self.m_WireBarrierThickness    = 2.4e-9
-        self.m_WireDielectricThickness = 110.4e-9
-        self.m_WireDielectricConstant  = 1.9
-        
+        if self.m_tech_node == 65:
+            if self.m_wire_layer_type == INTERMEDIATE:
+                self.m_WireMinWidth            = 140e-9;
+                self.m_WireMinSpacing          = 140e-9;
+                self.m_WireMetalThickness      = 252e-9;
+                self.m_WireBarrierThickness    = 5.2e-9;
+                self.m_WireDielectricThickness = 224e-9;
+                self.m_WireDielectricConstant  = 2.85;
+            elif self.m_wire_layer_type == GLOBAL:
+                self.m_WireMinWidth            = 400e-9;
+                self.m_WireMinSpacing          = 400e-9;
+                self.m_WireMetalThickness      = 400e-9;
+                self.m_WireBarrierThickness    = 5.2e-9;
+                self.m_WireDielectricThickness = 790e-9;
+                self.m_WireDielectricConstant  = 2.9;
+        elif self.m_tech_node == 32:
+            if self.m_wire_layer_type == INTERMEDIATE:
+                self.m_WireMinWidth            = 32e-9;
+                self.m_WireMinSpacing          = 32e-9;
+                self.m_WireMetalThickness      = 60.8e-9;
+                self.m_WireBarrierThickness    = 2.4e-9;
+                self.m_WireDielectricThickness = 54.4e-9;
+                self.m_WireDielectricConstant  = 1.9;
+            elif self.m_wire_layer_type == GLOBAL:
+                self.m_WireMinWidth            = 48e-9
+                self.m_WireMinSpacing          = 48e-9
+                self.m_WireMetalThickness      = 120e-9
+                self.m_WireBarrierThickness    = 2.4e-9
+                self.m_WireDielectricThickness = 110.4e-9
+                self.m_WireDielectricConstant  = 1.9
+                
     def get_EnergyFactor(self, vdd):
         return vdd * vdd
     
@@ -213,7 +279,7 @@ class Link:
     
     
     def __init__(self, len, width):
-        self.m_wire = Wire(self.MIN_DELAY, self.SWIDTH_SSPACE, True, TechParameter())
+        self.m_wire = Wire(self.MIN_DELAY, False, self.DWIDTH_DSPACE, TechParameter())
         
         self.m_len = len
         self.m_line_width = width
@@ -222,5 +288,6 @@ class Link:
         return (num_bit_flip*(self.m_wire.calc_dynamic_energy(self.m_len, vdd)/2))
                 
     def get_static_power(self, vdd):
-        return (self.m_line_width * self.m_wire.calc_static_power(self.m_len, vdd))
+        ret = (self.m_line_width * self.m_wire.calc_static_power(self.m_len, vdd))
+        return ret
         
