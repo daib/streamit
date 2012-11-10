@@ -76,7 +76,7 @@ east = 2
 wire_config_opts = [[2.50, 1000 * OneMhz], [2.20, 870 * OneMhz], [1.95, 750 * OneMhz],
                     [1.75, 640 * OneMhz], [1.58, 540 * OneMhz], [1.43, 450 * OneMhz],
                     [1.30, 370 * OneMhz], [1.19, 300 * OneMhz], [1.10, 240 * OneMhz],
-                    [1.02, 190 * OneMhz]]
+                    [1.02, 190 * OneMhz], [0, 0]]
 
 # wire_config_opts = [[2.50, 1000 * OneMhz], [0, 0]]
 
@@ -271,7 +271,8 @@ def calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndir
         for y in range(dim):
             u = x * dim + y
             [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs)
-            router_delays.append([x, y, float(OneGhz)/freq])
+            if freq > 0:
+                router_delays.append([x, y, float(OneGhz)/freq])
             #router_delays.append([x, y, 1])
     return router_delays
 
@@ -295,7 +296,7 @@ def calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles):
             # the format is:  node_address dirs
             #                (x,y) local, 1, 2, 3, 4
                 
-            wire_delay = [x, y, 1]  # FIXME: compute minimal local link power?
+            wire_delay = [x, y, 0.25]  # FIXME: compute minimal local link power?
             
             for d in range(1, ndirs + 1):
                 dir = vnoc_dir[d]
@@ -317,7 +318,7 @@ def calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles):
                         exists = True
                         break
                 if not exists:
-                    print 'Traffic is too much for the link'
+                    #print 'Traffic is too much for the link'
                     # quit()
                     wire_delay.append(1)
                     
@@ -344,7 +345,7 @@ def calculate_optimal_wire_delays(b, dim, ndirs, flows, ncycles):
             # the format is:  node_address dirs
             #                (x,y) local, 1, 2, 3, 4
                 
-            wire_delay = [x, y, 1]  # FIXME: compute minimal local link power?
+            wire_delay = [x, y, 0.25]  # FIXME: compute minimal local link power?
             
             for d in range(1, ndirs + 1):
                 dir = vnoc_dir[d]
@@ -1137,14 +1138,15 @@ def sort_flows_by_routing_freedom(flows):
 
 # testing flow-sorting function
 def sort_flows(flows):
-    for f in flows:
-        deltaX = abs(f[srcXIdx] - f[dstXIdx])
-        deltaY = abs(f[srcYIdx] - f[dstYIdx])
-        distance = deltaX + deltaY
-        f.insert(0, distance)
-    flows.sort(key=lambda tup:tup[0])
-    for f in flows:
-        f.pop(0)
+#    for f in flows:
+#        deltaX = abs(f[srcXIdx] - f[dstXIdx])
+#        deltaY = abs(f[srcYIdx] - f[dstYIdx])
+#        distance = deltaX + deltaY
+#        f.insert(0, distance)
+    flows.sort(key=lambda tup:tup[traffic_idx])
+    flows.reverse()
+#    for f in flows:
+#        f.pop(0)
     return flows
 
 def dp_routing(ncycles, flows, dim, ndirs):
@@ -1333,8 +1335,11 @@ def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycl
             max_freq = freq
             max_vdd =vdd
         total_traffic = total_traffic + traffic
-        
-    avg_traffic = float(total_traffic)/(ncycles * channel_width * max_freq / OneGhz)/(ndirs + 1)/2 #average traffic per one input port
+    
+    if max_freq != 0:    
+        avg_traffic = float(total_traffic)/(ncycles * channel_width * max_freq / OneGhz)/(ndirs + 1)/2 #average traffic per one input port
+    else:
+        avg_traffic = 0
     return [max_vdd, max_freq, avg_traffic]
 
 def orion_router_estimation(arguments):
@@ -1392,15 +1397,15 @@ def multipath_routing(ncycles, flows, dim, ndirs):
     for f in dirty_flows:
         n_routes = f.pop(0)
         
-        min_n_routes = 1#int(round(float(f[traffic_idx]) / (packet_bytes * 10)))
+        min_n_routes = int(round(float(f[traffic_idx]) / (packet_bytes * 5)))
         min_n_routes = max(min_n_routes, 1)
 #        if(f[traffic_idx]/min_n_routes < packet_bytes * 5):
 #            min_n_routes = 1
         
         if n_routes > min_n_routes:
             n_routes = min_n_routes
-        if n_routes > 1:
-            print f
+#        if n_routes > 1:
+#            print f
         #split the flow by at most the number of routes
         traffic_per_route = f[traffic_idx] / n_routes
         traffic_left = f[traffic_idx] % n_routes
@@ -1438,8 +1443,8 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
     dirty_flows = copy.deepcopy(flows)
     
     # sort the flows by traffic freedom
-    dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
-    # dirty_flows = sort_flows(dirty_flows)
+    #dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
+    dirty_flows = sort_flows(dirty_flows)
     local_edges_traffic = [0] * (dim * dim * 2)
     for f in dirty_flows:
         local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
@@ -1615,7 +1620,7 @@ def comm_prof(dim):
     # use the streamit compiler to obtain intercore communication bandwidth in one iteration 
     commlog = str(dim) + "x" + str(dim) + "_comm.log"
     if recompile or not os.path.isfile(commlog):
-        os.system("make -f Makefile.mk BACKEND=\'--spacetime --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
+        os.system("make -f Makefile.mk BACKEND=\'--spacetime --dup 1 --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
     
     FILE = open(commlog, 'r')
     flows = []
@@ -1767,64 +1772,85 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
                     break       
     FILE.close()
     
-    print 'Link energy (per second) ' + str(power) + ' router energy ' + str(rt_power) + ' time ' + running_time + ' total power link energy ' + str(power * float(running_time))
+    #print 'Link energy (per second) ' + str(power) + ' router energy ' + str(rt_power) + ' time ' + running_time + ' total power link energy ' + str(power * float(running_time))
+    print 'Watt Link ' + str(power) + ' router ' + str(rt_power) + ' time ' + running_time
+    print 'EDP Link ' + str(power * float(running_time)) + ' router ' + str(rt_power * float(running_time))
     
 ############################################################################################
 
-optimize = True
+#optimize = True
 n_vc = 4
 buffer_size = 12
     
-for dir in os.listdir(path)[4:]:
+for dir in os.listdir(path):
     
     if os.path.isfile('./dir'):
+        continue
+    if dir != 'mpeg2':
         continue
     # run to obtain profiling information first
     os.chdir('./' + dir + '/streamit')
     
     os.system("pwd")
     
+    if recompile: 
+        for dim in [4, 6, 8]:
+            ncycles = time_prof(dim)
+            flows = comm_prof(dim)
+            
+            continue
+        quit()
+        
     for dim in [8]:
+    
+        for optimize in range(3):
+            ncycles = time_prof(dim)
+            
+            flows = comm_prof(dim)
+            
+            ncycles = ncycles * 17
+            print ncycles
         
-        ncycles = time_prof(dim)
-        
-        flows = comm_prof(dim)
-        
-        ncycles = ncycles / 15
-        print ncycles
         
         # generate ILP files
-        if optimize:
-        # [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
-        # [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
-            # [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
-            #[routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
-            [routes, wire_delays, router_delays, flows] = multipath_routing(ncycles, flows, dim, directions)
-        else:
-            [routes, wire_delays, router_delays] = xy_routing(ncycles, flows, dim, directions)
+            if optimize == 3:
+                print 'MILP'
+                [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
+            elif optimize == 2:
+            # [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
+            # [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
+                # [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
+                print 'DJ'
+                [routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
+            elif optimize == 1:
+                print 'Multipath'
+                [routes, wire_delays, router_delays, flows] = multipath_routing(ncycles, flows, dim, directions)
+            else:
+                print 'XY'
+                [routes, wire_delays, router_delays] = xy_routing(ncycles, flows, dim, directions)
 
-        list_to_file('router_config.txt', router_delays)
-        # generate wire config
-        list_to_file('wire_config.txt', wire_delays)
-        
-        # generate routing config
-        list_to_file('traffic_config.txt', routes)
-        
-        # generate traffic
-        traffics = traffic_gen(flows, ncycles)
-                                
-        write_traffic(dir, traffics)
-
-        # invoke simulation
-        logfile = dir + str(dim) + 'x' + str(dim) + '_sim.log'
-        
-        if optimize:
-            os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
-        else:
-            os.system('vnoc ./traffics/' + dir + ' noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
-        # collect data
-        
-        logfile_to_power(logfile, wire_delays, dim, directions)
+            list_to_file('router_config.txt', router_delays)
+            # generate wire config
+            list_to_file('wire_config.txt', wire_delays)
+            
+            # generate routing config
+            list_to_file('traffic_config.txt', routes)
+            
+            # generate traffic
+            traffics = traffic_gen(flows, ncycles)
+                                    
+            write_traffic(dir, traffics)
+    
+            # invoke simulation
+            logfile = dir + str(dim) + 'x' + str(dim) + '_sim.log'
+            False
+            if optimize > 0:
+                os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
+            else:
+                os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
+            # collect data
+            
+            logfile_to_power(logfile, wire_delays, dim, directions)
         
         quit()
         
