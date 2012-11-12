@@ -700,8 +700,8 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
             rows.append([[format_var('b', i, e_id_s)], [1]])
             my_rhs.append(0)
             my_senses = my_senses + 'E'
-            
-    # minimal route
+
+# minimal route
 #    for i in range(0, n_flows):
 #        fi = dirty_flows[i]
 #        hop = abs(fi[srcXIdx] - fi[dstXIdx]) + abs(fi[srcYIdx] - fi[dstYIdx])
