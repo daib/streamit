@@ -520,8 +520,8 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     for i in range(n_flows):
         for j in range(n_splits):
             q.append(format_var('q', i, j))
-            q_type = q_type + 'C'
-            q_ub.append(dirty_flows[i])
+            q_type = q_type + 'I'
+            q_ub.append(dirty_flows[i][traffic_idx])
 
     q_lb = [0] * len(q)
     
@@ -535,8 +535,8 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                 for dir in range(ndirs):
                     edge_id = (x * dim + y) * ndirs + dir
                     fl.append(format_var('fl', i, edge_id))
-                    fl_type = fl_type + 'C'
-                    fl_ub.append(dirty_flows[i/n_splits])
+                    fl_type = fl_type + 'I'
+                    fl_ub.append(dirty_flows[i/n_splits][traffic_idx])
     
     fl_lb = [0] * len(fl)
     
