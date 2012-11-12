@@ -605,7 +605,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                                 my_rhs.append(0)
                                 my_senses = my_senses + 'E'
                     
-                continue
+                    continue
                      
                 # if this is the destination for the flowfreq_levels
                 # we do not need flow conservation
@@ -613,7 +613,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                 if x == dirty_flows[i][dstXIdx] and y == dirty_flows[i][dstYIdx]:
                     edgeSrcId = (x * dim + y) * ndirs
                     for j in range(n_splits):
-                        
+                        k = i * n_splits + j
                         #C1_2
                         # one incoming edge is true
                         var_names = []
@@ -621,7 +621,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                             e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
                             
                             if e_in_id >= 0:
-                                var_names.append(format_var('fl', i * n_splits + j, e_in_id))
+                                var_names.append(format_var('fl', k, e_in_id))
                         
                         coefs = [1] * len(var_names)
                         var_names.append(format_var('q', i, j))
@@ -632,11 +632,11 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                         
                         #C4_2
                         for dir in range(ndirs):
-                            rows.append([[format_var('fl', i * n_splits + j, edgeSrcId + dir)], [1]])
+                            rows.append([[format_var('fl', k, edgeSrcId + dir)], [1]])
                             my_rhs.append(0)
                             my_senses = my_senses + 'E'
                         
-                continue
+                    continue
                 
                 edgeSrcId = (x * dim + y) * ndirs
                     
@@ -735,11 +735,12 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                     var_names = []
                     coefs = [1] * n_splits
                     for j in range(n_splits):
+                        k = i * n_splits + j
                         #C3_2 disjoint routes 
-                        var_names.append(format_var('b', i * n_splits + j, edge_id))
+                        var_names.append(format_var('b', k, edge_id))
                         
                         #C3_1 split traffic bound 
-                        rows.append([[format_var('fl', i * n_splits + j, edge_id), format_var('b', i * n_splits + j, edge_id)], [1, -dirty_flows[i][traffic_idx]]])
+                        rows.append([[format_var('fl', k, edge_id), format_var('b', k, edge_id)], [1, -dirty_flows[i][traffic_idx]]])
                         my_rhs.append(0)
                         my_senses = my_senses + 'L'
                     # disjoint routes   
