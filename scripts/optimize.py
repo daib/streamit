@@ -670,6 +670,28 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                     rows.append([var_names, coefs])
                     my_rhs.append(0)
                     my_senses = my_senses + 'E'
+                    
+                    var_names = []
+                    coefs = []
+                    k = i * n_splits + j    
+                    for dir in range(ndirs):
+                        #C2
+                        # flows out
+                        var_names.append(format_var('fl', k, edgeSrcId + dir))
+                        coefs.append(1)
+                        
+                        # flows in
+                        e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                        
+                        # if this is a valid incoming edge
+                        if e_in_id >= 0:
+                            var_names.append(format_var('fl', k, e_in_id))
+                            coefs.append(-1)
+                        
+                    rows.append([var_names, coefs])
+                    my_rhs.append(0)
+                    my_senses = my_senses + 'E'
+                    
                         # m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
                         
     # edge conditions
@@ -816,11 +838,12 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
 
     # for j in range(numrows):
     #    print "Row %d:  Slack = %10f" % (j, slack[j])
-    for j in range(numcols):
-        print colnames[j] + " %d:  Value = %d" % (j, x[j])
+#    for j in range(numcols):
+#        print colnames[j] + " %d:  Value = %d" % (j, x[j])
     
     # calculate wire frequencies and routes
     wire_delays = calculate_optimal_wire_delays_3(x[len(b) + len(q):len(b) + len(q) + len(fl)], n_splits, dim, ndirs, flows, ncycles)
+    #wire_delays = calculate_optimal_wire_delays(x[0:len(b)], dim, ndirs, flows, ncycles)
     
     routes = calculate_routes_2(x[0:len(b)], n_splits, dim, ndirs, flows, ncycles)
     
@@ -2536,7 +2559,7 @@ for dir in os.listdir(path):
         
     for dim in [8]:
     
-        for optimize in range(5 , 6):
+        for optimize in range(5, 6):
             ncycles = time_prof(dim)
             
             flows = comm_prof(dim)
