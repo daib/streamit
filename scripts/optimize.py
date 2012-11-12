@@ -281,6 +281,8 @@ def calculate_routes_2(b, n_splits, dim, ndirs, flows, ncycles):
         for j in range(n_splits):
             f = dirty_flows[i]
             
+            k =  i * n_splits + j
+            
             # src and dst information
             route = [j, '(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
             
@@ -303,7 +305,7 @@ def calculate_routes_2(b, n_splits, dim, ndirs, flows, ncycles):
             
             while currentX != f[dstXIdx] or currentY != f[dstYIdx]:
                 # base_id = ((currentX * dim + currentY) * ndirs) * len(dirty_flows) + i
-                base_id = ((currentX * dim + currentY) * ndirs) + (i * n_splits + j) * dim * dim * ndirs
+                base_id = ((currentX * dim + currentY) * ndirs) + k * dim * dim * ndirs
                 for dir in range(ndirs):
                     if round(b[base_id + dir]) == 1:
                         route.append(vnoc_dir[dir])
@@ -490,7 +492,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     
     debug = False
     
-    n_splits = 1
+    n_splits = 2
     
     dirty_flows = copy.deepcopy(flows)  # make a copy of the flows in case it is modified
     
@@ -502,16 +504,28 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     b = []
     b_type = ''
 
-    for i in range(n_flows * n_splits):
-        for x in range(dim):
-            for y in range(dim):
-                for dir in range(ndirs):
-                    edge_id = (x * dim + y) * ndirs + dir
-                    b.append(format_var('b', i, edge_id))
-                    b_type = b_type + 'B'
+    fl = []
+    fl_type = ''
+    fl_ub = []
     
+    for i in range(n_flows):
+        for j in range(n_splits):
+            k = i * n_splits + j
+            for x in range(dim):
+                for y in range(dim):
+                    for dir in range(ndirs):
+                        edge_id = (x * dim + y) * ndirs + dir
+                        b.append(format_var('b', k, edge_id))
+                        b_type = b_type + 'B'
+        
+                        fl.append(format_var('fl', k, edge_id))
+                        fl_type = fl_type + 'I'
+                        fl_ub.append(dirty_flows[i][traffic_idx])
+                        
     b_lb = [0] * len(b)
     b_ub = [1] * len(b)
+
+    fl_lb = [0] * len(fl)
 
     q = []
     q_type = ''
@@ -525,21 +539,6 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
 
     q_lb = [0] * len(q)
     #q_ub = [cplex.infinity] * len(q)
-    
-    fl = []
-    fl_type = ''
-    fl_ub = []
-    
-    for i in range(n_flows * n_splits):
-        for x in range(dim):
-            for y in range(dim):
-                for dir in range(ndirs):
-                    edge_id = (x * dim + y) * ndirs + dir
-                    fl.append(format_var('fl', i, edge_id))
-                    fl_type = fl_type + 'I'
-                    fl_ub.append(dirty_flows[i/n_splits][traffic_idx])
-    
-    fl_lb = [0] * len(fl)
     
     rows = []
     my_rhs = []
@@ -582,11 +581,12 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                     
                     
                     for j in range(n_splits):
+                        k = i * n_splits + j
                         # C1_1
                         var_names = []
                         coefs = [1] * ndirs
                         for dir in range(ndirs):
-                            var_names.append(format_var('fl', i * n_splits + j, edgeSrcId + dir))
+                            var_names.append(format_var('fl', k, edgeSrcId + dir))
                         
                         var_names.append(format_var('q', i, j))
                         coefs.append(-1)
@@ -594,14 +594,27 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                         rows.append([var_names, coefs])
                         my_rhs.append(0)
                         my_senses = my_senses + 'E'
-                    
+                        
+                        var_names = []
+                        coefs = [1] * ndirs
+                        for dir in range(ndirs):
+                            var_names.append(format_var('b', k, edgeSrcId + dir))
+                            
+                        rows.append([var_names, coefs])
+                        my_rhs.append(1)
+                        my_senses = my_senses + 'E'
+                        
                         #C4_1
                         # all incoming edges are invalid
                         for dir in range(0, ndirs):
                             e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
                             
                             if e_in_id >= 0:
-                                rows.append([[format_var('b', i * n_splits + j, e_in_id)], [1]])
+                                rows.append([[format_var('b', k, e_in_id)], [1]])
+                                my_rhs.append(0)
+                                my_senses = my_senses + 'E'
+                                
+                                rows.append([[format_var('fl', k, e_in_id)], [1]])
                                 my_rhs.append(0)
                                 my_senses = my_senses + 'E'
                     
@@ -630,9 +643,26 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                         my_rhs.append(0)
                         my_senses = my_senses + 'E'
                         
+                        var_names = []
+                        for dir in range(ndirs):
+                            e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                            
+                            if e_in_id >= 0:
+                                var_names.append(format_var('b', k, e_in_id))
+                        
+                        coefs = [1] * len(var_names)
+                        rows.append([var_names, coefs])
+                        my_rhs.append(1)
+                        my_senses = my_senses + 'E'
+                        
+                        
                         #C4_2
                         for dir in range(ndirs):
                             rows.append([[format_var('b', k, edgeSrcId + dir)], [1]])
+                            my_rhs.append(0)
+                            my_senses = my_senses + 'E'
+                            
+                            rows.append([[format_var('fl', k, edgeSrcId + dir)], [1]])
                             my_rhs.append(0)
                             my_senses = my_senses + 'E'
                         
@@ -722,6 +752,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
             rows.append([[format_var('b', i, e_id_s)], [1]])
             my_rhs.append(0)
             my_senses = my_senses + 'E'
+
 
 # minimal route
 #    for i in range(0, n_flows):
@@ -835,14 +866,14 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     slack = my_prob.solution.get_linear_slacks()
     x = my_prob.solution.get_values()
     
-
+    check(x[0:len(b)], x[len(b):(len(b) + len(q))], x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], dim, ndirs)
     # for j in range(numrows):
     #    print "Row %d:  Slack = %10f" % (j, slack[j])
 #    for j in range(numcols):
 #        print colnames[j] + " %d:  Value = %d" % (j, x[j])
     
     # calculate wire frequencies and routes
-    wire_delays = calculate_optimal_wire_delays_3(x[len(b) + len(q):len(b) + len(q) + len(fl)], n_splits, dim, ndirs, flows, ncycles)
+    wire_delays = calculate_optimal_wire_delays_3(x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], n_splits, dim, ndirs, flows, ncycles)
     #wire_delays = calculate_optimal_wire_delays(x[0:len(b)], dim, ndirs, flows, ncycles)
     
     routes = calculate_routes_2(x[0:len(b)], n_splits, dim, ndirs, flows, ncycles)
@@ -858,6 +889,15 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
 
     return [routes, wire_delays, router_delays]
 
+def check(b, q, fl, dim, ndirs):
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                for i in range(len(q)):
+                    if fl[i * dim * dim * ndirs + edge_id] != b[i * dim * dim * ndirs + edge_id] * q[i]:
+                        print x, y, dir, i, fl[i * dim * dim * ndirs + edge_id], b[i * dim * dim * ndirs + edge_id], q[i]
+                    
 def minimize_max_load(ncycles, flows, dim, ndirs):
     
     debug = False
@@ -1615,12 +1655,12 @@ def minimize_used_links(ncycles, flows, dim, ndirs):
                     # if this is a valid incoming edge
                     if e_in_id >= 0:
                         # do no go back
-                        if dir < 2:  # avoid duplication
-                            e_back_id = (x * dim + y) * ndirs + (3 - dir)
-                            rows.append([[format_var('b', i, e_in_id), format_var('b', i, e_back_id)], [1, 1]])
-                            my_rhs.append(1)
-                            my_senses = my_senses + 'L'
-                            
+                        #if dir < 2:  # avoid duplication
+                        e_back_id = (x * dim + y) * ndirs + (3 - dir)
+                        rows.append([[format_var('b', i, e_in_id), format_var('b', i, e_back_id)], [1, 1]])
+                        my_rhs.append(1)
+                        my_senses = my_senses + 'L'
+                        
                         var_names.append(format_var('b', i, e_in_id))
                         coefs.append(-1)
                     
