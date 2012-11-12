@@ -895,7 +895,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     
     #edge_traffic = [0] * (dim * dim * ndirs)
     
-    router_delays = [] #calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
 
     q_ouput = x[len(b):(len(b) + len(q))]
     splitted_flows = []
@@ -2628,7 +2628,7 @@ for dir in os.listdir(path):
         
     for dim in [8]:
     
-        for optimize in range(5, 6):
+        for optimize in range(2, 3):
             ncycles = time_prof(dim)
             
             flows = comm_prof(dim)
