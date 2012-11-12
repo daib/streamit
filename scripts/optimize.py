@@ -521,10 +521,10 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
         for j in range(n_splits):
             q.append(format_var('q', i, j))
             q_type = q_type + 'I'
-            #q_ub.append(dirty_flows[i][traffic_idx])
+            q_ub.append(dirty_flows[i][traffic_idx])
 
     q_lb = [0] * len(q)
-    q_ub = [cplex.infinity] * len(q)
+    #q_ub = [cplex.infinity] * len(q)
     
     fl = []
     fl_type = ''
@@ -601,7 +601,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                             e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
                             
                             if e_in_id >= 0:
-                                rows.append([[format_var('fl', i * n_splits + j, e_in_id)], [1]])
+                                rows.append([[format_var('b', i * n_splits + j, e_in_id)], [1]])
                                 my_rhs.append(0)
                                 my_senses = my_senses + 'E'
                     
@@ -632,7 +632,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                         
                         #C4_2
                         for dir in range(ndirs):
-                            rows.append([[format_var('fl', k, edgeSrcId + dir)], [1]])
+                            rows.append([[format_var('b', k, edgeSrcId + dir)], [1]])
                             my_rhs.append(0)
                             my_senses = my_senses + 'E'
                         
@@ -648,7 +648,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                     for dir in range(ndirs):
                         #C2
                         # flows out
-                        var_names.append(format_var('fl', k, edgeSrcId + dir))
+                        var_names.append(format_var('b', k, edgeSrcId + dir))
                         coefs.append(1)
                         
                         # flows in
@@ -663,7 +663,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                             my_rhs.append(1)
                             my_senses = my_senses + 'L'
                             
-                            var_names.append(format_var('fl', k, e_in_id))
+                            var_names.append(format_var('b', k, e_in_id))
                             coefs.append(-1)
                         
     
