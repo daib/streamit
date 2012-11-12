@@ -265,7 +265,7 @@ def calculate_routes(b, dim, ndirs, flows, ncycles):
         
     return routes
 
-def calculate_routes_2(b, n_splits, dim, ndirs, flows, ncycles):
+def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
     routes = []
     
     dirty_flows = copy.deepcopy(flows)
@@ -277,15 +277,21 @@ def calculate_routes_2(b, n_splits, dim, ndirs, flows, ncycles):
     vnoc_dir[east] = 2
     vnoc_dir[west] = 1
     
+    edge_traffic = [0] * (dim * dim * ndirs)
+    
     for i in range(len(dirty_flows)):
+        true_idx = 0;
         for j in range(n_splits):
             f = dirty_flows[i]
             
             k =  i * n_splits + j
             
-            # src and dst information
-            route = [j, '(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
+            if q[k] == 0:
+                continue
             
+            # src and dst information
+            route = [true_idx, '(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
+            true_idx = true_idx + 1
             # vc
             vc = -1  # any VC
             if f[srcXIdx] < f[dstXIdx]:
@@ -306,8 +312,11 @@ def calculate_routes_2(b, n_splits, dim, ndirs, flows, ncycles):
             while currentX != f[dstXIdx] or currentY != f[dstYIdx]:
                 # base_id = ((currentX * dim + currentY) * ndirs) * len(dirty_flows) + i
                 base_id = ((currentX * dim + currentY) * ndirs) + k * dim * dim * ndirs
+                edge_base_id = (currentX * dim + currentY) * ndirs
                 for dir in range(ndirs):
                     if round(b[base_id + dir]) == 1:
+                        
+                        edge_traffic[edge_base_id + dir] = edge_traffic[edge_base_id + dir] + q[k]
                         route.append(vnoc_dir[dir])
                         
                         # move to the next node
@@ -324,7 +333,7 @@ def calculate_routes_2(b, n_splits, dim, ndirs, flows, ncycles):
             route.append('')
             routes.append(route)
         
-    return routes
+    return [routes, edge_traffic]
 
 def calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles):
     router_delays = []
@@ -866,17 +875,18 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     slack = my_prob.solution.get_linear_slacks()
     x = my_prob.solution.get_values()
     
-    check(x[0:len(b)], x[len(b):(len(b) + len(q))], x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], dim, ndirs)
+    #check(x[0:len(b)], x[len(b):(len(b) + len(q))], x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], dim, ndirs)
     # for j in range(numrows):
     #    print "Row %d:  Slack = %10f" % (j, slack[j])
 #    for j in range(numcols):
 #        print colnames[j] + " %d:  Value = %d" % (j, x[j])
     
     # calculate wire frequencies and routes
-    wire_delays = calculate_optimal_wire_delays_3(x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], n_splits, dim, ndirs, flows, ncycles)
-    #wire_delays = calculate_optimal_wire_delays(x[0:len(b)], dim, ndirs, flows, ncycles)
+    #wire_delays = calculate_optimal_wire_delays_3(x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], n_splits, dim, ndirs, flows, ncycles)
     
-    routes = calculate_routes_2(x[0:len(b)], n_splits, dim, ndirs, flows, ncycles)
+    [routes, edge_traffic] = calculate_routes_2(x[0:len(b)], x[len(b):(len(b) + len(q))], n_splits, dim, ndirs, flows, ncycles)
+    
+    wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
     
     local_edges_traffic = [0] * (dim * dim * 2)
     for f in dirty_flows:
@@ -887,7 +897,26 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     
     router_delays = [] #calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
 
-    return [routes, wire_delays, router_delays]
+    q_ouput = x[len(b):(len(b) + len(q))]
+    splitted_flows = []
+    for i in range(n_flows):
+        f = dirty_flows[i]
+        true_n_splits = 0
+        for j in range(n_splits):
+            if q_ouput[i * n_splits + j] > 0:
+                true_n_splits = true_n_splits + 1
+        k = 0
+        for j in range(n_splits):
+            if q_ouput[i * n_splits + j] == 0:
+                continue
+            f_child = copy.deepcopy(f)
+            f_child.append(k)
+            f_child.append(true_n_splits)
+            f_child[traffic_idx] = q_ouput[i * n_splits + j] 
+            splitted_flows.append(f_child)
+            k = k + 1
+            
+    return [routes, wire_delays, router_delays, splitted_flows]
 
 def check(b, q, fl, dim, ndirs):
     for x in range(dim):
@@ -2611,7 +2640,7 @@ for dir in os.listdir(path):
         # generate ILP files
             if optimize == 5:
                 print 'MinMaxLoadFission'
-                [routes, wire_delays, router_delays] = minimize_max_load_fission(ncycles, flows, dim, directions)
+                [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(ncycles, flows, dim, directions)
             elif optimize == 4:
                 print 'MinMaxLoad'
                 [routes, wire_delays, router_delays] = minimize_max_load(ncycles, flows, dim, directions)
