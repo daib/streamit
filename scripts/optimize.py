@@ -490,7 +490,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     
     debug = False
     
-    n_splits = 4
+    n_splits = 1
     
     dirty_flows = copy.deepcopy(flows)  # make a copy of the flows in case it is modified
     
@@ -521,9 +521,10 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
         for j in range(n_splits):
             q.append(format_var('q', i, j))
             q_type = q_type + 'I'
-            q_ub.append(dirty_flows[i][traffic_idx])
+            #q_ub.append(dirty_flows[i][traffic_idx])
 
     q_lb = [0] * len(q)
+    q_ub = [cplex.infinity] * len(q)
     
     fl = []
     fl_type = ''
@@ -604,7 +605,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                                 my_rhs.append(0)
                                 my_senses = my_senses + 'E'
                     
-                    continue
+                continue
                      
                 # if this is the destination for the flowfreq_levels
                 # we do not need flow conservation
@@ -635,14 +636,14 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                             my_rhs.append(0)
                             my_senses = my_senses + 'E'
                         
-                    continue
+                continue
                 
-                # this is an intermediate hop
-                var_names = []
-                coefs = []
                 edgeSrcId = (x * dim + y) * ndirs
-                
+                    
                 for j in range(n_splits):
+                    # this is an intermediate hop
+                    var_names = []
+                    coefs = []
                     k = i * n_splits + j    
                     for dir in range(ndirs):
                         #C2
@@ -675,7 +676,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     for y in range(dim):
         e_id_w = y * ndirs + west
         e_id_e = ((dim - 1) * dim + y) * ndirs + east
-        for i in range(n_flows):
+        for i in range(n_flows * n_splits):
             # m.constrain(b[i, e_id_w] == 0)
             # m.constrain(b[i, e_id_e] == 0)
 
@@ -689,7 +690,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     for x in range(dim):
         e_id_s = x * dim * ndirs + south
         e_id_n = (x * dim + dim - 1) * ndirs + north
-        for i in range(n_flows):
+        for i in range(n_flows * n_splits):
             # m.constrain(b[i, e_id_n] == 0)
             # m.constrain(b[i, e_id_s] == 0)
 
@@ -734,14 +735,14 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
                     var_names = []
                     coefs = [1] * n_splits
                     for j in range(n_splits):
-                        #C3_2
+                        #C3_2 disjoint routes 
                         var_names.append(format_var('b', i * n_splits + j, edge_id))
                         
-                        #C3_1 disjoint routes 
+                        #C3_1 split traffic bound 
                         rows.append([[format_var('fl', i * n_splits + j, edge_id), format_var('b', i * n_splits + j, edge_id)], [1, -dirty_flows[i][traffic_idx]]])
                         my_rhs.append(0)
                         my_senses = my_senses + 'L'
-                        
+                    # disjoint routes   
                     rows.append([var_names, coefs])
                     my_rhs.append(1)
                     my_senses = my_senses + 'L'
@@ -753,7 +754,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
             var_names.append(format_var('q', i, j))
         rows.append([var_names, coefs])
         my_rhs.append(dirty_flows[i][traffic_idx])
-        my_senses = my_senses + 'L'
+        my_senses = my_senses + 'E'
                     
     colnames = []
     colnames.extend(b)
@@ -770,7 +771,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
     
     var_ub = []
     var_ub.extend(b_ub)
-    var_ub.extend(q_lb)
+    var_ub.extend(q_ub)
     var_ub.extend(fl_ub)
     var_ub.append(channel_width * ncycles)
     
@@ -783,7 +784,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
-    var_type = b_type + q_type + fl_type + 'C'
+    var_type = b_type + q_type + fl_type + 'I'
     
     my_prob.variables.add(obj=load_obj, lb=var_lb, ub=var_ub, types=var_type,
                        names=colnames)
@@ -2531,7 +2532,7 @@ for dir in os.listdir(path):
         
     for dim in [8]:
     
-        for optimize in range(5, 6):
+        for optimize in range(5 , 6):
             ncycles = time_prof(dim)
             
             flows = comm_prof(dim)
