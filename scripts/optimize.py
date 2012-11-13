@@ -314,7 +314,7 @@ def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
             
             route.append(vc)
             
-            route.append(f[traffic_idx])
+            route.append(q[k])
             route.append(ncycles)
             route.append('|')
             
@@ -862,6 +862,8 @@ def minimize_path_len_fission(bound, flows, dim, ndirs, n_splits):
     load_obj.extend([1] * len(used_edges))
         
     my_prob = cplex.Cplex()
+    my_prob.set_results_stream(None)
+    my_prob.set_log_stream(None)
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -877,13 +879,15 @@ def minimize_path_len_fission(bound, flows, dim, ndirs, n_splits):
     
     x = my_prob.solution.get_values()
     
-    return [x[:len(b), x[lenb(b):(len(b) + len(q))]]]
+    return [x[:len(b)], x[len(b):(len(b) + len(q))]]
     
 def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     
     debug = False
     
     dirty_flows = copy.deepcopy(flows)  # make a copy of the flows in case it is modified
+    
+    local_edge_traffic = calculate_local_edge_traffic(dirty_flows, dim)
     
     n_flows = len(dirty_flows)
     
@@ -1274,12 +1278,8 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     
     wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
     
-    local_edge_traffic = calculate_local_edge_traffic(dirty_flows, dim)
-
-    #edge_traffic = [0] * (dim * dim * ndirs)
-    
     router_delays = calculate_optimal_router_delays(edge_traffic, local_edge_traffic, dim, ndirs, ncycles)
-
+    
     splitted_flows = []
     for i in range(n_flows):
         f = dirty_flows[i]
@@ -3180,7 +3180,7 @@ def traffic_gen(flows, ncycles):
                     f.extend([0,1])
                 interval = packet_bytes * ncycles / f[traffic_idx];
                 current_time = int(round(float(interval) * f[flow_id_idx]/f[-1]));
-                traffic_left = f[traffic_idx] * 5;
+                traffic_left = f[traffic_idx] * 10;
                 
                 while traffic_left >= packet_bytes:
                     packet = copy.deepcopy(f[0:traffic_idx])
@@ -3315,8 +3315,8 @@ for dir in os.listdir(path):
     
     if os.path.isfile('./dir'):
         continue
-    if dir != 'mpeg2':
-        continue
+#    if dir != 'mpeg2':
+#        continue
     # run to obtain profiling information first
     os.chdir('./' + dir + '/streamit')
     
@@ -3332,7 +3332,7 @@ for dir in os.listdir(path):
     
     print 'Profiling :', dir
     
-    n_splits = 2
+    n_splits = 4
     
     for dim in [8]:
         max_rate = max_rate_estimation(dim)
