@@ -228,12 +228,8 @@ def calculate_routes(b, dim, ndirs, flows, ncycles):
         route = [0, '(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
         
         # vc
-        vc = -1  # any VC
-        if f[srcXIdx] < f[dstXIdx]:
-            if f[srcYIdx] <= f[dstYIdx]:
-                vc = 0
-        elif f[srcYIdx] > f[dstYIdx]:
-            vc = 1
+        vc = vc_calculate(f)  
+
         route.append(vc)
         
         route.append(f[traffic_idx])
@@ -267,6 +263,19 @@ def calculate_routes(b, dim, ndirs, flows, ncycles):
         
     return routes
 
+def vc_calculate(f):
+    vc = -1
+    if f[srcXIdx] < f[dstXIdx]:
+        vc = 0
+    elif f[srcXIdx] > f[dstXIdx]:
+        vc = 1
+#        if f[srcXIdx] < f[dstXIdx]:
+#            if f[srcYIdx] <= f[dstYIdx]:
+#                vc = 0
+#        elif f[srcYIdx] >= f[dstYIdx]:
+#            if f[srcYIdx] > f[dstYIdx]:
+#                vc = 1
+
 def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
     routes = []
     
@@ -295,12 +304,8 @@ def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
             route = [true_idx, '(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
             true_idx = true_idx + 1
             # vc
-            vc = -1  # any VC
-            if f[srcXIdx] < f[dstXIdx]:
-                if f[srcYIdx] <= f[dstYIdx]:
-                    vc = 0
-            elif f[srcYIdx] > f[dstYIdx]:
-                vc = 1
+            vc = vc_calculate(f)
+            
             route.append(vc)
             
             route.append(f[traffic_idx])
@@ -2547,12 +2552,8 @@ def xy_routing(ncycles, flows, dim, ndirs):
         
         route = ['(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
          # vc
-        vc = -1  # any VC
-        if f[srcXIdx] < f[dstXIdx]:
-            if f[srcYIdx] <= f[dstYIdx]:
-                vc = 0
-        elif f[srcYIdx] > f[dstYIdx]:
-            vc = 1
+        vc = vc_calculate(f)
+
         route.append(vc)
         
         route.append(f[traffic_idx])
@@ -2754,12 +2755,8 @@ def dp_routing(ncycles, flows, dim, ndirs):
         route = ['(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
         
         # vc
-        vc = -1  # any VC
-        if f[srcXIdx] < f[dstXIdx]:
-            if f[srcYIdx] <= f[dstYIdx]:
-                vc = 0
-        elif f[srcYIdx] > f[dstYIdx]:
-            vc = 1
+        vc = vc_calculate(f)
+        
         route.append(vc)
         
         route.append(f[traffic_idx])
@@ -3043,12 +3040,8 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
         route = [f[-1], '(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
         
         # vc
-        vc = -1  # any VC
-        if f[srcXIdx] < f[dstXIdx]:
-            if f[srcYIdx] <= f[dstYIdx]:
-                vc = 0
-        elif f[srcYIdx] > f[dstYIdx]:
-            vc = 1
+        vc = vc_calculate(f)  
+
         route.append(vc)
         
         route.append(f[traffic_idx])
@@ -3353,7 +3346,7 @@ for dir in os.listdir(path):
         max_rate = max_rate_estimation(dim)
 #        max_rate = int(max_rate / 0.8)
         
-        methods = [mml_routing, mml_ml_routing, default_routing, dj_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
+        methods = [default_routing, dj_routing, mml_routing, mml_ml_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
         
         for i in range(0, 10):
             ncycles = int(round(max_rate * 10 / (10 - i)))
@@ -3416,9 +3409,9 @@ for dir in os.listdir(path):
                 logfile = dir + str(dim) + 'x' + str(dim) + '_' + str(i) + '_' + method + '_sim.log'
                 
                 if method != default_routing:
-                    os.system('vnoc ./traffics/' + dir + ' cycles: 5000000 noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
+                    os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
                 else:
-                    os.system('vnoc ./traffics/' + dir + ' cycles: 5000000 noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
+                    os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
                 # collect data
                 
                 logfile_to_power(logfile, wire_delays, dim, directions)
