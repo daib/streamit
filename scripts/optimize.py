@@ -3294,7 +3294,7 @@ def max_rate_estimation(dim):
         try:
             for t in local_edges_traffic:
                 [vdd, freq] = min_freq_vdd(t, ncycles)
-                if freq <= 0:
+                if freq < 0:
                     raise Exception("unsat local links")
                 
             dijkstra_routing(ncycles, flows, dim, directions)
@@ -3416,9 +3416,9 @@ for dir in os.listdir(path):
                 logfile = dir + str(dim) + 'x' + str(dim) + '_' + str(i) + '_' + method + '_sim.log'
                 
                 if method != default_routing:
-                    os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
+                    os.system('vnoc ./traffics/' + dir + ' cycles: 5000000 noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
                 else:
-                    os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
+                    os.system('vnoc ./traffics/' + dir + ' cycles: 5000000 noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
                 # collect data
                 
                 logfile_to_power(logfile, wire_delays, dim, directions)
