@@ -263,18 +263,24 @@ def calculate_routes(b, dim, ndirs, flows, ncycles):
         
     return routes
 
+def calculate_local_edge_traffic(flows, dim):
+    local_edge_traffic = [0] * (dim * dim * 2)
+    for f in flows:
+        local_edge_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edge_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
+        local_edge_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edge_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
+    return local_edge_traffic
+
 def vc_calculate(f):
     vc = -1
+#    if f[srcXIdx] < f[dstXIdx]:
+#        vc = 0
+#    elif f[srcXIdx] > f[dstXIdx]:
+#        vc = 1
     if f[srcXIdx] < f[dstXIdx]:
-        vc = 0
-    elif f[srcXIdx] > f[dstXIdx]:
+        if f[srcYIdx] <= f[dstYIdx]:
+            vc = 0
+    elif f[srcXIdx] > f[dstYIdx]:
         vc = 1
-#        if f[srcXIdx] < f[dstXIdx]:
-#            if f[srcYIdx] <= f[dstYIdx]:
-#                vc = 0
-#        elif f[srcYIdx] >= f[dstYIdx]:
-#            if f[srcYIdx] > f[dstYIdx]:
-#                vc = 1
 
 def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
     routes = []
@@ -342,12 +348,12 @@ def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
         
     return [routes, edge_traffic]
 
-def calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles):
+def calculate_optimal_router_delays(edge_traffic, local_edge_traffic, dim, ndirs, ncycles):
     router_delays = []
     for x in range(dim):
         for y in range(dim):
             u = x * dim + y
-            [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs)
+            [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edge_traffic, ncycles, dim, ndirs)
             if freq > 0:
                 router_delays.append([x, y, float(OneGhz)/freq])
             #router_delays.append([x, y, 1])
@@ -1268,14 +1274,11 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     
     wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
     
-    local_edges_traffic = [0] * (dim * dim * 2)
-    for f in dirty_flows:
-        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
-        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
-    
+    local_edge_traffic = calculate_local_edge_traffic(dirty_flows, dim)
+
     #edge_traffic = [0] * (dim * dim * ndirs)
     
-    router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edge_traffic, dim, ndirs, ncycles)
 
     splitted_flows = []
     for i in range(n_flows):
@@ -1569,14 +1572,11 @@ def minimize_max_load(min_links, ncycles, flows, dim, ndirs):
     
     #routes = calculate_routes(b_output, dim, ndirs, flows, ncycles)
     
-    local_edges_traffic = [0] * (dim * dim * 2)
-    for f in dirty_flows:
-        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
-        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
+    local_edge_traffic = calculate_local_edge_traffic(dirty_flows, dim)
     
     #edge_traffic = [0] * (dim * dim * ndirs)
     
-    router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edge_traffic, dim, ndirs, ncycles)
 
     return [routes, wire_delays, router_delays]
                         
@@ -1922,12 +1922,9 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
     
     routes = calculate_routes(x[0:len(b)], dim, ndirs, flows, ncycles)
 
-    local_edges_traffic = [0] * (dim * dim * 2)
-    for f in dirty_flows:
-        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
-        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
+    local_edge_traffic = calculate_local_edge_traffic(dirty_flows, dim)
     
-    router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edge_traffic, dim, ndirs, ncycles)
 
     return [routes, wire_delays, router_delays]
 
@@ -2532,11 +2529,7 @@ def xy_routing(ncycles, flows, dim, ndirs):
      # make a copy of the flows in case we advertently modify it
     dirty_flows = copy.deepcopy(flows)
     
-    local_edges_traffic = [0] * (dim * dim * 2)
-    for f in dirty_flows:
-        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
-        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
-    
+    local_edge_traffic = calculate_local_edge_traffic(dirty_flows, dim)
     
     edge_traffic = [0] * (dim * dim * ndirs) 
     # gradually route flows through the network
@@ -2593,7 +2586,8 @@ def xy_routing(ncycles, flows, dim, ndirs):
         
     wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
     
-    router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edge_traffic, dim, ndirs, ncycles)
+    
     return [routes, wire_delays, router_delays]
     
 def sort_flows_by_routing_freedom(flows):
@@ -2800,7 +2794,7 @@ def min_freq_vdd(total_traffic, ncycles):
     return [-1, -1]
     #return wire_config_opts[-1]
 
-def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs):
+def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edge_traffic, ncycles, dim, ndirs):
     max_vdd = 0
     max_freq = 0 
     u_x = u / dim
@@ -2817,8 +2811,8 @@ def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycl
         if in_edge_id >= 0:
             traffics.append(edge_traffic[in_edge_id])
     
-    traffics.append(local_edges_traffic[u * 2 + out_edge_idx])
-    traffics.append(local_edges_traffic[u * 2 + in_edge_idx])
+    traffics.append(local_edge_traffic[u * 2 + out_edge_idx])
+    traffics.append(local_edge_traffic[u * 2 + in_edge_idx])
     
     for traffic in traffics:
         [vdd, freq] = min_freq_vdd(traffic, ncycles)
@@ -2842,13 +2836,13 @@ def orion_router_estimation(arguments):
     #        rt_power = float(m.group(1))
     return calculate_power(arguments)       
  
-def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, local_edges_traffic, ncycles, dim, ndirs):
+def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, local_edge_traffic, ncycles, dim, ndirs):
     #temporaty commit the traffic
     dirty_edge_traffic = copy.deepcopy(edge_traffic)
     dirty_edge_traffic[edge_id] = dirty_edge_traffic[edge_id] + added_traffic
     
     #estimate u freq
-    [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(u, dirty_edge_traffic, local_edges_traffic, ncycles, dim, ndirs)
+    [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(u, dirty_edge_traffic, local_edge_traffic, ncycles, dim, ndirs)
     
     arguments = str(vdd) + ' ' + str(freq) + ' ' + str(ndirs + 1) + ' ' + str(ndirs + 1) + ' ' + str(flit_size) + ' ' + str(n_vc) + ' ' +str(buffer_size) + ' -' + str(avg_traffic)
     for i in range(3, 10):
@@ -2856,7 +2850,7 @@ def estimate_power_consumption(u, v, edge_id, edge_traffic, added_traffic, local
 
     rt_power = orion_router_estimation(arguments)
     
-    [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(v, dirty_edge_traffic, local_edges_traffic, ncycles, dim, ndirs)
+    [vdd, freq, avg_traffic] = estimate_router_Vdd_freq_traffic(v, dirty_edge_traffic, local_edge_traffic, ncycles, dim, ndirs)
     
     arguments = str(vdd) + ' ' + str(freq) + ' ' + str(ndirs + 1) + ' ' + str(ndirs + 1) + ' ' + str(flit_size) + ' ' + str(n_vc) + ' ' +str(buffer_size) + ' -' + str(avg_traffic)
     for i in range(3, 10):
@@ -2941,10 +2935,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
     # sort the flows by traffic freedom
     #dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
     dirty_flows = sort_flows(dirty_flows)
-    local_edges_traffic = [0] * (dim * dim * 2)
-    for f in dirty_flows:
-        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
-        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
+    local_edge_traffic = calculate_local_edge_traffic(dirty_flows, dim)
     
     edge_traffic = [0] * (dim * dim * ndirs) 
     # gradually route flows through the network
@@ -3022,7 +3013,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
                     # cost of increasing traffic on this edge
                     link_power_increase = power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles)
                     # cost of increasing routers' freqs on this edge to meet the traffic demand
-                    rt_power_increase = 0 #estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edges_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edges_traffic, ncycles, dim, ndirs) 
+                    rt_power_increase = 0 #estimate_power_consumption(u, v_id, edge_id, edge_traffic, f[traffic_idx], local_edge_traffic, ncycles, dim, ndirs) - estimate_power_consumption(u, v_id, edge_id, edge_traffic, 0, local_edge_traffic, ncycles, dim, ndirs) 
                     
                     #link_power_increase = 1.0/(utilization(f[traffic_idx], ncycles) + 1 - utilization(edge_traffic[edge_id], ncycles))
                     
@@ -3071,7 +3062,7 @@ def dijkstra_routing(ncycles, flows, dim, ndirs):
     # new wire delays
     wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
           
-    router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edge_traffic, dim, ndirs, ncycles)
     return [routes, wire_delays, router_delays]
 
             
@@ -3274,10 +3265,7 @@ def max_rate_estimation(dim):
 
     # sort the flows by traffic freedom
     #dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
-    local_edges_traffic = [0] * (dim * dim * 2)
-    for f in flows:
-        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
-        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
+    local_edge_traffic = calculate_local_edge_traffic(flows, dim)
     
     sat = max([f[traffic_idx] for f in flows]) * 2
     unsat = 0
@@ -3285,8 +3273,12 @@ def max_rate_estimation(dim):
     
     while(True):
         try:
-            for t in local_edges_traffic:
-                [vdd, freq] = min_freq_vdd(t, ncycles)
+            for t in local_edge_traffic:
+                freq = -1
+                for opt in wire_config_opts:
+                    if channel_width * ncycles * opt[freq_idx] >= t * max_wire_freq:
+                        freq = opt[freq_idx]
+                        break
                 if freq < 0:
                     raise Exception("unsat local links")
                 
