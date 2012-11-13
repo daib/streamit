@@ -1215,6 +1215,8 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs, n_splits):
     load_obj.append(1)
         
     my_prob = cplex.Cplex()
+    my_prob.set_results_stream(None)
+    my_prob.set_log_stream(None)
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -1228,7 +1230,7 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs, n_splits):
 
     # m.minimize((power_levels * s).sum())
     # m.minimize(b[0,:].sum())
-    #print 'Solving the problem ...'
+    print 'Solving the problem ...'
     my_prob.solve()
     #print
     # solution.get_status() returns an integer code
@@ -1252,7 +1254,10 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs, n_splits):
     # calculate wire frequencies and routes
     #wire_delays = calculate_optimal_wire_delays_3(x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], n_splits, dim, ndirs, flows, ncycles)
     
-    [b_output, q_ouput] = minimize_path_len_fission(x[-1], flows, dim, ndirs, n_splits)
+    #[b_output, q_ouput] = minimize_path_len_fission(x[-1], flows, dim, ndirs, n_splits)
+    
+    b_output = x[:len(b)]
+    q_ouput = x[len(b):(len(b) + len(q))]
     
     [routes, edge_traffic] = calculate_routes_2(b_output, q_ouput, n_splits, dim, ndirs, flows, ncycles)
     
@@ -1267,7 +1272,6 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs, n_splits):
     
     router_delays = calculate_optimal_router_delays(edge_traffic, local_edges_traffic, dim, ndirs, ncycles)
 
-#    q_ouput = x[len(b):(len(b) + len(q))]
     splitted_flows = []
     for i in range(n_flows):
         f = dirty_flows[i]
@@ -1514,6 +1518,8 @@ def minimize_max_load(ncycles, flows, dim, ndirs):
     load_obj.append(1)
         
     my_prob = cplex.Cplex()
+    my_prob.set_results_stream(None)
+    my_prob.set_log_stream(None)
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -1867,6 +1873,8 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                     power_obj.extend(power_levels)
         
     my_prob = cplex.Cplex()
+    my_prob.set_results_stream(None)
+    my_prob.set_log_stream(None)
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -2160,6 +2168,8 @@ def minimize_used_links_1(bound, flows, dim, ndirs):
     link_obj.extend([1] * len(used_edges))
         
     my_prob = cplex.Cplex()
+    my_prob.set_results_stream(None)
+    my_prob.set_log_stream(None)
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -2443,6 +2453,8 @@ def minimize_used_links(ncycles, flows, dim, ndirs):
     link_obj.extend([1] * len(used_edges))
         
     my_prob = cplex.Cplex()
+    my_prob.set_results_stream(None)
+    my_prob.set_log_stream(None)
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -3321,7 +3333,7 @@ for dir in os.listdir(path):
     n_splits = 2
     
     for dim in [8]:
-        max_rate = max_rate_estimation(dim)
+        max_rate = int(max_rate_estimation(dim) / 0.8)
         
         methods = [mml_routing, default_routing, dj_routing, mp_routing, mml_fission_routing]
         
@@ -3330,7 +3342,7 @@ for dir in os.listdir(path):
             
             for method in methods:
                 #ncycles = time_prof(dim)
-                
+                print
                 print "Num cycles per iteration :", ncycles, i
                 
                 flows = comm_prof(dim)
