@@ -9,6 +9,7 @@ import copy
 import random
 import math
 from orion2 import *
+from cplex.exceptions import CplexError
 
 #######################################################################################
 path = sys.argv[1]
@@ -356,8 +357,6 @@ def calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles):
     vnoc_dir[2] = east
     vnoc_dir[1] = west
     
-    dirty_flows = copy.deepcopy(flows)
-    
     for x  in range(dim):
         for y in range(dim):
             # we need to convert to the vnoc direction
@@ -497,11 +496,9 @@ def calculate_optimal_wire_delays_3(fl, n_splits, dim, ndirs, flows, ncycles):
     return wire_delays
 
 
-def minimize_max_load_fission(ncycles, flows, dim, ndirs):
+def minimize_max_load_fission(ncycles, flows, dim, ndirs, n_splits):
     
     debug = False
-    
-    n_splits = 2
     
     dirty_flows = copy.deepcopy(flows)  # make a copy of the flows in case it is modified
     
@@ -860,14 +857,14 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs):
 
     # m.minimize((power_levels * s).sum())
     # m.minimize(b[0,:].sum())
-    print 'Solving the problem ...'
+    #print 'Solving the problem ...'
     my_prob.solve()
-    print
+    #print
     # solution.get_status() returns an integer code
-    print "Solution status = " , my_prob.solution.get_status(), ":",
+    #print "Solution status = " , my_prob.solution.get_status(), ":",
     # the following line prints the corresponding string
-    print my_prob.solution.status[my_prob.solution.get_status()]
-    print "Solution value  = ", my_prob.solution.get_objective_value()
+    #print my_prob.solution.status[my_prob.solution.get_status()]
+    #print "Solution value  = ", my_prob.solution.get_objective_value()
 
     numcols = my_prob.variables.get_num()
     numrows = my_prob.linear_constraints.get_num()
@@ -1155,16 +1152,14 @@ def minimize_max_load(ncycles, flows, dim, ndirs):
     my_prob.linear_constraints.add(lin_expr=rows, senses=my_senses,
                                 rhs=my_rhs)
 
-    # m.minimize((power_levels * s).sum())
-    # m.minimize(b[0,:].sum())
-    print 'Solving the problem ...'
+    #print 'Solving the problem ...'
     my_prob.solve()
-    print
+    #print
     # solution.get_status() returns an integer code
-    print "Solution status = " , my_prob.solution.get_status(), ":",
+    #print "Solution status = " , my_prob.solution.get_status(), ":",
     # the following line prints the corresponding string
-    print my_prob.solution.status[my_prob.solution.get_status()]
-    print "Solution value  = ", my_prob.solution.get_objective_value()
+    #print my_prob.solution.status[my_prob.solution.get_status()]
+    #print "Solution value  = ", my_prob.solution.get_objective_value()
 
     numcols = my_prob.variables.get_num()
     numrows = my_prob.linear_constraints.get_num()
@@ -1175,8 +1170,8 @@ def minimize_max_load(ncycles, flows, dim, ndirs):
 
     # for j in range(numrows):
     #    print "Row %d:  Slack = %10f" % (j, slack[j])
-    for j in range(numcols):
-        print colnames[j] + " %d:  Value = %d" % (j, x[j])
+#    for j in range(numcols):
+#        print colnames[j] + " %d:  Value = %d" % (j, x[j])
     
     # calculate wire frequencies and routes
     wire_delays = calculate_optimal_wire_delays(x[0:len(b)], dim, ndirs, flows, ncycles)
@@ -2600,19 +2595,50 @@ def logfile_to_power(logfile, wire_delays, dim, ndirs):
     #print 'Link energy (per second) ' + str(power) + ' router energy ' + str(rt_power) + ' time ' + running_time + ' total power link energy ' + str(power * float(running_time))
     print 'Watt Link ' + str(power) + ' router ' + str(rt_power) + ' time ' + running_time
     print 'EDP Link ' + str(power * float(running_time)) + ' router ' + str(rt_power * float(running_time))
+
+def max_rate_estimation(dim):
     
+    flows = comm_prof(dim)
+
+    sat = max([f[traffic_idx] for f in flows]) * 2
+    unsat = 0
+    ncycles = int(round((sat + unsat)/2))
+    
+    while(True):
+        try:
+            [routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
+            if sat == ncycles: #no improvement
+                break
+            sat = ncycles
+            ncycles = int(round((sat + unsat)/2))
+        except Exception, exc:
+            print exc
+            if unsat == ncycles: #no improvement
+                break
+            unsat = ncycles
+            ncycles = int(round((sat + unsat)/2))
+    return sat
+    
+        
 ############################################################################################
 
 #optimize = True
 n_vc = 4
 buffer_size = 12
+
+default_routing = 'xyrouting'
+dj_routing = 'dijkstra'
+mp_routing = 'multipath'
+of_routing = 'milp'
+mml_routing = 'mml'
+mml_fission_routing = 'mmlfission'
     
 for dir in os.listdir(path):
     
     if os.path.isfile('./dir'):
         continue
-    if dir != 'mpeg2':
-        continue
+#    if dir != 'mpeg2':
+#        continue
     # run to obtain profiling information first
     os.chdir('./' + dir + '/streamit')
     
@@ -2625,66 +2651,76 @@ for dir in os.listdir(path):
             
             continue
         quit()
-        
-    for dim in [8]:
     
-        for optimize in range(2, 3):
-            ncycles = time_prof(dim)
-            
-            flows = comm_prof(dim)
-            
-            ncycles = ncycles * 17
-            print ncycles
-        
-        
-        # generate ILP files
-            if optimize == 5:
-                print 'MinMaxLoadFission'
-                [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(ncycles, flows, dim, directions)
-            elif optimize == 4:
-                print 'MinMaxLoad'
-                [routes, wire_delays, router_delays] = minimize_max_load(ncycles, flows, dim, directions)
-            elif optimize == 3:
-                print 'MILP'
-                [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
-            elif optimize == 2:
-            # [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
-            # [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
-                # [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
-                print 'DJ'
-                [routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
-            elif optimize == 1:
-                print 'Multipath'
-                [routes, wire_delays, router_delays, flows] = multipath_routing(ncycles, flows, dim, directions)
-            else:
-                print 'XY'
-                [routes, wire_delays, router_delays] = xy_routing(ncycles, flows, dim, directions)
-
-            list_to_file('router_config.txt', router_delays)
-            # generate wire config
-            list_to_file('wire_config.txt', wire_delays)
-            
-            # generate routing config
-            list_to_file('traffic_config.txt', routes)
-            
-            # generate traffic
-            traffics = traffic_gen(flows, ncycles)
-                                    
-            write_traffic(dir, traffics)
+    print 'Profiling :', dir
     
-            # invoke simulation
-            logfile = dir + str(dim) + 'x' + str(dim) + '_sim.log'
-            False
-            if optimize > 0:
-                os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
-            else:
-                os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
-            # collect data
+    n_splits = 2
+    
+    for dim in [4, 6, 8]:
+        max_rate = max_rate_estimation(dim)
+        
+        flows = comm_prof(dim)
+        
+        methods = [default_routing, dj_routing, mp_routing, mml_routing, mml_fission_routing]
+        
+        for i in range(1, 11):
+            ncycles = max_rate * i
             
-            logfile_to_power(logfile, wire_delays, dim, directions)
+            for method in methods:
+                #ncycles = time_prof(dim)
+                
+                print "Num cycles per iteration :", ncycles, i
+                
+                try:
+                # generate ILP files
+                    if method == mml_fission_routing:
+                        print 'Routing = MinMaxLoadFission'
+                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(ncycles, flows, dim, directions, n_splits)
+                    elif method == mml_routing:
+                        print 'Routing = MinMaxLoad'
+                        [routes, wire_delays, router_delays] = minimize_max_load(ncycles, flows, dim, directions)
+                    elif method == of_routing:
+                        print 'Routing = Optimal Freq'
+                        [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
+                    elif method == mp_routing:
+                        # [routes, wire_delays] = minimize_used_links(ncycles, flows, dim, directions)
+                        # [routes, wire_delays] = dp_routing(ncycles, flows, dim, directions)
+                        print 'Routing = Multipath'
+                        [routes, wire_delays, router_delays, flows] = multipath_routing(ncycles, flows, dim, directions)
+                    elif method == dj_routing:
+                        print 'Routing = DJ'
+                        [routes, wire_delays, router_delays] = dijkstra_routing(ncycles, flows, dim, directions)
+                    elif method == default_routing:
+                        print 'Routing = XY'
+                        [routes, wire_delays, router_delays] = xy_routing(ncycles, flows, dim, directions)
+                    else:
+                        raise Exception("Unkown routing method!")
+                except Exception, exc:
+                    print exc
+                    continue 
+    
+                list_to_file('router_config.txt', router_delays)
+                # generate wire config
+                list_to_file('wire_config.txt', wire_delays)
+                
+                # generate routing config
+                list_to_file('traffic_config.txt', routes)
+                
+                # generate traffic
+                traffics = traffic_gen(flows, ncycles)
+                                        
+                write_traffic(dir, traffics)
         
-        quit()
-        
+                # invoke simulation
+                logfile = dir + str(dim) + 'x' + str(dim) + '_' + str(i) + '_' + method + '_sim.log'
+                
+                if method != default_routing:
+                    os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
+                else:
+                    os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
+                # collect data
+                
+                logfile_to_power(logfile, wire_delays, dim, directions)
         
     os.chdir("../../")
         
