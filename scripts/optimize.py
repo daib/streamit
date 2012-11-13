@@ -868,7 +868,7 @@ def minimize_path_len_fission(bound, flows, dim, ndirs, n_splits):
     
     return [x[:len(b), x[lenb(b):(len(b) + len(q))]]]
     
-def minimize_max_load_fission(ncycles, flows, dim, ndirs, n_splits):
+def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     
     debug = False
     
@@ -1253,11 +1253,11 @@ def minimize_max_load_fission(ncycles, flows, dim, ndirs, n_splits):
     
     # calculate wire frequencies and routes
     #wire_delays = calculate_optimal_wire_delays_3(x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], n_splits, dim, ndirs, flows, ncycles)
-    
-    #[b_output, q_ouput] = minimize_path_len_fission(x[-1], flows, dim, ndirs, n_splits)
-    
-    b_output = x[:len(b)]
-    q_ouput = x[len(b):(len(b) + len(q))]
+    if min_links:
+        [b_output, q_ouput] = minimize_path_len_fission(x[-1], flows, dim, ndirs, n_splits)
+    else:
+        b_output = x[:len(b)]
+        q_ouput = x[len(b):(len(b) + len(q))]
     
     [routes, edge_traffic] = calculate_routes_2(b_output, q_ouput, n_splits, dim, ndirs, flows, ncycles)
     
@@ -1301,7 +1301,7 @@ def check(b, q, fl, dim, ndirs):
                     if fl[i * dim * dim * ndirs + edge_id] != b[i * dim * dim * ndirs + edge_id] * q[i]:
                         print x, y, dir, i, fl[i * dim * dim * ndirs + edge_id], b[i * dim * dim * ndirs + edge_id], q[i]
                     
-def minimize_max_load(ncycles, flows, dim, ndirs):
+def minimize_max_load(min_links, ncycles, flows, dim, ndirs):
     
     debug = False
     
@@ -1553,8 +1553,11 @@ def minimize_max_load(ncycles, flows, dim, ndirs):
 #        print colnames[j] + " %d:  Value = %d" % (j, x[j])
     
     # calculate wire frequencies and routes
-    b_output = minimize_used_links_1(x[-1], flows, dim, ndirs)
-    
+    if min_links:
+        b_output = minimize_used_links_1(x[-1], flows, dim, ndirs)
+    else:
+        b_output = x[:len(b)]
+        
     [routes, edge_traffic] = calculate_routes_2(b_output, [1] * n_flows, 1, dim, ndirs, flows, ncycles)
     
     wire_delays = calculate_optimal_wire_delays(b_output, dim, ndirs, flows, ncycles)
@@ -2797,8 +2800,8 @@ def min_freq_vdd(total_traffic, ncycles):
     for opt in wire_config_opts:
         if channel_width * ncycles * opt[freq_idx] * router_speed_scale >= total_traffic * max_wire_freq:
             return opt
-    #return [-1, -1]
-    return wire_config_opts[-1]
+    return [-1, -1]
+    #return wire_config_opts[-1]
 
 def estimate_router_Vdd_freq_traffic(u, edge_traffic, local_edges_traffic, ncycles, dim, ndirs):
     max_vdd = 0
@@ -3276,19 +3279,31 @@ def max_rate_estimation(dim):
     
     flows = comm_prof(dim)
 
+    # sort the flows by traffic freedom
+    #dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
+    local_edges_traffic = [0] * (dim * dim * 2)
+    for f in flows:
+        local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] = local_edges_traffic[((f[srcXIdx] * dim  + f[srcYIdx]) * 2 + out_edge_idx)] + f[traffic_idx]
+        local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] = local_edges_traffic[((f[dstXIdx] * dim  + f[dstYIdx]) * 2 + in_edge_idx)] + f[traffic_idx]
+    
     sat = max([f[traffic_idx] for f in flows]) * 2
     unsat = 0
     ncycles = int(round((sat + unsat)/2))
     
     while(True):
         try:
+            for t in local_edges_traffic:
+                [vdd, freq] = min_freq_vdd(t, ncycles)
+                if freq <= 0:
+                    raise Exception("unsat local links")
+                
             dijkstra_routing(ncycles, flows, dim, directions)
             if sat == ncycles: #no improvement
                 break
             sat = ncycles
             ncycles = int(round((sat + unsat)/2))
         except Exception, exc:
-            print exc
+            #print exc
             if unsat == ncycles: #no improvement
                 break
             unsat = ncycles
@@ -3307,7 +3322,9 @@ dj_routing = 'dijkstra'
 mp_routing = 'multipath'
 of_routing = 'milp'
 mml_routing = 'mml'
+mml_ml_routing = 'mmlml'
 mml_fission_routing = 'mmlfission'
+mml_ml_fission_routing = 'mmlmlfission'
 
 for dir in os.listdir(path):
     
@@ -3333,9 +3350,10 @@ for dir in os.listdir(path):
     n_splits = 2
     
     for dim in [8]:
-        max_rate = int(max_rate_estimation(dim) / 0.8)
+        max_rate = max_rate_estimation(dim)
+#        max_rate = int(max_rate / 0.8)
         
-        methods = [mml_routing, default_routing, dj_routing, mp_routing, mml_fission_routing]
+        methods = [mml_routing, mml_ml_routing, default_routing, dj_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
         
         for i in range(0, 10):
             ncycles = int(round(max_rate * 10 / (10 - i)))
@@ -3351,10 +3369,16 @@ for dir in os.listdir(path):
                 # generate ILP files
                     if method == mml_fission_routing:
                         print 'Routing = MinMaxLoadFission'
-                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(ncycles, flows, dim, directions, n_splits)
+                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(False, ncycles, flows, dim, directions, n_splits)
+                    elif method == mml_ml_fission_routing:
+                        print 'Routing = MinMaxLoadFission-Minlinks'
+                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(True, ncycles, flows, dim, directions, n_splits)
                     elif method == mml_routing:
                         print 'Routing = MinMaxLoad'
-                        [routes, wire_delays, router_delays] = minimize_max_load(ncycles, flows, dim, directions)
+                        [routes, wire_delays, router_delays] = minimize_max_load(False, ncycles, flows, dim, directions)
+                    elif method == mml_ml_routing:
+                        print 'Routing = MinMaxLoad-Minlinks'
+                        [routes, wire_delays, router_delays] = minimize_max_load(True, ncycles, flows, dim, directions)
                     elif method == of_routing:
                         print 'Routing = Optimal Freq'
                         [routes, wire_delays] = optimal_routes_freqs(ncycles, flows, dim, directions)
