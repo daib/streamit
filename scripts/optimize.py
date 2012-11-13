@@ -2659,17 +2659,17 @@ for dir in os.listdir(path):
     for dim in [4, 6, 8]:
         max_rate = max_rate_estimation(dim)
         
-        flows = comm_prof(dim)
-        
         methods = [default_routing, dj_routing, mp_routing, mml_routing, mml_fission_routing]
         
-        for i in range(1, 11):
-            ncycles = max_rate * i
+        for i in range(0, 10):
+            ncycles = max_rate + int(round(i * max_rate/ 10))
             
             for method in methods:
                 #ncycles = time_prof(dim)
                 
                 print "Num cycles per iteration :", ncycles, i
+                
+                flows = comm_prof(dim)
                 
                 try:
                 # generate ILP files
