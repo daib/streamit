@@ -15,7 +15,9 @@ import traceback
 #######################################################################################
 path = sys.argv[1]
 
-recompile = False
+os.chdir(path)
+
+recompile = False 
 
 iterations = 100
 
@@ -25,8 +27,6 @@ OneGhz = 1000 * OneMhz
 
 profiling_cpu_freq = 3 * OneGhz  # 3GHz
 assumed_cpu_freq = OneGhz
-
-os.chdir(path)
 
 start_time = 10  # start sending packets at cycle 10
 packet_flits = 6  # packet size in numbers of flits
@@ -875,6 +875,7 @@ def minimize_path_len_fission(bound, flows, dim, ndirs, n_splits):
     my_prob.linear_constraints.add(lin_expr=rows, senses=my_senses,
                                 rhs=my_rhs)
 
+    print 'Solving the problem ...'
     my_prob.solve()
     
     x = my_prob.solution.get_values()
@@ -971,7 +972,6 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
                 # there must be some out going edge
                 if x == dirty_flows[i][srcXIdx] and y == dirty_flows[i][srcYIdx]:
                     edgeSrcId = (x * dim + y) * ndirs
-                    
                     
                     for j in range(n_splits):
                         k = i * n_splits + j
@@ -1566,7 +1566,7 @@ def minimize_max_load(min_links, ncycles, flows, dim, ndirs):
     else:
         b_output = x[:len(b)]
         
-    [routes, edge_traffic] = calculate_routes_2(b_output, [1] * n_flows, 1, dim, ndirs, flows, ncycles)
+    [routes, edge_traffic] = calculate_routes_2(b_output, nsent, 1, dim, ndirs, flows, ncycles)
     
     wire_delays = calculate_optimal_wire_delays(b_output, dim, ndirs, flows, ncycles)
     
@@ -3103,7 +3103,7 @@ def comm_prof(dim):
     # use the streamit compiler to obtain intercore communication bandwidth in one iteration 
     commlog = str(dim) + "x" + str(dim) + "_comm.log"
     if recompile or not os.path.isfile(commlog):
-        os.system("make -f Makefile.mk BACKEND=\'--spacetime --dup 1 --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
+        os.system("make -f Makefile.mk BACKEND=\'--memory 16000M --spacetime --dup 1 --profile --newSimple " + str(dim) + " --i " + str(iterations) + " \' > " + str(commlog))
     
     FILE = open(commlog, 'r')
     flows = []
@@ -3268,6 +3268,15 @@ def max_rate_estimation(dim):
     local_edge_traffic = calculate_local_edge_traffic(flows, dim)
     
     sat = max([f[traffic_idx] for f in flows]) * 2
+    
+    #find a suitable SAT value
+    while True:
+        try: 
+            dijkstra_routing(sat, flows, dim, directions)
+            break
+        except Exception, exc:
+            sat = sat * 2
+            
     unsat = 0
     ncycles = int(round((sat + unsat)/2))
     
@@ -3311,12 +3320,24 @@ mml_ml_routing = 'mmlml'
 mml_fission_routing = 'mmlfission'
 mml_ml_fission_routing = 'mmlmlfission'
 
+done = True 
+
+undone = ['vocoder', 'channelvocoder']
+
 for dir in os.listdir(path):
+    
+    if dir in undone:
+        continue
     
     if os.path.isfile('./dir'):
         continue
-#    if dir != 'mpeg2':
+    if dir == 'vocoder':
+    #    done = False 
+        continue
+
+#    if done:
 #        continue
+#    
     # run to obtain profiling information first
     os.chdir('./' + dir + '/streamit')
     
@@ -3324,11 +3345,12 @@ for dir in os.listdir(path):
     
     if recompile: 
         for dim in [4, 6, 8]:
-            ncycles = time_prof(dim)
+            #ncycles = time_prof(dim)
             flows = comm_prof(dim)
             
             continue
-        quit()
+        os.chdir("../../")
+        continue
     
     print 'Profiling :', dir
     
@@ -3338,7 +3360,9 @@ for dir in os.listdir(path):
         max_rate = max_rate_estimation(dim)
 #        max_rate = int(max_rate / 0.8)
         
-        methods = [default_routing, dj_routing, mml_routing, mml_ml_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
+        #methods = [default_routing, dj_routing, mml_routing, mml_ml_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
+        methods = [default_routing, dj_routing, mp_routing, mml_routing, mml_ml_routing, mml_fission_routing]
+        #methods = [mml_ml_routing]
         
         for i in range(0, 10):
             ncycles = int(round(max_rate * 10 / (10 - i)))
@@ -3385,12 +3409,12 @@ for dir in os.listdir(path):
                     traceback.print_exc()
                     continue 
     
-                list_to_file('router_config.txt', router_delays)
+                list_to_file(method + '_router_config.txt', router_delays)
                 # generate wire config
-                list_to_file('wire_config.txt', wire_delays)
+                list_to_file(method + '_wire_config.txt', wire_delays)
                 
                 # generate routing config
-                list_to_file('traffic_config.txt', routes)
+                list_to_file(method + '_traffic_config.txt', routes)
                 
                 # generate traffic
                 traffics = traffic_gen(flows, ncycles)
@@ -3400,10 +3424,11 @@ for dir in os.listdir(path):
                 # invoke simulation
                 logfile = dir + str(dim) + 'x' + str(dim) + '_' + str(i) + '_' + method + '_sim.log'
                 
+                cmd = 'vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' vc_n: ' + str(n_vc) + ' rtcfg: ' + method + '_router_config.txt wirecfg: ' + method + '_wire_config.txt trafficcfg: ' + method + '_traffic_config.txt '
                 if method != default_routing:
-                    os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: TABLE vc_n: ' + str(n_vc) + ' > ' + logfile)
+                    os.system(cmd + ' routing: TABLE > ' + logfile)
                 else:
-                    os.system('vnoc ./traffics/' + dir + ' cycles: 500000 noc_size: ' + str(dim) + ' routing: XY vc_n: ' + str(n_vc) + ' > ' + logfile)
+                    os.system(cmd + ' routing: XY  > ' + logfile)
                 # collect data
                 
                 logfile_to_power(logfile, wire_delays, dim, directions)
