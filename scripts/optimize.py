@@ -100,6 +100,16 @@ link = Link(link_len, channel_width_bits)
 
 #######################################################################################
 
+def new_cplex_solver():
+    prob = cplex.Cplex()
+    prob.parameters.timelimit.set(SOLVER_TIME_LIMIT)
+    prob.parameters.tuning.timelimit.set(SOLVER_TIME_LIMIT)
+    
+    prob.set_results_stream(None)
+    prob.set_log_stream(None)
+    
+    return prob
+    
 def format_var(name, idx1, idx2):
     return name + '_' + str(idx1) + '_' + str(idx2)
 # dir is the direction of incomming edge
@@ -862,10 +872,7 @@ def minimize_path_len_fission(bound, flows, dim, ndirs, n_splits):
     
     load_obj.extend([1] * len(used_edges))
         
-    my_prob = cplex.Cplex()
-    my_prob.timelimit = SOLVER_TIME_LIMIT
-    my_prob.set_results_stream(None)
-    my_prob.set_log_stream(None)
+    my_prob = new_cplex_solver()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -1231,11 +1238,7 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     
     load_obj.append(1)
         
-    my_prob = cplex.Cplex()
-    my_prob.timelimit = SOLVER_TIME_LIMIT
-    my_prob.timelimit = 600
-    my_prob.set_results_stream(None)
-    my_prob.set_log_stream(None)
+    my_prob = new_cplex_solver()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -1273,7 +1276,7 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     # calculate wire frequencies and routes
     #wire_delays = calculate_optimal_wire_delays_3(x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], n_splits, dim, ndirs, flows, ncycles)
     if min_links:
-        [b_output, q_ouput] = minimize_path_len_fission(x[-1], flows, dim, ndirs, n_splits)
+        [b_output, q_ouput] = minimize_path_len_fission(x[-1] +  1, flows, dim, ndirs, n_splits)
     else:
         b_output = x[:len(b)]
         q_ouput = x[len(b):(len(b) + len(q))]
@@ -1529,10 +1532,7 @@ def minimize_max_load(min_links, ncycles, flows, dim, ndirs):
     
     load_obj.append(1)
         
-    my_prob = cplex.Cplex()
-    my_prob.timelimit = SOLVER_TIME_LIMIT
-    my_prob.set_results_stream(None)
-    my_prob.set_log_stream(None)
+    my_prob = new_cplex_solver()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -1885,10 +1885,7 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                 for dir in range(ndirs):
                     power_obj.extend(power_levels)
         
-    my_prob = cplex.Cplex()
-    my_prob.timelimit = SOLVER_TIME_LIMIT
-    my_prob.set_results_stream(None)
-    my_prob.set_log_stream(None)
+    my_prob = new_cplex_solver()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -2178,10 +2175,7 @@ def minimize_used_links_1(bound, flows, dim, ndirs):
     
     link_obj.extend([1] * len(used_edges))
         
-    my_prob = cplex.Cplex()
-    my_prob.timelimit = SOLVER_TIME_LIMIT
-    my_prob.set_results_stream(None)
-    my_prob.set_log_stream(None)
+    my_prob = new_cplex_solver()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -2464,10 +2458,7 @@ def minimize_used_links(ncycles, flows, dim, ndirs):
     
     link_obj.extend([1] * len(used_edges))
         
-    my_prob = cplex.Cplex()
-    my_prob.timelimit = SOLVER_TIME_LIMIT
-    my_prob.set_results_stream(None)
-    my_prob.set_log_stream(None)
+    my_prob = new_cplex_solver()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
@@ -3373,7 +3364,7 @@ for dir in os.listdir(path):
         
         #methods = [default_routing, dj_routing, mml_routing, mml_ml_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
         #methods = [default_routing, dj_routing, mp_routing, mml_routing, mml_ml_routing, mml_fission_routing]
-        methods = [dj_routing, mml_fission_routing, mml_ml_fission_routing]
+        methods = [dj_routing, mml_ml_fission_routing]
         
         for i in range(0, 10):
             ncycles = int(round(max_rate * 10 / (10 - i)))
