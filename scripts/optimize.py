@@ -21,6 +21,7 @@ recompile = False
 
 iterations = 100
 
+SOLVER_TIME_LIMIT = 600
 
 OneMhz = 1
 OneGhz = 1000 * OneMhz
@@ -862,6 +863,7 @@ def minimize_path_len_fission(bound, flows, dim, ndirs, n_splits):
     load_obj.extend([1] * len(used_edges))
         
     my_prob = cplex.Cplex()
+    my_prob.timelimit = SOLVER_TIME_LIMIT
     my_prob.set_results_stream(None)
     my_prob.set_log_stream(None)
               
@@ -1230,6 +1232,8 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     load_obj.append(1)
         
     my_prob = cplex.Cplex()
+    my_prob.timelimit = SOLVER_TIME_LIMIT
+    my_prob.timelimit = 600
     my_prob.set_results_stream(None)
     my_prob.set_log_stream(None)
               
@@ -1526,6 +1530,7 @@ def minimize_max_load(min_links, ncycles, flows, dim, ndirs):
     load_obj.append(1)
         
     my_prob = cplex.Cplex()
+    my_prob.timelimit = SOLVER_TIME_LIMIT
     my_prob.set_results_stream(None)
     my_prob.set_log_stream(None)
               
@@ -1881,6 +1886,7 @@ def optimal_routes_freqs(ncycles, flows, dim, ndirs):
                     power_obj.extend(power_levels)
         
     my_prob = cplex.Cplex()
+    my_prob.timelimit = SOLVER_TIME_LIMIT
     my_prob.set_results_stream(None)
     my_prob.set_log_stream(None)
               
@@ -2173,6 +2179,7 @@ def minimize_used_links_1(bound, flows, dim, ndirs):
     link_obj.extend([1] * len(used_edges))
         
     my_prob = cplex.Cplex()
+    my_prob.timelimit = SOLVER_TIME_LIMIT
     my_prob.set_results_stream(None)
     my_prob.set_log_stream(None)
               
@@ -2458,6 +2465,7 @@ def minimize_used_links(ncycles, flows, dim, ndirs):
     link_obj.extend([1] * len(used_edges))
         
     my_prob = cplex.Cplex()
+    my_prob.timelimit = SOLVER_TIME_LIMIT
     my_prob.set_results_stream(None)
     my_prob.set_log_stream(None)
               
@@ -3329,6 +3337,9 @@ for dir in os.listdir(path):
     if dir in undone:
         continue
     
+    if dir == 'fm':
+        quit()
+    
     if os.path.isfile('./dir'):
         continue
     if dir == 'vocoder':
@@ -3361,8 +3372,8 @@ for dir in os.listdir(path):
 #        max_rate = int(max_rate / 0.8)
         
         #methods = [default_routing, dj_routing, mml_routing, mml_ml_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
-        methods = [default_routing, dj_routing, mp_routing, mml_routing, mml_ml_routing, mml_fission_routing]
-        #methods = [mml_ml_routing]
+        #methods = [default_routing, dj_routing, mp_routing, mml_routing, mml_ml_routing, mml_fission_routing]
+        methods = [dj_routing, mml_fission_routing, mml_ml_fission_routing]
         
         for i in range(0, 10):
             ncycles = int(round(max_rate * 10 / (10 - i)))
