@@ -943,6 +943,20 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     q_lb = [0] * len(q)
     #q_ub = [cplex.infinity] * len(q)
     
+    if min_links:
+        used_edges = []
+        used_edges_type = ''
+        
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    edge_id = (x * dim + y) * ndirs + dir
+                    used_edges.append(format_var('ue', 0, edge_id))
+                    used_edges_type = used_edges_type + 'B'
+        
+        used_edges_ub = [1] * len(used_edges)
+        used_edges_lb = [0] * len(used_edges)
+    
     rows = []
     my_rhs = []
     my_senses = ''
@@ -972,6 +986,16 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     rows.append([['bound'], [1]])
     my_rhs.append(channel_width * ncycles)
     my_senses = my_senses + 'L'
+    
+    if min_links:
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    for i in range(n_flows * n_splits):
+                        rows.append([[format_var('b', i, edge_id), format_var('ue', 0, edge_id)], [1, -1]])
+                        my_rhs.append(0)
+                        my_senses = my_senses + 'L'
+                         
     
     # unsplitable constraints and flow conservation
     for x in range(dim):
@@ -1219,6 +1243,8 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     colnames.extend(q)
     colnames.extend(fl)
     colnames.append('bound')
+    if min_links:
+        colnames.extend(used_edges)
 #    colnames.extend(used_edges)
     
     var_lb = []
@@ -1226,23 +1252,34 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     var_lb.extend(q_lb)
     var_lb.extend(fl_lb)
     var_lb.append(0)
+    if min_links:
+        var_lb.extend(used_edges_lb)
+        
     
     var_ub = []
     var_ub.extend(b_ub)
     var_ub.extend(q_ub)
     var_ub.extend(fl_ub)
     var_ub.append(channel_width * ncycles)
+    if min_links:
+        var_ub.extend(used_edges_ub)
     
     # optimal goal
     load_obj = [0] * (len(b) + len(q) + len(fl))
     
-    load_obj.append(1)
+    
+    
+    if min_links:
+        load_obj.append(10 * len(used_edges))
+        load_obj.extend([1] * len(used_edges))
+    else:
+        load_obj.append(1)
         
     my_prob = new_cplex_solver()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
-    var_type = b_type + q_type + fl_type + 'I'
+    var_type = b_type + q_type + fl_type + 'I' + used_edges_type
     
     my_prob.variables.add(obj=load_obj, lb=var_lb, ub=var_ub, types=var_type,
                        names=colnames)
@@ -1275,11 +1312,11 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
     
     # calculate wire frequencies and routes
     #wire_delays = calculate_optimal_wire_delays_3(x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], n_splits, dim, ndirs, flows, ncycles)
-    if min_links:
-        [b_output, q_ouput] = minimize_path_len_fission(x[-1] +  1, flows, dim, ndirs, n_splits)
-    else:
-        b_output = x[:len(b)]
-        q_ouput = x[len(b):(len(b) + len(q))]
+    #if min_links:
+    #    [b_output, q_ouput] = minimize_path_len_fission(x[-1] +  1, flows, dim, ndirs, n_splits)
+    #else:
+    b_output = x[:len(b)]
+    q_ouput = x[len(b):(len(b) + len(q))]
     
     [routes, edge_traffic] = calculate_routes_2(b_output, q_ouput, n_splits, dim, ndirs, flows, ncycles)
     
@@ -3358,7 +3395,7 @@ for dir in os.listdir(path):
     
     n_splits = 4
     
-    for dim in [8]:
+    for dim in [4, 6, 8]:
         max_rate = max_rate_estimation(dim)
 #        max_rate = int(max_rate / 0.8)
         
