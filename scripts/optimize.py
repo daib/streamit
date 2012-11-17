@@ -1152,6 +1152,18 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
                                 my_rhs.append(0)
                                 my_senses = my_senses + 'E'
                                 current_row = current_row + 1
+                                
+                        for dir in range(0, ndirs):
+                            e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                            
+                            if e_in_id >= 0:
+                                #rows.append([[format_var('fl', k, e_in_id)], [1]])
+                                rows.append(current_row)
+                                cols.append(cal_index(k, e_in_id, dim, ndirs) + b_base_idx)
+                                vals.append(1)
+                                my_rhs.append(0)
+                                my_senses = my_senses + 'E'
+                                current_row = current_row + 1
                     
                     continue
                      
@@ -1191,6 +1203,15 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
                             my_senses = my_senses + 'E'
                             current_row = current_row + 1
                         
+                        for dir in range(ndirs):
+                            #rows.append([[format_var('fl', k, edgeSrcId + dir)], [1]])
+                            rows.append(current_row)
+                            cols.append(cal_index(k, edgeSrcId + dir, dim, ndirs) + b_base_idx)
+                            vals.append(1)
+                            my_rhs.append(0)
+                            my_senses = my_senses + 'E'
+                            current_row = current_row + 1
+                        
                     continue
                 
                 edgeSrcId = (x * dim + y) * ndirs
@@ -1222,6 +1243,30 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
                     my_senses = my_senses + 'E'
                     current_row = current_row + 1
                     
+                    for dir in range(ndirs):
+                        #C2
+                        # flows out
+                        #var_names.append(format_var('fl', k, edgeSrcId + dir))
+                        rows.append(current_row)
+                        cols.append(cal_index(k, edgeSrcId + dir, dim, ndirs) + b_base_idx)
+                        vals.append(1)
+                        
+                        # flows in
+                        e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                        
+                        # if this is a valid incoming edge
+                        if e_in_id >= 0:
+                            #var_names.append(format_var('fl', k, e_in_id))
+                            #coefs.append(-1)
+                            rows.append(current_row)
+                            cols.append(cal_index(k, e_in_id, dim, ndirs) + b_base_idx)
+                            vals.append(-1)
+                        
+                    #rows.append([var_names, coefs])
+                    my_rhs.append(0)
+                    my_senses = my_senses + 'E'
+                    current_row = current_row + 1
+                    
                         # m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
                         
     # edge conditions
@@ -1234,7 +1279,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
 
             #rows.append([[format_var('fl', i, e_id_w)], [1]])
             rows.append(current_row)
-            cols.append(cal_index(i, e_id_w, dim, ndirs) + fl_base_idx)
+            cols.append(cal_index(i, e_id_w, dim, ndirs) + b_base_idx)
             vals.append(1)
             my_rhs.append(0)
             my_senses = my_senses + 'E'
@@ -1242,7 +1287,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
             
             #rows.append([[format_var('fl', i, e_id_e)], [1]])
             rows.append(current_row)
-            cols.append(cal_index(i, e_id_e, dim, ndirs) + fl_base_idx)
+            cols.append(cal_index(i, e_id_e, dim, ndirs) + b_base_idx)
             vals.append(1)
             my_rhs.append(0)
             my_senses = my_senses + 'E'
@@ -1257,7 +1302,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
 
             #rows.append([[format_var('fl', i, e_id_n)], [1]])
             rows.append(current_row)
-            cols.append(cal_index(i, e_id_n, dim, ndirs) + fl_base_idx)
+            cols.append(cal_index(i, e_id_n, dim, ndirs) + b_base_idx)
             vals.append(1)
             my_rhs.append(0)
             my_senses = my_senses + 'E'
@@ -1265,7 +1310,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
             
             #rows.append([[format_var('fl', i, e_id_s)], [1]])
             rows.append(current_row)
-            cols.append(cal_index(i, e_id_s, dim, ndirs) + fl_base_idx)
+            cols.append(cal_index(i, e_id_s, dim, ndirs) + b_base_idx)
             vals.append(1)
             my_rhs.append(0)
             my_senses = my_senses + 'E'
@@ -1278,7 +1323,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
             #\forall u
             for x in range(dim):
                 for y in range(dim):
-                    #var_indices = []
+                    var_indices = []
                     #coefs = [1] * ndirs
                     for dir in range(ndirs):
                         edge_id = (x * dim + y) * ndirs + dir
@@ -1293,19 +1338,17 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
 
                         # all out going edges
                         #var_names.append(format_var('b', k, edge_id))
-                        #var_indices.append(cal_index(k, edge_id, dim, ndirs) + b_base_idx)
-                        #var_indices.append(dir)
+                        #var_indices.append(int(cal_index(k, edge_id, dim, ndirs) + b_base_idx))
                     
+                    #C3_2 unsplittable 
                     for dir in range(ndirs):
                         edge_id = (x * dim + y) * ndirs + dir
                         rows.append(current_row)
                         cols.append(cal_index(k, edge_id, dim, ndirs) + b_base_idx)
-                        vals.append(0)
-                    #C3_2 unsplittable 
-                    #rows.append([var_names, coefs])
-#                    rows.extend([current_row] * ndirs)
-#                    cols.extend(var_indices)
-#                    vals.append([1] * ndirs)
+                        vals.append(1)
+                    #rows.extend([current_row] * ndirs)
+                    #cols.extend(var_indices)
+                    #vals.append([1] * ndirs)
                     my_rhs.append(1)
                     my_senses = my_senses + 'L'
                     current_row = current_row + 1
@@ -1398,7 +1441,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
     #check(x[0:len(b)], x[len(b):(len(b) + len(q))], x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], dim, ndirs)
     # for j in range(numrows):
     #    print "Row %d:  Slack = %10f" % (j, slack[j])
-#    for j in range(numcols):
+#    for j in range(numcols):((currentX * dim + currentY) * ndirs)
 #        print colnames[j] + " %d:  Value = %d" % (j, x[j])
     
     # calculate wire frequencies and routes
@@ -3204,7 +3247,7 @@ mml_ml_fission_routing = 'mmlmlfission'
 
 is_done = True 
 
-done = ['serpent']
+done = []
 notready = ['vocoder', 'channelvocoder', 'tde']
 
 for dir in os.listdir(path):
