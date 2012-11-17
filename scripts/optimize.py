@@ -22,7 +22,7 @@ recompile = False
 
 iterations = 100
 
-SOLVER_TIME_LIMIT = 2400
+SOLVER_TIME_LIMIT = 1800
 
 OneMhz = 1
 OneGhz = 1000 * OneMhz
@@ -1243,29 +1243,29 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
                     my_senses = my_senses + 'E'
                     current_row = current_row + 1
                     
-                    for dir in range(ndirs):
-                        #C2
-                        # flows out
-                        #var_names.append(format_var('fl', k, edgeSrcId + dir))
-                        rows.append(current_row)
-                        cols.append(cal_index(k, edgeSrcId + dir, dim, ndirs) + b_base_idx)
-                        vals.append(1)
-                        
-                        # flows in
-                        e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
-                        
-                        # if this is a valid incoming edge
-                        if e_in_id >= 0:
-                            #var_names.append(format_var('fl', k, e_in_id))
-                            #coefs.append(-1)
-                            rows.append(current_row)
-                            cols.append(cal_index(k, e_in_id, dim, ndirs) + b_base_idx)
-                            vals.append(-1)
-                        
-                    #rows.append([var_names, coefs])
-                    my_rhs.append(0)
-                    my_senses = my_senses + 'E'
-                    current_row = current_row + 1
+#                    for dir in range(ndirs):
+#                        #C2
+#                        # flows out
+#                        #var_names.append(format_var('fl', k, edgeSrcId + dir))
+#                        rows.append(current_row)
+#                        cols.append(cal_index(k, edgeSrcId + dir, dim, ndirs) + b_base_idx)
+#                        vals.append(1)
+#                        
+#                        # flows in
+#                        e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+#                        
+#                        # if this is a valid incoming edge
+#                        if e_in_id >= 0:
+#                            #var_names.append(format_var('fl', k, e_in_id))
+#                            #coefs.append(-1)
+#                            rows.append(current_row)
+#                            cols.append(cal_index(k, e_in_id, dim, ndirs) + b_base_idx)
+#                            vals.append(-1)
+#                        
+#                    #rows.append([var_names, coefs])
+#                    my_rhs.append(0)
+#                    my_senses = my_senses + 'E'
+#                    current_row = current_row + 1
                     
                         # m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
                         
@@ -1279,7 +1279,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
 
             #rows.append([[format_var('fl', i, e_id_w)], [1]])
             rows.append(current_row)
-            cols.append(cal_index(i, e_id_w, dim, ndirs) + b_base_idx)
+            cols.append(cal_index(i, e_id_w, dim, ndirs) + fl_base_idx)
             vals.append(1)
             my_rhs.append(0)
             my_senses = my_senses + 'E'
@@ -1287,7 +1287,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
             
             #rows.append([[format_var('fl', i, e_id_e)], [1]])
             rows.append(current_row)
-            cols.append(cal_index(i, e_id_e, dim, ndirs) + b_base_idx)
+            cols.append(cal_index(i, e_id_e, dim, ndirs) + fl_base_idx)
             vals.append(1)
             my_rhs.append(0)
             my_senses = my_senses + 'E'
@@ -1302,7 +1302,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
 
             #rows.append([[format_var('fl', i, e_id_n)], [1]])
             rows.append(current_row)
-            cols.append(cal_index(i, e_id_n, dim, ndirs) + b_base_idx)
+            cols.append(cal_index(i, e_id_n, dim, ndirs) + fl_base_idx)
             vals.append(1)
             my_rhs.append(0)
             my_senses = my_senses + 'E'
@@ -1310,7 +1310,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
             
             #rows.append([[format_var('fl', i, e_id_s)], [1]])
             rows.append(current_row)
-            cols.append(cal_index(i, e_id_s, dim, ndirs) + b_base_idx)
+            cols.append(cal_index(i, e_id_s, dim, ndirs) + fl_base_idx)
             vals.append(1)
             my_rhs.append(0)
             my_senses = my_senses + 'E'
@@ -1367,6 +1367,8 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
         my_rhs.append(dirty_flows[i][traffic_idx])
         my_senses = my_senses + 'E'
         current_row = current_row + 1
+    
+    assert(current_row == len(my_rhs))
                     
     colnames = []
     colnames.extend(b)
@@ -2565,155 +2567,6 @@ def sort_flows(flows):
 #        f.pop(0)
     return flows
 
-def dp_routing(ncycles, flows, dim, ndirs):
-    
-    vnoc_dir = [0] * ndirs
-    
-    vnoc_dir[north] = 4
-    vnoc_dir[south] = 3
-    vnoc_dir[east] = 2
-    vnoc_dir[west] = 1
-    
-    node_cost_id = 2
-    node_X_id = 0
-    node_Y_id = 1
-    
-    wire_delays = []
-    routes = []
-    
-    # make a copy of the flows in case we advertently modify it
-    dirty_flows = copy.deepcopy(flows)
-    
-    # sort the flows by traffic freedom
-    dirty_flows = sort_flows_by_routing_freedom(dirty_flows)
-    
-    edge_traffic = [0] * (dim * dim * ndirs) 
-    # gradually route flows through the network
-    # such that each time a new flow is added
-    # the power increment is minimal
-    for f in dirty_flows:
-        currentX = f[srcXIdx]
-        currentY = f[srcYIdx]
-        
-        dstX = f[dstXIdx]
-        dstY = f[dstYIdx]
-        
-        node_layers = []
-        node_layers.append([[currentX, currentY, 0]])  # coordinate and cost from the node
-        
-        finished = False
-        # spreading out to correct directions
-        while not finished:
-            next_layer = []
-            
-            # derive nodes that is one hop from the current layer's node
-            current_layer = node_layers[-1]
-            
-            if len(current_layer) == 0:
-                print 'Cannot route, exiting ...'
-                quit()
-                
-            for node in current_layer:
-                if node[node_X_id] == dstX and node[node_Y_id] == dstY:
-                    finished = True
-                    break
-                
-                next_nodes = []
-                # exam the node in x direction
-                nextX = -1
-                dir = -1
-                
-                if node[node_X_id] > dstX:
-                    nextX = node[node_X_id] - 1
-                    dir = west 
-                elif node[node_X_id] < dstX:
-                    nextX = node[node_X_id] + 1
-                    dir = east
-                if nextX != -1:
-                    next_nodes.append([nextX, node[node_Y_id], dir])
-                
-                nextY = -1 
-                
-                if node[node_Y_id] > dstY:
-                    nextY = node[node_Y_id] - 1
-                    dir = south
-                elif node[node_Y_id] < dstY:
-                    nextY = node[node_Y_id] + 1
-                    dir = north
-                if nextY != -1:
-                    next_nodes.append([node[node_X_id], nextY, dir])
-
-                for next_node in next_nodes:
-                    edge_id = (node[node_X_id] * dim + node[node_Y_id]) * ndirs + next_node[2]
-                    
-                    # if this link can not afford the additional traffic
-                    if power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) < 0:
-                        continue
-                    
-                    # cost of increasing traffic on this edge
-                    cost = power_cost(edge_traffic[edge_id] + f[traffic_idx], ncycles) - power_cost(edge_traffic[edge_id], ncycles) + node[node_cost_id]
-                    # cost = utilization(edge_traffic[edge_id] + f[traffic_idx], ncycles) + node[node_cost_id]
-                    exists = False
-                    
-                    for nn in next_layer:
-                        if nn[node_X_id] == next_node[node_X_id] and nn[node_Y_id] == next_node[node_Y_id]:
-                            prev_edge_id = (nn[node_cost_id + 1] * dim + nn[node_cost_id + 2]) * ndirs + 3 - nn[node_cost_id + 3]
-                            
-                            if nn[node_cost_id] > cost or (nn[node_cost_id] == cost and edge_traffic[edge_id] < edge_traffic[prev_edge_id]):
-                                # this is more optimal route
-                                nn[node_cost_id] = cost
-                                nn[node_cost_id + 1] = node[node_X_id]
-                                nn[node_cost_id + 2] = node[node_Y_id]
-                                nn[node_cost_id + 3] = next_node[2]
-                            exists = True
-                    if not exists:
-                        next_layer.append([next_node[node_X_id], next_node[node_Y_id], cost, node[node_X_id], node[node_Y_id], next_node[2]])  # include last node address  
-            if not finished:      
-                node_layers.append(next_layer)
-            
-        # commit the route
-        # src and dst information
-        route = ['(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
-        
-        # vc
-        vc = vc_calculate(f)
-        
-        route.append(vc)
-        
-        route.append(f[traffic_idx])
-        route.append(ncycles)
-        route.append('|')
-        
-        currentX = dstX
-        currentY = dstY
-        
-        dirs = []
-        while len(node_layers) > 1:
-            current_layer = node_layers.pop()
-            for node in current_layer:
-                if node[node_X_id] == currentX and node[node_Y_id] == currentY:
-                    dir = node[node_cost_id + 3]
-                    dirs.insert(0, vnoc_dir[dir])
-                    
-                    currentX = node[node_cost_id + 1]
-                    currentY = node[node_cost_id + 2]
-                    
-                    edge_id = (currentX * dim + currentY) * ndirs + dir
-                    
-                    # commit the traffic
-                    edge_traffic[edge_id] = edge_traffic[edge_id] + f[traffic_idx]
-                    
-                    break
-        
-        
-        route.extend(dirs)
-        
-        route.append(' ')
-        routes.append(route)
-        # new compute routes and delays
-    wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)      
-        
-    return [routes, wire_delays]
 def min_freq_vdd(total_traffic, ncycles):
     for opt in wire_config_opts:
         if channel_width * ncycles * opt[freq_idx] * router_speed_scale >= total_traffic * max_wire_freq:
@@ -3248,7 +3101,7 @@ mml_ml_fission_routing = 'mmlmlfission'
 is_done = True 
 
 done = []
-notready = ['vocoder', 'channelvocoder', 'tde']
+notready = ['vocoder']
 
 for dir in os.listdir(path):
     
@@ -3257,6 +3110,9 @@ for dir in os.listdir(path):
     
     if os.path.isfile('./dir'):
         continue
+    
+#    if dir != 'filterbank':
+#        continue
     # run to obtain profiling information first
     os.chdir('./' + dir + '/streamit')
     
@@ -3275,10 +3131,10 @@ for dir in os.listdir(path):
         #methods = [default_routing, dj_routing, mp_routing]
         methods = [mml_ml_fission_routing]
         
-        for i in range(0, 6):
+        for i in [0,5]: #range(0, 6):
             ncycles = int(round(max_rate * 10 / (10 - i)))
             
-            #time.sleep(5)
+            time.sleep(5)
             
             for method in methods:
                 #ncycles = time_prof(dim)
@@ -3291,10 +3147,10 @@ for dir in os.listdir(path):
                 # generate ILP files
                     if method == mml_fission_routing:
                         print 'Routing = MinMaxLoadFission'
-                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(False, ncycles, flows, dim, directions, n_splits)
+                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission_zero_pop(False, ncycles, flows, dim, directions, n_splits)
                     elif method == mml_ml_fission_routing:
                         print 'Routing = MinMaxLoadFission-Minlinks'
-                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission_zero_pop(False, ncycles, flows, dim, directions, n_splits)
+                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission_zero_pop(True, ncycles, flows, dim, directions, n_splits)
                         #[routes, wire_delays, router_delays, flows] = minimize_max_load_fission(True, ncycles, flows, dim, directions, n_splits)
                     elif method == mml_routing:
                         print 'Routing = MinMaxLoad'
