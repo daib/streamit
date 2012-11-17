@@ -336,8 +336,8 @@ def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
             
             while currentX != f[dstXIdx] or currentY != f[dstYIdx]:
                 # base_id = ((currentX * dim + currentY) * ndirs) * len(dirty_flows) + i
-                base_id = ((currentX * dim + currentY) * ndirs) + k * dim * dim * ndirs
                 edge_base_id = (currentX * dim + currentY) * ndirs
+                base_id = cal_index(k, edge_base_id, dim, ndirs)#((currentX * dim + currentY) * ndirs) + k * dim * dim * ndirs
                 for dir in range(ndirs):
                     if round(b[base_id + dir]) == 1:
                         
@@ -621,6 +621,7 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
         for x in range(dim):
             for y in range(dim):
                 for dir in range(ndirs):
+                    edge_id = (x * dim + y) * ndirs + dir
                     for i in range(n_flows * n_splits):
                         rows.append([[format_var('b', i, edge_id), format_var('ue', 0, edge_id)], [1, -1]])
                         my_rhs.append(0)
@@ -920,6 +921,462 @@ def minimize_max_load_fission(min_links, ncycles, flows, dim, ndirs, n_splits):
 
     my_prob.linear_constraints.add(lin_expr=rows, senses=my_senses,
                                 rhs=my_rhs)
+
+    # m.minimize((power_levels * s).sum())
+    # m.minimize(b[0,:].sum())
+    print 'Solving the problem ...'
+    my_prob.solve()
+    #print
+    # solution.get_status() returns an integer code
+    #print "Solution status = " , my_prob.solution.get_status(), ":",
+    # the following line prints the corresponding string
+    #print my_prob.solution.status[my_prob.solution.get_status()]
+    #print "Solution value  = ", my_prob.solution.get_objective_value()
+
+#    numcols = my_prob.variables.get_num()
+#    numrows = my_prob.linear_constraints.get_num()
+#
+#    slack = my_prob.solution.get_linear_slacks()
+    x = my_prob.solution.get_values()
+    
+    #check(x[0:len(b)], x[len(b):(len(b) + len(q))], x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], dim, ndirs)
+    # for j in range(numrows):
+    #    print "Row %d:  Slack = %10f" % (j, slack[j])
+#    for j in range(numcols):
+#        print colnames[j] + " %d:  Value = %d" % (j, x[j])
+    
+    # calculate wire frequencies and routes
+    #wire_delays = calculate_optimal_wire_delays_3(x[(len(b) + len(q)):(len(b) + len(q) + len(fl))], n_splits, dim, ndirs, flows, ncycles)
+    #if min_links:
+    #    [b_output, q_ouput] = minimize_path_len_fission(x[-1] +  1, flows, dim, ndirs, n_splits)
+    #else:
+    b_output = x[:len(b)]
+    q_ouput = x[len(b):(len(b) + len(q))]
+    
+    [routes, edge_traffic] = calculate_routes_2(b_output, q_ouput, n_splits, dim, ndirs, flows, ncycles)
+    
+    wire_delays = calculate_optimal_wire_delays_2(edge_traffic, dim, ndirs, ncycles)
+    
+    router_delays = calculate_optimal_router_delays(edge_traffic, local_edge_traffic, dim, ndirs, ncycles)
+    
+    splitted_flows = []
+    for i in range(n_flows):
+        f = dirty_flows[i]
+        true_n_splits = 0
+        for j in range(n_splits):
+            if q_ouput[i * n_splits + j] > 0:
+                true_n_splits = true_n_splits + 1
+        k = 0
+        for j in range(n_splits):
+            if q_ouput[i * n_splits + j] == 0:
+                continue
+            f_child = copy.deepcopy(f)
+            f_child.append(k)
+            f_child.append(true_n_splits)
+            f_child[traffic_idx] = q_ouput[i * n_splits + j] 
+            splitted_flows.append(f_child)
+            k = k + 1
+            
+    return [routes, wire_delays, router_delays, splitted_flows]
+
+def cal_index(i, edge_id, dim , ndirs):
+    return i * dim * dim * ndirs + edge_id
+
+def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_splits):
+    
+    dirty_flows = copy.deepcopy(flows)  # make a copy of the flows in case it is modified
+    
+    local_edge_traffic = calculate_local_edge_traffic(dirty_flows, dim)
+    
+    n_flows = len(dirty_flows)
+    
+    # flows demands
+    nsent = copy.deepcopy([f[traffic_idx] for f in dirty_flows])
+    
+    b = []
+    b_type = ''
+
+    fl = []
+    fl_type = ''
+    fl_ub = []
+    
+    for i in range(n_flows):
+        for j in range(n_splits):
+            k = i * n_splits + j
+            for x in range(dim):
+                for y in range(dim):
+                    for dir in range(ndirs):
+                        edge_id = (x * dim + y) * ndirs + dir
+                        b.append(format_var('b', k, edge_id))
+                        b_type = b_type + 'B'
+        
+                        fl.append(format_var('fl', k, edge_id))
+                        fl_type = fl_type + 'I'
+                        fl_ub.append(dirty_flows[i][traffic_idx])
+                        
+    b_lb = [0] * len(b)
+    b_ub = [1] * len(b)
+
+    fl_lb = [0] * len(fl)
+
+    q = []
+    q_type = ''
+    q_ub = []
+        
+    for i in range(n_flows):
+        for j in range(n_splits):
+            q.append(format_var('q', i, j))
+            q_type = q_type + 'I'
+            q_ub.append(dirty_flows[i][traffic_idx])
+
+    q_lb = [0] * len(q)
+    #q_ub = [cplex.infinity] * len(q)
+    
+    if min_links:
+        used_edges = []
+        used_edges_type = ''
+        
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    edge_id = (x * dim + y) * ndirs + dir
+                    used_edges.append(format_var('ue', 0, edge_id))
+                    used_edges_type = used_edges_type + 'B'
+        
+        used_edges_ub = [1] * len(used_edges)
+        used_edges_lb = [0] * len(used_edges)
+    
+    b_base_idx = 0
+    q_base_idx = len(b)
+    fl_base_idx = len(q) + q_base_idx
+    bound_base_idx = fl_base_idx + len(fl)
+    ue_base_idx = bound_base_idx + 1
+    
+    current_row = 0
+    rows = []
+    cols = []
+    vals = []
+    my_rhs = []
+    my_senses = ''
+    
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                edge_id = (x * dim + y) * ndirs + dir
+                # capacity constraint for each edge
+                rows.extend([current_row] * (n_flows * n_splits))
+                vals.extend([1] * (n_flows * n_splits))
+                
+                for i in range(n_flows * n_splits):
+                    cols.append(cal_index(i, edge_id, dim, ndirs) + fl_base_idx)
+                
+#                var_names.append('bound')
+                rows.append(current_row)
+                cols.append(bound_base_idx)
+                vals.append(-1)
+                my_rhs.append(0)
+                my_senses = my_senses + 'L'
+                current_row = current_row + 1
+                
+    #bound <= channel load
+    #rows.append([['bound'], [1]])
+    #my_rhs.append(channel_width * ncycles)
+    #my_senses = my_senses + 'L'
+    
+    if min_links:
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    edge_id = (x * dim + y) * ndirs + dir
+                    for i in range(n_flows * n_splits):
+                        rows.extend([current_row] * 2)
+                        cols.extend([cal_index(i, edge_id, dim, ndirs) + b_base_idx, edge_id + ue_base_idx])
+                        vals.extend([1, -1])
+                        #rows.append([[format_var('b', i, edge_id), format_var('ue', 0, edge_id)], [1, -1]])
+                        
+                        my_rhs.append(0)
+                        my_senses = my_senses + 'L'
+                        current_row = current_row + 1
+                         
+    
+    # unsplitable constraints and flow conservation
+    for x in range(dim):
+        for y in range(dim):
+            for i in range(n_flows):
+                # if this is the source of the flow
+                # there must be some out going edge
+                if x == dirty_flows[i][srcXIdx] and y == dirty_flows[i][srcYIdx]:
+                    edgeSrcId = (x * dim + y) * ndirs
+                    
+                    for j in range(n_splits):
+                        k = i * n_splits + j
+                        # C1_1
+                        #var_names = []
+                        #coefs = [1] * ndirs
+                        for dir in range(ndirs):
+                            rows.append(current_row)
+                            cols.append(cal_index(k, edgeSrcId + dir, dim, ndirs) + fl_base_idx)
+                            vals.append(1)
+                            #var_names.append(format_var('fl', k, edgeSrcId + dir))
+                            
+                        rows.append(current_row)
+                        cols.append(k + q_base_idx)
+                        vals.append(-1)
+                        
+                        #rows.append([var_names, coefs])
+                        my_rhs.append(0)
+                        my_senses = my_senses + 'E'
+                        current_row = current_row + 1
+                        
+                        for dir in range(ndirs):
+                            rows.append(current_row)
+                            cols.append(cal_index(k, edgeSrcId + dir, dim, ndirs) + b_base_idx)
+                            vals.append(1)
+                            #var_names.append(format_var('b', k, edgeSrcId + dir))
+                            
+                        #rows.append([var_names, coefs])
+                        my_rhs.append(1)
+                        my_senses = my_senses + 'E'
+                        current_row = current_row + 1
+                        
+                        #C4_1
+                        # all incoming edges are invalid
+                        for dir in range(0, ndirs):
+                            e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                            
+                            if e_in_id >= 0:
+                                #rows.append([[format_var('fl', k, e_in_id)], [1]])
+                                rows.append(current_row)
+                                cols.append(cal_index(k, e_in_id, dim, ndirs) + fl_base_idx)
+                                vals.append(1)
+                                my_rhs.append(0)
+                                my_senses = my_senses + 'E'
+                                current_row = current_row + 1
+                    
+                    continue
+                     
+                # if this is the destination for the flow
+                # we do not need flow conservation
+                # and all outgoing edge is invalid
+                if x == dirty_flows[i][dstXIdx] and y == dirty_flows[i][dstYIdx]:
+                    edgeSrcId = (x * dim + y) * ndirs
+                    for j in range(n_splits):
+                        k = i * n_splits + j
+                        #C1_2
+                        # one incoming edge is true
+                        for dir in range(ndirs):
+                            e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                            
+                            if e_in_id >= 0:
+                                rows.append(current_row)
+                                cols.append(cal_index(k, e_in_id, dim, ndirs) + fl_base_idx)
+                                vals.append(1)
+                                #var_names.append(format_var('fl', k, e_in_id))
+                        
+                        rows.append(current_row)
+                        cols.append(k + q_base_idx)
+                        #var_names.append(format_var('q', i, j))
+                        vals.append(-1)
+                        my_rhs.append(0)
+                        my_senses = my_senses + 'E'
+                        current_row = current_row + 1
+                        
+                        #C4_2
+                        for dir in range(ndirs):
+                            #rows.append([[format_var('fl', k, edgeSrcId + dir)], [1]])
+                            rows.append(current_row)
+                            cols.append(cal_index(k, edgeSrcId + dir, dim, ndirs) + fl_base_idx)
+                            vals.append(1)
+                            my_rhs.append(0)
+                            my_senses = my_senses + 'E'
+                            current_row = current_row + 1
+                        
+                    continue
+                
+                edgeSrcId = (x * dim + y) * ndirs
+                    
+                for j in range(n_splits):
+                    # this is an intermediate hop
+                    k = i * n_splits + j    
+                    for dir in range(ndirs):
+                        #C2
+                        # flows out
+                        #var_names.append(format_var('fl', k, edgeSrcId + dir))
+                        rows.append(current_row)
+                        cols.append(cal_index(k, edgeSrcId + dir, dim, ndirs) + fl_base_idx)
+                        vals.append(1)
+                        
+                        # flows in
+                        e_in_id = incoming_edge_id(x, y, dir, dim, ndirs)
+                        
+                        # if this is a valid incoming edge
+                        if e_in_id >= 0:
+                            #var_names.append(format_var('fl', k, e_in_id))
+                            #coefs.append(-1)
+                            rows.append(current_row)
+                            cols.append(cal_index(k, e_in_id, dim, ndirs) + fl_base_idx)
+                            vals.append(-1)
+                        
+                    #rows.append([var_names, coefs])
+                    my_rhs.append(0)
+                    my_senses = my_senses + 'E'
+                    current_row = current_row + 1
+                    
+                        # m.constrain(b[i, edgeSrcId:(edgeSrcId+ndirs)].sum() - b[i, e_back_id] == b[i, e_id])
+                        
+    # edge conditions
+    for y in range(dim):
+        e_id_w = y * ndirs + west
+        e_id_e = ((dim - 1) * dim + y) * ndirs + east
+        for i in range(n_flows * n_splits):
+            # m.constrain(b[i, e_id_w] == 0)
+            # m.constrain(b[i, e_id_e] == 0)
+
+            #rows.append([[format_var('fl', i, e_id_w)], [1]])
+            rows.append(current_row)
+            cols.append(cal_index(i, e_id_w, dim, ndirs) + fl_base_idx)
+            vals.append(1)
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            current_row = current_row + 1
+            
+            #rows.append([[format_var('fl', i, e_id_e)], [1]])
+            rows.append(current_row)
+            cols.append(cal_index(i, e_id_e, dim, ndirs) + fl_base_idx)
+            vals.append(1)
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            current_row = current_row + 1
+            
+    for x in range(dim):
+        e_id_s = x * dim * ndirs + south
+        e_id_n = (x * dim + dim - 1) * ndirs + north
+        for i in range(n_flows * n_splits):
+            # m.constrain(b[i, e_id_n] == 0)
+            # m.constrain(b[i, e_id_s] == 0)
+
+            #rows.append([[format_var('fl', i, e_id_n)], [1]])
+            rows.append(current_row)
+            cols.append(cal_index(i, e_id_n, dim, ndirs) + fl_base_idx)
+            vals.append(1)
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            current_row = current_row + 1
+            
+            #rows.append([[format_var('fl', i, e_id_s)], [1]])
+            rows.append(current_row)
+            cols.append(cal_index(i, e_id_s, dim, ndirs) + fl_base_idx)
+            vals.append(1)
+            my_rhs.append(0)
+            my_senses = my_senses + 'E'
+            current_row = current_row + 1
+
+    #C3
+    for i in range(n_flows):
+        for j in range(n_splits):
+            k = i * n_splits + j
+            #\forall u
+            for x in range(dim):
+                for y in range(dim):
+                    #var_indices = []
+                    #coefs = [1] * ndirs
+                    for dir in range(ndirs):
+                        edge_id = (x * dim + y) * ndirs + dir
+                        #C3_1 split traffic bound 
+                        #rows.append([[format_var('fl', k, edge_id), format_var('b', k, edge_id)], [1, -dirty_flows[i][traffic_idx]]])
+                        rows.extend([current_row] * 2)
+                        cols.extend([cal_index(k, edge_id, dim, ndirs) + fl_base_idx, cal_index(i, edge_id, dim, ndirs) + b_base_idx])
+                        vals.extend([1, -dirty_flows[i][traffic_idx]])
+                        my_rhs.append(0)
+                        my_senses = my_senses + 'L'
+                        current_row = current_row + 1
+
+                        # all out going edges
+                        #var_names.append(format_var('b', k, edge_id))
+                        #var_indices.append(cal_index(k, edge_id, dim, ndirs) + b_base_idx)
+                        #var_indices.append(dir)
+                    
+                    for dir in range(ndirs):
+                        edge_id = (x * dim + y) * ndirs + dir
+                        rows.append(current_row)
+                        cols.append(cal_index(k, edge_id, dim, ndirs) + b_base_idx)
+                        vals.append(0)
+                    #C3_2 unsplittable 
+                    #rows.append([var_names, coefs])
+#                    rows.extend([current_row] * ndirs)
+#                    cols.extend(var_indices)
+#                    vals.append([1] * ndirs)
+                    my_rhs.append(1)
+                    my_senses = my_senses + 'L'
+                    current_row = current_row + 1
+                    
+    #C1_3
+    for i in range(n_flows):
+        var_indices = []
+        #coefs = [1] * n_splits
+        for j in range(n_splits):
+            #var_names.append(format_var('q', i, j))
+            var_indices.append(i * n_splits + j + q_base_idx)
+        #rows.append([var_names, coefs])
+        rows.extend([current_row] * n_splits)
+        cols.extend(var_indices)
+        vals.extend([1] * n_splits)
+        my_rhs.append(dirty_flows[i][traffic_idx])
+        my_senses = my_senses + 'E'
+        current_row = current_row + 1
+                    
+    colnames = []
+    colnames.extend(b)
+    colnames.extend(q)
+    colnames.extend(fl)
+    colnames.append('bound')
+    if min_links:
+        colnames.extend(used_edges)
+#    colnames.extend(used_edges)
+    
+    var_lb = []
+    var_lb.extend(b_lb)
+    var_lb.extend(q_lb)
+    var_lb.extend(fl_lb)
+    var_lb.append(0)
+    if min_links:
+        var_lb.extend(used_edges_lb)
+        
+    
+    var_ub = []
+    var_ub.extend(b_ub)
+    var_ub.extend(q_ub)
+    var_ub.extend(fl_ub)
+    #var_ub.append(channel_width * ncycles)
+    var_ub.append(cplex.infinity)
+    if min_links:
+        var_ub.extend(used_edges_ub)
+    
+    # optimal goal
+    load_obj = [0] * (len(b) + len(q) + len(fl))
+    
+    
+    
+    if min_links:
+        load_obj.append(10 * len(used_edges))
+        load_obj.extend([1] * len(used_edges))
+    else:
+        load_obj.append(1)
+        
+    my_prob = new_cplex_solver()
+              
+    my_prob.objective.set_sense(my_prob.objective.sense.minimize)
+
+    if min_links:
+        var_type = b_type + q_type + fl_type + 'I' + used_edges_type
+    else:
+       var_type = b_type + q_type + fl_type + 'I'
+    
+    my_prob.variables.add(obj=load_obj, lb=var_lb, ub=var_ub, types=var_type)
+
+    my_prob.linear_constraints.add(rhs = my_rhs, senses = my_senses)
+    #my_prob.linear_constraints.add(lin_expr=rows, senses=my_senses, rhs=my_rhs)
+    my_prob.linear_constraints.set_coefficients(zip(rows, cols, vals))
 
     # m.minimize((power_levels * s).sum())
     # m.minimize(b[0,:].sum())
@@ -2772,13 +3229,13 @@ for dir in os.listdir(path):
         
         #methods = [default_routing, dj_routing, mml_routing, mml_ml_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
         #methods = [default_routing, dj_routing, mp_routing, mml_routing, mml_ml_routing, mml_fission_routing]
-        methods = [default_routing, dj_routing, mp_routing]
-        #methods = [mml_ml_fission_routing]
+        #methods = [default_routing, dj_routing, mp_routing]
+        methods = [mml_ml_fission_routing]
         
         for i in range(0, 6):
             ncycles = int(round(max_rate * 10 / (10 - i)))
             
-            time.sleep(5)
+            #time.sleep(5)
             
             for method in methods:
                 #ncycles = time_prof(dim)
@@ -2794,7 +3251,8 @@ for dir in os.listdir(path):
                         [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(False, ncycles, flows, dim, directions, n_splits)
                     elif method == mml_ml_fission_routing:
                         print 'Routing = MinMaxLoadFission-Minlinks'
-                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(True, ncycles, flows, dim, directions, n_splits)
+                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission_zero_pop(False, ncycles, flows, dim, directions, n_splits)
+                        #[routes, wire_delays, router_delays, flows] = minimize_max_load_fission(True, ncycles, flows, dim, directions, n_splits)
                     elif method == mml_routing:
                         print 'Routing = MinMaxLoad'
                         [routes, wire_delays, router_delays] = minimize_max_load(False, ncycles, flows, dim, directions)
