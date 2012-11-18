@@ -296,8 +296,240 @@ def vc_calculate(f):
         vc = 1
     return vc
 
+def resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles):
+    dirty_flows = copy.deepcopy(flows)
+    
+    flows_vertices = []
+    
+    for i in range(len(dirty_flows)):
+        true_idx = 0;
+        for j in range(n_splits):
+            f = dirty_flows[i]
+            
+            k =  i * n_splits + j
+            
+            if q[k] == 0:
+                continue
+            
+            this_flow = []
+            this_flow.append([i , j])
+            flows_vertices.append(this_flow)
+            
+            # src and dst information
+            currentX = f[srcXIdx]
+            currentY = f[srcYIdx]
+            
+            while currentX != f[dstXIdx] or currentY != f[dstYIdx]:
+                
+                # base_id = ((currentX * dim + currentY) * ndirs) * len(dirty_flows) + i
+                edge_base_id = (currentX * dim + currentY) * ndirs
+                base_id = cal_index(k, edge_base_id, dim, ndirs)#((currentX * dim + currentY) * ndirs) + k * dim * dim * ndirs
+                for dir in range(ndirs):
+                    if round(b[base_id + dir]) == 1:
+                        this_flow.append([currentX, currentY, dir])
+                        # move to the next node
+                        if dir == north:
+                            currentY = currentY + 1
+                        elif dir == south:
+                            currentY = currentY - 1
+                        elif dir == west:
+                            currentX = currentX - 1
+                        elif dir == east:
+                            currentX = currentX + 1
+                            
+                        break
+            
+            #this_flow.append([currentX, currentY])
+    
+    routes = []
+    vcs = []
+    
+    edge_transfer = {}#[[False, []]] * ((dim * dim * ndirs) * (dim * dim * ndirs))
+    
+    def edge_idx(v):
+        return (v[0] * dim + v[1]) * ndirs + v[2]
+    
+    #create connected graphs
+    for this_flow in flows_vertices:
+        for i in range(1, len(this_flow) - 1):
+            #v = this_flow[i]
+            #for j in range(i, len(this_flow)):
+            entry_idx =  edge_idx(this_flow[i]) * (dim * dim * ndirs) + edge_idx(this_flow[i + 1])
+            #edge_transfer[entry_idx][0] = True
+            #edge_transfer[entry_idx][1].append(this_flow[0]) #id of the flow transferring between two edges
+            if not edge_transfer.has_key(entry_idx):
+                edge_transfer[entry_idx] = []
+            edge_transfer[entry_idx].append(this_flow[0])
+    
+    #identify strongly connected components
+#    input: graph G = (V, E)
+#      output: set of strongly connected components (sets of vertices)
+#    
+#      index := 0
+#      S := empty
+#      for each v in V do
+#        if (v.index is undefined) then
+#          strongconnect(v)
+#        end if
+#      repeat
+#    function strongconnect(v)
+#    // Set the depth index for v to the smallest unused index
+#    v.index := index
+#    v.lowlink := index
+#    index := index + 1
+#    S.push(v)
+#
+#    // Consider successors of v
+#    for each (v, w) in E do
+#      if (w.index is undefined) then
+#        // Successor w has not yet been visited; recurse on it
+#        strongconnect(w)
+#        v.lowlink := min(v.lowlink, w.lowlink)
+#      else if (w is in S) then
+#        // Successor w is in stack S and hence in the current SCC
+#        v.lowlink := min(v.lowlink, w.index)
+#      end if
+#    repeat
+#
+#    // If v is a root node, pop the stack and generate an SCC
+#    if (v.lowlink = v.index) then
+#      start a new strongly connected component
+#      repeat
+#        w := S.pop()
+#        add w to current strongly connected component
+#      until (w = v)
+#      output the current strongly connected component
+#    end if
+#  end function
+
+    index = [0]
+    S = []
+
+    v_index = [-1] * (dim * dim * ndirs)
+    v_lowlink = [-1] * (dim * dim * ndirs)
+    
+    SCCs = []
+    
+    def strongconnect(v):
+        v_index[edge_idx(v)] = index[0]
+        v_lowlink[edge_idx(v)] = index[0]
+        index[0] = index[0] + 1
+        S.append(v)
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    w = [x, y, dir]
+                    entry_idx =  edge_idx(v) * (dim * dim * ndirs) + edge_idx(w)
+                    if edge_transfer.has_key(entry_idx):
+                        if v_index[edge_idx(w)] == -1:
+                            strongconnect(w)
+                            v_lowlink[edge_idx(v)] = min(v_lowlink[edge_idx(v)], v_lowlink[edge_idx(w)])
+                        elif w in S:
+                            v_lowlink[edge_idx(v)] = min(v_lowlink[edge_idx(v)], v_index[edge_idx(w)])
+        if v_lowlink[edge_idx(v)] == v_index[edge_idx(v)]:
+            SCC = []
+            
+            while True:
+                w = S.pop()
+                SCC.append(w)
+                if w == v:
+                    break
+            if len(SCC) > 1:
+                SCCs.append(SCC)
+    
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                if v_index[edge_idx([x, y, dir])] == -1:
+                    strongconnect([x, y, dir])
+                
+    #list the flows involved in connected components
+    conflict_sccs = []
+    resolving_flows = []
+    for SCC in SCCs:
+        if len(SCC) <= 1:
+            continue
+        conflict_flows = []
+        for i in range(len(SCC)):
+            for j in range(i, len(SCC)):
+                entry_idx =  edge_idx(SCC[i]) * (dim * dim * ndirs) + edge_idx(SCC[j])
+                if edge_transfer.has_key(entry_idx):
+                    for f in edge_transfer[entry_idx]:
+                        if not f in conflict_flows:
+                            conflict_flows.append(f)
+                        if not f in resolving_flows:
+                            resolving_flows.append(f)
+        conflict_sccs.append(conflict_flows)
+
+
+    #use ILP to solve the problem
+    
+    vc_vars = []
+    vc_vars_type = ''
+    
+    nvc = 2
+    for f in resolving_flows:
+        k = f[0] * n_splits + f[1]
+        for i in range(nvc): 
+            vc_vars.append(str(k) + '_' + str(i))
+            vc_vars_type = vc_vars_type + 'B'
+    
+    vc_vars_ub = [1] * len(vc_vars)
+    vc_vars_lb = [0] * len(vc_vars)
+    rows = []
+    my_rhs = []
+    my_senses = []
+    
+    for cfs  in conflict_sccs:
+        for i in range(nvc):
+            var_names = []
+            for f in cfs:
+                k = f[0] * n_splits + f[1]
+                var_names.append(str(k) + '_' + str(i))
+            coefs = [1] * len(var_names)
+            rows.append([var_names, coefs])
+            my_rhs.append(len(var_names) - 1)
+            my_senses.append('L')
+    for f in resolving_flows:
+        k = f[0] * n_splits + f[1]
+        var_names = []
+        for i in range(nvc):
+            var_names.append(str(k) + '_' + str(i))
+        coefs = [1] * len(var_names)
+        rows.append([var_names, coefs])
+        my_rhs.append(1)
+        my_senses.append('E')
+        
+    
+    load_obj = [1] * len(vc_vars)
+    
+    my_prob = new_cplex_solver()
+              
+    my_prob.objective.set_sense(my_prob.objective.sense.minimize)
+
+    my_prob.variables.add(obj=load_obj, lb=vc_vars_lb, ub=vc_vars_ub, types=vc_vars_type,
+                       names=vc_vars)
+
+    my_prob.linear_constraints.add(lin_expr=rows, senses=my_senses,
+                                rhs=my_rhs)
+
+    print 'Finding vc values ...'
+    my_prob.solve()
+    x = my_prob.solution.get_values()
+    
+    for i in range(len(resolving_flows)):
+        for j in range(nvc):
+            if x[i * nvc + j] == 1:
+                k = resolving_flows[i][0] * n_splits + resolving_flows[i][1] 
+                vcs.append([k, j])
+                break
+    
+    return vcs
+
 def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
     routes = []
+    
+    vcs = resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles)
     
     dirty_flows = copy.deepcopy(flows)
     
@@ -324,7 +556,12 @@ def calculate_routes_2(b, q, n_splits, dim, ndirs, flows, ncycles):
             route = [true_idx, '(' + str(f[srcXIdx]) + ',' + str(f[srcYIdx]) + ')', '(' + str(f[dstXIdx]) + ',' + str(f[dstYIdx]) + ')']
             true_idx = true_idx + 1
             # vc
-            vc = vc_calculate(f)
+            #vc = vc_calculate(f)
+            vc = -1
+            for v in vcs:
+                if v[0] == k:
+                    vc = v[1]
+                    break
             
             route.append(vc)
             
@@ -1012,10 +1249,10 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
     # flows demands
     nsent = copy.deepcopy([f[traffic_idx] for f in dirty_flows])
     
-    b = []
+    #b = []
     b_type = ''
 
-    fl = []
+    #fl = []
     fl_type = ''
     fl_ub = []
     
@@ -1026,53 +1263,53 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
                 for y in range(dim):
                     for dir in range(ndirs):
                         edge_id = (x * dim + y) * ndirs + dir
-                        b.append(format_var('b', k, edge_id))
+                        #b.append(format_var('b', k, edge_id))
                         b_type = b_type + 'B'
         
-                        fl.append(format_var('fl', k, edge_id))
+                        #fl.append(format_var('fl', k, edge_id))
                         fl_type = fl_type + 'I'
                         fl_ub.append(dirty_flows[i][traffic_idx])
                         
-    b_lb = [0] * len(b)
-    b_ub = [1] * len(b)
+    b_lb = [0] * len(b_type)
+    b_ub = [1] * len(b_type)
 
-    fl_lb = [0] * len(fl)
+    fl_lb = [0] * len(fl_type)
 
-    q = []
+    #q = []
     q_type = ''
     q_ub = []
         
     for i in range(n_flows):
         for j in range(n_splits):
-            q.append(format_var('q', i, j))
+            #q.append(format_var('q', i, j))
             q_type = q_type + 'I'
             q_ub.append(dirty_flows[i][traffic_idx])
 
-    q_lb = [0] * len(q)
+    q_lb = [0] * len(q_type)
     #q_ub = [cplex.infinity] * len(q)
     
     if min_links:
-        used_edges = []
+        #used_edges = []
         used_edges_type = ''
         
         for x in range(dim):
             for y in range(dim):
                 for dir in range(ndirs):
                     edge_id = (x * dim + y) * ndirs + dir
-                    used_edges.append(format_var('ue', 0, edge_id))
+                    #used_edges.append(format_var('ue', 0, edge_id))
                     used_edges_type = used_edges_type + 'B'
         
-        used_edges_ub = [1] * len(used_edges)
-        used_edges_lb = [0] * len(used_edges)
+        used_edges_ub = [1] * len(used_edges_type)
+        used_edges_lb = [0] * len(used_edges_type)
     
     #rows = []
     my_rhs = []
     my_senses = ''
     
     b_base_idx = 0
-    q_base_idx = len(b)
-    fl_base_idx = len(q) + q_base_idx
-    bound_base_idx = fl_base_idx + len(fl)
+    q_base_idx = len(b_lb)
+    fl_base_idx = len(q_lb) + q_base_idx
+    bound_base_idx = fl_base_idx + len(fl_lb)
     ue_base_idx = bound_base_idx + 1
     
     entries = []
@@ -1369,13 +1606,13 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
     
     assert(current_row == len(my_rhs))
                     
-    colnames = []
-    colnames.extend(b)
-    colnames.extend(q)
-    colnames.extend(fl)
-    colnames.append('bound')
-    if min_links:
-        colnames.extend(used_edges)
+#    colnames = []
+#    colnames.extend(b)
+#    colnames.extend(q)
+#    colnames.extend(fl)
+#    colnames.append('bound')
+#    if min_links:
+#        colnames.extend(used_edges)
 #    colnames.extend(used_edges)
     
     var_lb = []
@@ -1397,7 +1634,7 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
         var_ub.extend(used_edges_ub)
     
     # optimal goal
-    load_obj = [0] * (len(b) + len(q) + len(fl))
+    load_obj = [0] * (len(b_type) + len(q_type) + len(fl_type))
     
     
     
@@ -1450,8 +1687,8 @@ def minimize_max_load_fission_zero_pop(min_links, ncycles, flows, dim, ndirs, n_
     #if min_links:
     #    [b_output, q_ouput] = minimize_path_len_fission(x[-1] +  1, flows, dim, ndirs, n_splits)
     #else:
-    b_output = x[:len(b)]
-    q_ouput = x[len(b):(len(b) + len(q))]
+    b_output = x[:len(b_type)]
+    q_ouput = x[len(b_type):(len(b_type) + len(q_type))]
     
     [routes, edge_traffic] = calculate_routes_2(b_output, q_ouput, n_splits, dim, ndirs, flows, ncycles)
     
@@ -2977,10 +3214,10 @@ def traffic_gen(flows, ncycles):
                 if traffic_left > 0:
                     packet = copy.deepcopy(f[0:traffic_idx])
                     packet.insert(0, current_time)
-                    n_bytes = int(round(float(traffic_left + 0.5) / flit_size))
-                    if n_bytes <= 1:
-                        n_bytes = 2
-                    packet.append(n_bytes)
+                    n_flits = int(round(float(traffic_left) / flit_size + 0.5))
+                    if n_flits <= 1:
+                        n_flits = 2
+                    packet.append(n_flits)
                     packet.append(f[flow_id_idx])
                     packets.append(packet)
                     
@@ -3109,12 +3346,12 @@ is_done = True
 done = []
 notready = ['vocoder']
 
-#undone = ['fm', 'tde', 'channelvocoder']
-undone = ['tde']
+undone = ['channelvocoder', 'fm']
+#undone = ['tde']
 
 for dir in os.listdir(path):
     
-    if dir in notready or dir in done or (not dir in undone):
+    if dir in notready or dir in done or not dir in undone:
         continue
     
     if os.path.isfile('./dir'):
@@ -3138,7 +3375,7 @@ for dir in os.listdir(path):
         #methods = [default_routing, dj_routing, mml_routing, mml_ml_routing, mp_routing, mml_fission_routing, mml_ml_fission_routing]
         #methods = [default_routing, dj_routing, mp_routing, mml_routing, mml_ml_routing, mml_fission_routing]
         #methods = [default_routing, dj_routing, mp_routing]
-        methods = [mml_ml_fission_routing]
+        methods = [mml_fission_routing]
         #methods = [dj_routing]
         
         for i in [0,5]: #range(0, 6):
@@ -3155,7 +3392,7 @@ for dir in os.listdir(path):
                 # generate ILP files
                     if method == mml_fission_routing:
                         print 'Routing = MinMaxLoadFission'
-                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission(False, ncycles, flows, dim, directions, n_splits)
+                        [routes, wire_delays, router_delays, flows] = minimize_max_load_fission_zero_pop(False, ncycles, flows, dim, directions, n_splits)
                     elif method == mml_ml_fission_routing:
                         print 'Routing = MinMaxLoadFission-Minlinks'
                         [routes, wire_delays, router_delays, flows] = minimize_max_load_fission_zero_pop(True, ncycles, flows, dim, directions, n_splits)

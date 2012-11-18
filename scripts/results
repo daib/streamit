@@ -1776,295 +1776,6 @@ Routing = Multipath
 n split 2
 Watt Link 0.01370444769 router 0.429084370258 time 143726.32
 EDP Link 1969.68983411 router 61670.7175066
-Profiling : fm
-
-Num cycles per iteration : 648 0 4
-Routing = XY
-Watt Link 0.00933238412744 router 0.187802455207 time 8978.95
-EDP Link 83.7950104611 router 1686.26885518
-
-Num cycles per iteration : 648 0 4
-Routing = DJ
-Watt Link 0.0101205067308 router 0.165201823241 time 7168.42
-EDP Link 72.5480428591 router 1184.23605375
-
-Num cycles per iteration : 648 0 4
-Routing = Multipath
-n split 1
-Watt Link 0.00961682034115 router 0.165201819095 time 7363.16
-EDP Link 70.8101868631 router 1216.40742629
-
-Num cycles per iteration : 720 1 4
-Routing = XY
-Watt Link 0.00883615479773 router 0.175593223563 time 9094.74
-EDP Link 80.3625304851 router 1596.97471406
-
-Num cycles per iteration : 720 1 4
-Routing = DJ
-Watt Link 0.00868459043894 router 0.156368815262 time 7747.37
-EDP Link 67.282735429 router 1211.44706829
-
-Num cycles per iteration : 720 1 4
-Routing = Multipath
-n split 1
-Watt Link 0.00868459043894 router 0.156368815262 time 7747.37
-EDP Link 67.282735429 router 1211.44706829
-
-Num cycles per iteration : 810 2 4
-Routing = XY
-Watt Link 0.00830383527259 router 0.166428746855 time 9136.84
-EDP Link 75.870814272 router 1520.63283142
-
-Num cycles per iteration : 810 2 4
-Routing = DJ
-Watt Link 0.00825821509607 router 0.153591539728 time 8147.37
-EDP Link 67.2827339273 router 1251.36710303
-
-Num cycles per iteration : 810 2 4
-Routing = Multipath
-n split 1
-Watt Link 0.00825821509607 router 0.153591539728 time 8147.37
-EDP Link 67.2827339273 router 1251.36710303
-
-Num cycles per iteration : 925 3 4
-Routing = XY
-Watt Link 0.0074122119235 router 0.153617146342 time 9468.42
-EDP Link 70.1819356207 router 1454.51166077
-
-Num cycles per iteration : 925 3 4
-Routing = DJ
-Watt Link 0.00694622045893 router 0.146198408864 time 9321.05
-EDP Link 64.7460682088 router 1362.72267894
-
-Num cycles per iteration : 925 3 4
-Routing = Multipath
-n split 1
-Watt Link 0.00694622045893 router 0.146198408864 time 9321.05
-EDP Link 64.7460682088 router 1362.72267894
-
-Num cycles per iteration : 1080 4 4
-Routing = XY
-Watt Link 0.00589503455975 router 0.102726781634 time 11905.26
-EDP Link 70.1819191428 router 1222.98904432
-
-Num cycles per iteration : 1080 4 4
-Routing = DJ
-Watt Link 0.00595625799124 router 0.0932948270569 time 10873.68
-EDP Link 64.7664433942 router 1014.45809507
-
-Num cycles per iteration : 1080 4 4
-Routing = Multipath
-n split 1
-Watt Link 0.00558275704922 router 0.091281600572 time 11268.42
-EDP Link 62.9088511886 router 1028.59941352
-
-Num cycles per iteration : 1296 5 4
-Routing = XY
-Watt Link 0.00476408626108 router 0.081551688993 time 13936.84
-EDP Link 66.3963079668 router 1136.57284122
-
-Num cycles per iteration : 1296 5 4
-Routing = DJ
-Watt Link 0.00481794900367 router 0.0765362302918 time 13005.26
-EDP Link 62.6586794594 router 995.373574365
-
-Num cycles per iteration : 1296 5 4
-Routing = Multipath
-n split 1
-Watt Link 0.00481794900367 router 0.0765362302918 time 13005.26
-EDP Link 62.6586794594 router 995.373574365
-
-Num cycles per iteration : 3241 0 6
-Routing = XY
-Watt Link 0.0194290677168 router 0.3078784458 time 44242.11
-EDP Link 859.582951125 router 13621.1920657
-
-Num cycles per iteration : 3241 0 6
-Routing = DJ
-Watt Link 8.10919930091e-05 router 0.255970032587 time 500000.00
-EDP Link 40.5459965046 router 127985.016294
-
-Num cycles per iteration : 3241 0 6
-Routing = Multipath
-n split 1
-Watt Link 0.0161860611853 router 0.25343484471 time 42094.74
-EDP Link 681.34803722 router 10668.273895
-
-Num cycles per iteration : 3601 1 6
-Routing = XY
-Watt Link 0.0179615644895 router 0.300082312598 time 44421.05
-EDP Link 797.871554265 router 13329.9714121
-
-Num cycles per iteration : 3601 1 6
-Routing = DJ
-Watt Link 0.0154079215451 router 0.235607776174 time 41852.63
-EDP Link 644.862039494 router 9860.80508133
-
-Num cycles per iteration : 3601 1 6
-Routing = Multipath
-n split 1
-Watt Link 6.36992709919e-05 router 0.23660615424 time 500000.00
-EDP Link 31.8496354959 router 118303.07712
-
-Num cycles per iteration : 4051 2 6
-Routing = XY
-Watt Link 0.0164598145047 router 0.265012028944 time 44884.21
-EDP Link 738.785770789 router 11894.8555597
-
-Num cycles per iteration : 4051 2 6
-Routing = DJ
-Watt Link 0.0140742921576 router 0.223645727615 time 44510.53
-EDP Link 626.454203312 router 9954.58986839
-
-Num cycles per iteration : 4051 2 6
-Routing = Multipath
-n split 1
-Watt Link 5.9312220466e-05 router 0.224409579971 time 500000.00
-EDP Link 29.656110233 router 112204.789986
-
-Num cycles per iteration : 4630 3 6
-Routing = XY
-Watt Link 0.0153553487129 router 0.240831301787 time 46284.21
-EDP Link 710.71018445 router 11146.6865465
-
-Num cycles per iteration : 4630 3 6
-Routing = DJ
-Watt Link 7.98033175422e-05 router 0.214812540094 time 500000.00
-EDP Link 39.9016587711 router 107406.270047
-
-Num cycles per iteration : 4630 3 6
-Routing = Multipath
-n split 1
-Watt Link 0.000112827556877 router 0.209797078099 time 500000.00
-EDP Link 56.4137784386 router 104898.53905
-
-Num cycles per iteration : 5401 4 6
-Routing = XY
-Watt Link 0.0114554377554 router 0.177774206844 time 58789.47
-EDP Link 673.459114259 router 10451.2514
-
-Num cycles per iteration : 5401 4 6
-Routing = DJ
-Watt Link 6.29969656179e-05 router 0.161934620136 time 500000.00
-EDP Link 31.4984828089 router 80967.3100679
-
-Num cycles per iteration : 5401 4 6
-Routing = Multipath
-n split 1
-Watt Link 6.3399177172e-05 router 0.15389129509 time 500000.00
-EDP Link 31.699588586 router 76945.6475448
-
-Num cycles per iteration : 6482 5 6
-Routing = XY
-Watt Link 0.00934835962963 router 0.153593467867 time 68126.32
-EDP Link 636.869339603 router 10463.7577418
-
-Num cycles per iteration : 6482 5 6
-Routing = DJ
-Watt Link 7.11729995781e-05 router 0.141159164225 time 500000.00
-EDP Link 35.5864997891 router 70579.5821125
-
-Num cycles per iteration : 6482 5 6
-Routing = Multipath
-n split 1
-Watt Link 5.13226084202e-05 router 0.135744082017 time 500000.00
-EDP Link 25.6613042101 router 67872.0410083
-
-Num cycles per iteration : 7728 0 8
-Routing = XY
-Watt Link 0.0274714327825 router 0.550725427991 time 139326.32
-EDP Link 3827.49363471 router 76730.5472124
-
-Num cycles per iteration : 7728 0 8
-Routing = DJ
-Watt Link 0.000115955240073 router 0.37729442788 time 500000.00
-EDP Link 57.9776200365 router 188647.21394
-
-Num cycles per iteration : 7728 0 8
-Routing = Multipath
-n split 1
-Watt Link 8.44071923083e-05 router 0.35147728614 time 500000.00
-EDP Link 42.2035961541 router 175738.64307
-
-Num cycles per iteration : 8586 1 8
-Routing = XY
-Watt Link 0.0240684714086 router 0.490841151281 time 141021.05
-EDP Link 3394.16110993 router 69218.9345369
-
-Num cycles per iteration : 8586 1 8
-Routing = DJ
-Watt Link 0.000105833201892 router 0.358323999097 time 500000.00
-EDP Link 52.9166009461 router 179161.999548
-
-Num cycles per iteration : 8586 1 8
-Routing = Multipath
-n split 1
-Watt Link 9.36233796888e-05 router 0.330079891928 time 500000.00
-EDP Link 46.8116898444 router 165039.945964
-
-Num cycles per iteration : 9660 2 8
-Routing = XY
-Watt Link 0.0220252396559 router 0.426349546251 time 144236.84
-EDP Link 3176.85096821 router 61495.3112867
-
-Num cycles per iteration : 9660 2 8
-Routing = DJ
-Watt Link 0.00012585418235 router 0.32691597269 time 500000.00
-EDP Link 62.927091175 router 163457.986345
-
-Num cycles per iteration : 9660 2 8
-Routing = Multipath
-n split 1
-Watt Link 0.000110247843639 router 0.312465150878 time 500000.00
-EDP Link 55.1239218197 router 156232.575439
-
-Num cycles per iteration : 11040 3 8
-Routing = XY
-Watt Link 0.0213055262344 router 0.376283314003 time 143552.63
-EDP Link 3058.46432449 router 54016.4593502
-
-Num cycles per iteration : 11040 3 8
-Routing = DJ
-Watt Link 0.000115411797546 router 0.312715744346 time 500000.00
-EDP Link 57.7058987729 router 156357.872173
-
-Num cycles per iteration : 11040 3 8
-Routing = Multipath
-n split 1
-Watt Link 0.000125346796499 router 0.297878272468 time 500000.00
-EDP Link 62.6733982493 router 148939.136234
-
-Num cycles per iteration : 12880 4 8
-Routing = XY
-Watt Link 0.0181887850354 router 0.344352358933 time 154905.26
-EDP Link 2817.53847499 router 53341.9916921
-
-Num cycles per iteration : 12880 4 8
-Routing = DJ
-Watt Link 0.000114994593541 router 0.302494115151 time 500000.00
-EDP Link 57.4972967707 router 151247.057575
-
-Num cycles per iteration : 12880 4 8
-Routing = Multipath
-n split 1
-Watt Link 0.00011905039213 router 0.290449966731 time 500000.00
-EDP Link 59.5251960648 router 145224.983366
-
-Num cycles per iteration : 15456 5 8
-Routing = XY
-Watt Link 0.0138959587826 router 0.288809315587 time 187642.11
-EDP Link 2607.46702644 router 54192.7893644
-
-Num cycles per iteration : 15456 5 8
-Routing = DJ
-Watt Link 0.000125977474203 router 0.26214910075 time 500000.00
-EDP Link 62.9887371013 router 131074.550375
-
-Num cycles per iteration : 15456 5 8
-Routing = Multipath
-n split 1
-Watt Link 0.000120530269238 router 0.253731779984 time 500000.00
-EDP Link 60.2651346191 router 126865.889992
 Profiling : fft
 
 Num cycles per iteration : 2048 0 4
@@ -3029,3 +2740,100 @@ Routing = Multipath
 n split 4
 Watt Link 0.00996268425466 router 0.242250559687 time 737287.50
 EDP Link 7345.36256741 router 178608.309525
+Profiling : filterbank
+
+Num cycles per iteration : 72 0 4
+Routing = XY
+Watt Link 0.13758031627 router 1.22481699364 time 868.00
+EDP Link 119.419714522 router 1063.14115048
+
+Num cycles per iteration : 72 0 4
+Routing = DJ
+Watt Link 0.108379088041 router 0.940682817855 time 800.00
+EDP Link 86.703270433 router 752.546254284
+
+Num cycles per iteration : 72 0 4
+Routing = Multipath
+n split 1
+Watt Link 0.107963696218 router 1.00809885248 time 797.00
+EDP Link 86.0470658855 router 803.454785427
+
+Num cycles per iteration : 144 5 4
+Routing = XY
+Watt Link 0.0375491558279 router 0.313134010938 time 1525.93
+EDP Link 57.2973833524 router 477.82058131
+
+Num cycles per iteration : 144 5 4
+Routing = DJ
+Watt Link 0.0322046603405 router 0.251908672509 time 1531.48
+EDP Link 49.3207932183 router 385.793093774
+
+Num cycles per iteration : 144 5 4
+Routing = Multipath
+n split 1
+Watt Link 0.0323417352159 router 0.247089151551 time 1553.70
+EDP Link 50.2493540049 router 383.902414764
+
+Num cycles per iteration : 216 0 6
+Routing = XY
+Watt Link 0.277721595986 router 2.0302064942 time 2921.62
+EDP Link 811.396969266 router 5931.49189759
+
+Num cycles per iteration : 216 0 6
+Routing = DJ
+Watt Link 0.223442206118 router 1.64630257073 time 2321.33
+EDP Link 518.683096329 router 3821.61154651
+
+Num cycles per iteration : 216 0 6
+Routing = Multipath
+n split 1
+Watt Link 0.224120112946 router 1.64966123603 time 2382.67
+EDP Link 534.004269514 router 3930.59833725
+
+Num cycles per iteration : 432 5 6
+Routing = XY
+Watt Link 0.0895218981238 router 0.663412068438 time 4452.63
+EDP Link 398.607889243 router 2953.92847829
+
+Num cycles per iteration : 432 5 6
+Routing = DJ
+Watt Link 0.0670350734023 router 0.419452272356 time 4532.81
+EDP Link 303.857251069 router 1901.29745466
+
+Num cycles per iteration : 432 5 6
+Routing = Multipath
+n split 1
+Watt Link 0.06790216158 router 0.430333707036 time 4586.67
+EDP Link 311.444807454 router 1973.79870405
+
+Num cycles per iteration : 520 0 8
+Routing = XY
+Watt Link 0.228394875485 router 1.84156145202 time 5757.47
+EDP Link 1314.97664376 router 10602.7348131
+
+Num cycles per iteration : 520 0 8
+Routing = DJ
+Watt Link 0.167765854395 router 1.39677167713 time 6925.00
+EDP Link 1161.77854169 router 9672.6438641
+
+Num cycles per iteration : 520 0 8
+Routing = Multipath
+n split 1
+Watt Link 0.203588999778 router 1.40318956389 time 5915.79
+EDP Link 1204.38976899 router 8300.97479015
+
+Num cycles per iteration : 1040 5 8
+Routing = XY
+Watt Link 0.0786554982673 router 0.487131730534 time 10868.89
+EDP Link 854.897958563 router 5294.58119468
+
+Num cycles per iteration : 1040 5 8
+Routing = DJ
+Watt Link 0.0757199851037 router 0.408771967476 time 10829.73
+EDP Link 820.026994278 router 4426.89003934
+
+Num cycles per iteration : 1040 5 8
+Routing = Multipath
+n split 1
+Watt Link 0.0616415613694 router 0.398141930149 time 13275.00
+EDP Link 818.291727179 router 5285.33412273
