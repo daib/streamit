@@ -12,6 +12,7 @@ from orion2 import *
 from cplex.exceptions import CplexError
 import traceback
 import time
+from compiler.pyassem import Block
 
 #######################################################################################
 path = sys.argv[1]
@@ -361,47 +362,6 @@ def resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles):
                 edge_transfer[entry_idx] = []
             edge_transfer[entry_idx].append(this_flow[0])
     
-    #identify strongly connected components
-#    input: graph G = (V, E)
-#      output: set of strongly connected components (sets of vertices)
-#    
-#      index := 0
-#      S := empty
-#      for each v in V do
-#        if (v.index is undefined) then
-#          strongconnect(v)
-#        end if
-#      repeat
-#    function strongconnect(v)
-#    // Set the depth index for v to the smallest unused index
-#    v.index := index
-#    v.lowlink := index
-#    index := index + 1
-#    S.push(v)
-#
-#    // Consider successors of v
-#    for each (v, w) in E do
-#      if (w.index is undefined) then
-#        // Successor w has not yet been visited; recurse on it
-#        strongconnect(w)
-#        v.lowlink := min(v.lowlink, w.lowlink)
-#      else if (w is in S) then
-#        // Successor w is in stack S and hence in the current SCC
-#        v.lowlink := min(v.lowlink, w.index)
-#      end if
-#    repeat
-#
-#    // If v is a root node, pop the stack and generate an SCC
-#    if (v.lowlink = v.index) then
-#      start a new strongly connected component
-#      repeat
-#        w := S.pop()
-#        add w to current strongly connected component
-#      until (w = v)
-#      output the current strongly connected component
-#    end if
-#  end function
-
     index = [0]
     S = []
 
@@ -442,17 +402,103 @@ def resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles):
             for dir in range(ndirs):
                 if v_index[edge_idx([x, y, dir])] == -1:
                     strongconnect([x, y, dir])
+                    
+    circles = []
+    
+    def circuit(v):
+        def unblock(u):
+            blocked[edge_idx(u)] = False
+            for w in B[edge_idx(u)]:
+                B[edge_idx(u)].remove(w)
+                if blocked[edge_idx(w)]:
+                    unblock(w)
+        f = False
+        
+        stack.append(v)
+        
+        blocked[edge_idx(v)] = True
+        
+#        for x in range(dim):
+#            for y in range(dim):
+#                for dir in range(ndirs):
+#                    w = [x, y, dir]
+        for w in adj[edge_idx(v)]:
+            if w == s:
+                 circle = []
+                 circle.extend(stack)
+                 circle.append(s)
+                 circles.append(circle)
+                 f = True
+            elif not blocked[edge_idx(w)]:
+                if circuit(w):
+                    f = True
+        if f:
+            unblock(v)
+        else:
+#            for x in range(dim):
+#                for y in range(dim):
+#                    for dir in range(ndirs):
+#                        w = [x, y, dir]
+            for w in adj[edge_idx(v)]:
+                if not v in B[edge_idx(w)]:
+                    B[edge_idx(w)].append(v)
+        v = stack.pop()
+        return f
+    
+    stack = []
+    
+    ss = 0
+    blocked = [False] * dim * dim * ndirs
+    B = {}
+    
+#    while ss < (dim * dim * ndirs):
+#        x = (ss/ndirs)/dim
+#        y = (ss/ndirs)%dim
+#        dir = ss % ndirs
+#        
+    for SCC in SCCs:
+        while(len(SCC) > 1):
+            adj = {}
+            for v in SCC:
+               adj[edge_idx(v)] = []
+               for w in SCC:
+                   entry_idx = edge_idx(v) * (dim * dim * ndirs) + edge_idx(w)
+                   if edge_transfer.has_key(entry_idx):
+                       adj[edge_idx(v)].append(w)
+            #find min element of SCC
+            ndegs = float('inf')
+            
+            for s in SCC:
+                degs = 0
+                for w in SCC:
+                    entry_idx = edge_idx(s) * (dim * dim * ndirs) + edge_idx(w)
+                    if edge_transfer.has_key(entry_idx):
+                        degs = degs + 1
+                if degs < ndegs:
+                    ndegs = degs
+                    min_s = s
+                        
+            s = min_s
+            for i in range(dim * dim * ndirs):
+                blocked[i] = False
+                B[i] = []
+            
+            circuit(s)
+            SCC.remove(s)
+            
                 
-    #list the flows involved in connected components
+                
+                                       
+#list the flows involved in connected components
     conflict_sccs = []
     resolving_flows = []
-    for SCC in SCCs:
-        if len(SCC) <= 1:
+    for circle in circles:
+        if len(circle) <= 1:
             continue
         conflict_flows = []
-        for i in range(len(SCC)):
-            for j in range(i, len(SCC)):
-                entry_idx =  edge_idx(SCC[i]) * (dim * dim * ndirs) + edge_idx(SCC[j])
+        for i in range(len(circle)):
+            for j in range(i, len(circle)):
+                entry_idx =  edge_idx(circle[i]) * (dim * dim * ndirs) + edge_idx(circle[j])
                 if edge_transfer.has_key(entry_idx):
                     for f in edge_transfer[entry_idx]:
                         if not f in conflict_flows:
