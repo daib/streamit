@@ -465,7 +465,7 @@ def resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles):
             e_vc_type = e_vc_type + 'B'
     
     e_vc_vars_ub = [1] * len(e_vc_vars)
-    e_vc_vars_lb = [1] * len(e_vc_vars)
+    e_vc_vars_lb = [0] * len(e_vc_vars)
     
     lb_names = []
     ub_names = []
@@ -528,7 +528,7 @@ def resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles):
             for v in SCC:
                 var_names.extend([format_var('u' + str(vc), i, edge_idx(v)), format_var('l' + str(vc), i, edge_idx(v))])
                 coefs.extend([1, -1])
-            rows.append([u_var_names, coefs])
+            rows.append([var_names, coefs])
             my_rhs.append(1)
             my_senses.append('G')
             
@@ -570,8 +570,8 @@ def resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles):
     col_names = []
     col_names.extend(f_vc_vars)
     col_names.extend(e_vc_vars)
-    col_names.extend(ub_names)
     col_names.extend(lb_names)
+    col_names.extend(ub_names)
     
     var_lb = []
     var_lb.extend(f_vc_vars_lb)
@@ -587,7 +587,7 @@ def resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles):
     
     var_types = f_vc_type + e_vc_type + b_type + b_type 
     
-    load_obj = [1] * len(col_names)
+    load_obj = [0] * len(col_names)
     
     my_prob = new_cplex_solver()
               
