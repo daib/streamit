@@ -362,199 +362,239 @@ def resolve_cycles(b, q, n_splits, dim, ndirs, flows, ncycles):
                 edge_transfer[entry_idx] = []
             edge_transfer[entry_idx].append(this_flow[0])
     
-    index = [0]
-    S = []
-
-    v_index = [-1] * (dim * dim * ndirs)
-    v_lowlink = [-1] * (dim * dim * ndirs)
+    def find_scc(adj, vertices):
+        index = [0]
+        S = []
     
-    SCCs = []
+        v_index = [-1] * (dim * dim * ndirs)
+        v_lowlink = [-1] * (dim * dim * ndirs)
     
-    def strongconnect(v):
-        v_index[edge_idx(v)] = index[0]
-        v_lowlink[edge_idx(v)] = index[0]
-        index[0] = index[0] + 1
-        S.append(v)
-        for x in range(dim):
-            for y in range(dim):
-                for dir in range(ndirs):
-                    w = [x, y, dir]
-                    entry_idx =  edge_idx(v) * (dim * dim * ndirs) + edge_idx(w)
-                    if edge_transfer.has_key(entry_idx):
-                        if v_index[edge_idx(w)] == -1:
-                            strongconnect(w)
-                            v_lowlink[edge_idx(v)] = min(v_lowlink[edge_idx(v)], v_lowlink[edge_idx(w)])
-                        elif w in S:
-                            v_lowlink[edge_idx(v)] = min(v_lowlink[edge_idx(v)], v_index[edge_idx(w)])
-        if v_lowlink[edge_idx(v)] == v_index[edge_idx(v)]:
-            SCC = []
-            
-            while True:
-                w = S.pop()
-                SCC.append(w)
-                if w == v:
-                    break
-            if len(SCC) > 1:
-                SCCs.append(SCC)
-    
-    for x in range(dim):
-        for y in range(dim):
-            for dir in range(ndirs):
-                if v_index[edge_idx([x, y, dir])] == -1:
-                    strongconnect([x, y, dir])
-                    
-    circles = []
-    
-    def circuit(v):
-        def unblock(u):
-            blocked[edge_idx(u)] = False
-            for w in B[edge_idx(u)]:
-                B[edge_idx(u)].remove(w)
-                if blocked[edge_idx(w)]:
-                    unblock(w)
-        f = False
+        SCCs = []
         
-        stack.append(v)
-        
-        blocked[edge_idx(v)] = True
-        
-#        for x in range(dim):
-#            for y in range(dim):
-#                for dir in range(ndirs):
-#                    w = [x, y, dir]
-        for w in adj[edge_idx(v)]:
-            if w == s:
-                 circle = []
-                 circle.extend(stack)
-                 circle.append(s)
-                 circles.append(circle)
-                 f = True
-            elif not blocked[edge_idx(w)]:
-                if circuit(w):
-                    f = True
-        if f:
-            unblock(v)
-        else:
+        def strongconnect(v):
+            v_index[edge_idx(v)] = index[0]
+            v_lowlink[edge_idx(v)] = index[0]
+            index[0] = index[0] + 1
+            S.append(v)
 #            for x in range(dim):
 #                for y in range(dim):
 #                    for dir in range(ndirs):
 #                        w = [x, y, dir]
+#                        entry_idx =  edge_idx(v) * (dim * dim * ndirs) + edge_idx(w)
+#                        if edge_transfer.has_key(entry_idx):
             for w in adj[edge_idx(v)]:
-                if not v in B[edge_idx(w)]:
-                    B[edge_idx(w)].append(v)
-        v = stack.pop()
-        return f
-    
-    stack = []
-    
-    ss = 0
-    blocked = [False] * dim * dim * ndirs
-    B = {}
-    
-#    while ss < (dim * dim * ndirs):
-#        x = (ss/ndirs)/dim
-#        y = (ss/ndirs)%dim
-#        dir = ss % ndirs
-#        
-    for SCC in SCCs:
-        while(len(SCC) > 1):
-            adj = {}
-            for v in SCC:
-               adj[edge_idx(v)] = []
-               for w in SCC:
-                   entry_idx = edge_idx(v) * (dim * dim * ndirs) + edge_idx(w)
-                   if edge_transfer.has_key(entry_idx):
-                       adj[edge_idx(v)].append(w)
-            #find min element of SCC
-            ndegs = float('inf')
-            
-            for s in SCC:
-                degs = 0
-                for w in SCC:
-                    entry_idx = edge_idx(s) * (dim * dim * ndirs) + edge_idx(w)
-                    if edge_transfer.has_key(entry_idx):
-                        degs = degs + 1
-                if degs < ndegs:
-                    ndegs = degs
-                    min_s = s
+                if v_index[edge_idx(w)] == -1:
+                    strongconnect(w)
+                    v_lowlink[edge_idx(v)] = min(v_lowlink[edge_idx(v)], v_lowlink[edge_idx(w)])
+                elif w in S:
+                    v_lowlink[edge_idx(v)] = min(v_lowlink[edge_idx(v)], v_index[edge_idx(w)])
+            if v_lowlink[edge_idx(v)] == v_index[edge_idx(v)]:
+                SCC = []
+                
+                while True:
+                    w = S.pop()
+                    SCC.append(w)
+                    if w == v:
+                        break
+                if len(SCC) > 1:
+                    SCCs.append(SCC)
+        
+#        for x in range(dim):
+#            for y in range(dim):
+#                for dir in range(ndirs):
+        for v in vertices:
+            if v_index[edge_idx(v)] == -1:
+                strongconnect(v)
                         
-            s = min_s
-            for i in range(dim * dim * ndirs):
-                blocked[i] = False
-                B[i] = []
-            
-            circuit(s)
-            SCC.remove(s)
-            
-                
-                
-                                       
-#list the flows involved in connected components
-    conflict_sccs = []
+        return SCCs
+    
+    adj = {}
+    for i in range(dim * dim * ndirs):
+        adj[i] = []
+        for x in range(dim):
+            for y in range(dim):
+                for dir in range(ndirs):
+                    w = [x, y, dir]
+                    entry_idx =  i * (dim * dim * ndirs) + edge_idx(w)
+                    if not edge_transfer.has_key(entry_idx):
+                        adj[i].append(w)
+    vertices = []
+    for x in range(dim):
+        for y in range(dim):
+            for dir in range(ndirs):
+                w = [x, y, dir]
+                vertices.append(w)
+    
+    SCCs = find_scc(adj, vertices)
+    
     resolving_flows = []
-    for circle in circles:
-        if len(circle) <= 1:
-            continue
-        conflict_flows = []
-        for i in range(len(circle)):
-            for j in range(i, len(circle)):
-                entry_idx =  edge_idx(circle[i]) * (dim * dim * ndirs) + edge_idx(circle[j])
+    edge_entries = []
+    
+    for SCC in SCCs:
+        for v in SCC:
+            for w in SCC:
+                entry_idx = edge_idx(v) * (dim * dim * ndirs) + edge_idx(w)
                 if edge_transfer.has_key(entry_idx):
                     for f in edge_transfer[entry_idx]:
-                        if not f in conflict_flows:
-                            conflict_flows.append(f)
                         if not f in resolving_flows:
                             resolving_flows.append(f)
-        conflict_sccs.append(conflict_flows)
-
-
+                    if not entry_idx in edge_entries:
+                        edge_entries.append(entry_idx)
+                                       
     #use ILP to solve the problem
-    
-    vc_vars = []
-    vc_vars_type = ''
-    
     nvc = 2
+        
+    f_vc_vars = []
+    f_vc_type = ''
+    
     for f in resolving_flows:
         k = f[0] * n_splits + f[1]
         for i in range(nvc): 
-            vc_vars.append(str(k) + '_' + str(i))
-            vc_vars_type = vc_vars_type + 'B'
+            f_vc_vars.append(format_var('f', k, i))
+            f_vc_type = f_vc_type + 'B'
     
-    vc_vars_ub = [1] * len(vc_vars)
-    vc_vars_lb = [0] * len(vc_vars)
+    f_vc_vars_ub = [1] * len(f_vc_vars)
+    f_vc_vars_lb = [0] * len(f_vc_vars)
+    
+    e_vc_vars = []
+    e_vc_type = ''
+
+    for e in edge_entries:
+        for i in range(nvc):
+            e_vc_vars.append(format_var('e', e, i))
+            e_vc_type = e_vc_type + 'B'
+    
+    e_vc_vars_ub = [1] * len(e_vc_vars)
+    e_vc_vars_lb = [1] * len(e_vc_vars)
+    
+    lb_names = []
+    ub_names = []
+    b_type = ''
+    for i in range(len(SCCs)):
+        SCC = SCCs[i]
+        for vc in range(nvc):
+            for v in SCC:
+                lb_names.append(format_var('l' + str(vc), i, edge_idx(v)))
+                ub_names.append(format_var('u' + str(vc), i, edge_idx(v)))
+                b_type = b_type + 'I'
+    
+    lb_lb = [-cplex.infinity] * len(lb_names)
+    lb_ub = [0] * len(lb_names)
+    
+    ub_ub = [cplex.infinity] * len(ub_names)
+    ub_lb = [0] * len(ub_names)
+    
     rows = []
     my_rhs = []
     my_senses = []
     
-    for cfs  in conflict_sccs:
-        for i in range(nvc):
+    #no cycle constraints for each SCC
+    for i in range(len(SCCs)):
+        SCC = SCCs[i]
+        for vc in range(nvc): #each vc layer for
+            #no cycle constraint: C*e_vc = 0
+            #enumerate all the edges of this entry
+            for v in SCC:
+                var_names = []
+                coefs = []
+                for w in SCC:
+                    #check if this is an incoming edge
+                    entry_idx = edge_idx(v) * (dim * dim * ndirs) + edge_idx(w)
+                    if edge_transfer.has_key(entry_idx):
+                        var_names.append(format_var('e', entry_idx, vc))
+                        coefs.append(1)
+                    #check if this is an outgoing edge
+                    entry_idx = edge_idx(v) + edge_idx(w) * (dim * dim * ndirs)
+                    if edge_transfer.has_key(entry_idx):
+                        var_names.append(format_var('e', entry_idx, vc))
+                        coefs.append(-1)
+                
+                coefs.append(-1)        
+                #lower bound constraints
+                l_var_names = copy.deepcopy(var_names)
+                l_var_names.append(format_var('l' + str(vc), i, edge_idx(v)))
+                rows.append([l_var_names, coefs])
+                my_rhs.append(0)
+                my_senses.append('G')
+            
+                u_var_names = copy.deepcopy(var_names)
+                u_var_names.append(format_var('u' + str(vc), i, edge_idx(v)))
+                rows.append([u_var_names, coefs])
+                my_rhs.append(0)
+                my_senses.append('L')
+           
             var_names = []
-            for f in cfs:
-                k = f[0] * n_splits + f[1]
-                var_names.append(str(k) + '_' + str(i))
-            coefs = [1] * len(var_names)
-            rows.append([var_names, coefs])
-            my_rhs.append(len(var_names) - 1)
-            my_senses.append('L')
+            coefs = []
+            for v in SCC:
+                var_names.extend([format_var('u' + str(vc), i, edge_idx(v)), format_var('l' + str(vc), i, edge_idx(v))])
+                coefs.extend([1, -1])
+            rows.append([u_var_names, coefs])
+            my_rhs.append(1)
+            my_senses.append('G')
+            
+            # if one flow use this vc layer
+            for v in SCC:
+                var_names = []
+                coefs = []
+                for w in SCC:
+                    #check if this is an incoming edge
+                    entry_idx = edge_idx(v) * (dim * dim * ndirs) + edge_idx(w)
+                    if edge_transfer.has_key(entry_idx):
+                        for f in edge_transfer[entry_idx]:
+                            k = f[0] * n_splits + f[1]
+                            rows.append([[format_var('f', k, vc), format_var('e', entry_idx, vc)], [1, -1]])
+                            my_rhs.append(0)
+                            my_senses.append('L')
+                    #check if this is an outgoing edge
+                    entry_idx = edge_idx(v) + edge_idx(w) * (dim * dim * ndirs)
+                    if edge_transfer.has_key(entry_idx):
+                        for f in edge_transfer[entry_idx]:
+                            k = f[0] * n_splits + f[1]
+                            rows.append([[format_var('f', k, vc), format_var('e', entry_idx, vc)], [1, -1]])
+                            my_rhs.append(0)
+                            my_senses.append('L')
+                        
+                
+    #single VC selection for each flow
     for f in resolving_flows:
         k = f[0] * n_splits + f[1]
         var_names = []
         for i in range(nvc):
-            var_names.append(str(k) + '_' + str(i))
+            var_names.append(format_var('f', k, i))
         coefs = [1] * len(var_names)
         rows.append([var_names, coefs])
         my_rhs.append(1)
         my_senses.append('E')
         
     
-    load_obj = [1] * len(vc_vars)
+    col_names = []
+    col_names.extend(f_vc_vars)
+    col_names.extend(e_vc_vars)
+    col_names.extend(ub_names)
+    col_names.extend(lb_names)
+    
+    var_lb = []
+    var_lb.extend(f_vc_vars_lb)
+    var_lb.extend(e_vc_vars_lb)
+    var_lb.extend(lb_lb)
+    var_lb.extend(ub_lb)
+    
+    var_ub = []
+    var_ub.extend(f_vc_vars_ub)
+    var_ub.extend(e_vc_vars_ub)
+    var_ub.extend(lb_ub)
+    var_ub.extend(ub_ub)
+    
+    var_types = f_vc_type + e_vc_type + b_type + b_type 
+    
+    load_obj = [1] * len(col_names)
     
     my_prob = new_cplex_solver()
               
     my_prob.objective.set_sense(my_prob.objective.sense.minimize)
 
-    my_prob.variables.add(obj=load_obj, lb=vc_vars_lb, ub=vc_vars_ub, types=vc_vars_type,
-                       names=vc_vars)
+    my_prob.variables.add(obj=load_obj, lb=var_lb, ub=var_ub, types=var_types,
+                       names=col_names)
 
     my_prob.linear_constraints.add(lin_expr=rows, senses=my_senses,
                                 rhs=my_rhs)
