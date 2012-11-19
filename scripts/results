@@ -2837,3 +2837,150 @@ Routing = Multipath
 n split 1
 Watt Link 0.0616415613694 router 0.398141930149 time 13275.00
 EDP Link 818.291727179 router 5285.33412273
+
+Profiling : dct
+
+Num cycles per iteration : 4096 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Finding vc values ...
+mkdir: cannot create directory `traffics': File exists
+Watt Link 0.0487522833107 router 0.459064428954 time 46400.000000
+EDP Link 2262.10594562 router 21300.5895035
+
+Profiling : filterbank
+
+Num cycles per iteration : 216 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.239463604757 router 1.43302659047 time 2776.000000
+EDP Link 664.750966806 router 3978.08181514
+Profiling : filterbank
+
+Profiling : channelvocoder
+
+Num cycles per iteration : 3400 0 4
+Routing = XY
+Watt Link 0.0361052350986 router 0.325582152235 time 36541.67
+EDP Link 1319.34558625 router 11897.3155648
+
+Num cycles per iteration : 3400 0 4
+Routing = DJ
+Watt Link 0.0239353908727 router 0.248194611802 time 43829.17
+EDP Link 1049.06831557 router 10878.1638338
+
+Num cycles per iteration : 3400 0 4
+Routing = Multipath
+n split 1
+Watt Link 0.0213704548952 router 0.258650751536 time 50730.00
+EDP Link 1084.12317684 router 13121.3526254
+
+Num cycles per iteration : 6800 5 4
+Routing = XY
+Watt Link 0.0133478839744 router 0.101807733918 time 68105.26
+EDP Link 909.061108529 router 6933.64218847
+
+Num cycles per iteration : 6800 5 4
+Routing = DJ
+Watt Link 0.0112705321622 router 0.0897441115778 time 74415.79
+EDP Link 838.705554571 router 6678.37896091
+
+Num cycles per iteration : 6800 5 4
+Routing = Multipath
+n split 1
+Watt Link 0.0105594688572 router 0.0877308804652 time 78942.11
+EDP Link 833.586752068 router 6925.66081608
+
+Num cycles per iteration : 14600 0 6
+Routing = XY
+Watt Link 0.0574627107903 router 0.4524843179 time 19289.47
+EDP Link 1108.42523591 router 8728.18267559
+
+Num cycles per iteration : 14600 0 6
+Routing = DJ
+Watt Link 0.0303114919508 router 0.364783202397 time 28384.21
+EDP Link 860.367752944 router 10354.0830213
+
+Num cycles per iteration : 14600 0 6
+Routing = Multipath
+n split 1
+Watt Link 0.0268071569108 router 0.370704108213 time 33989.47
+EDP Link 911.161055605 router 12600.036165
+
+Num cycles per iteration : 29200 5 6
+Routing = XY
+Watt Link 0.0261808670194 router 0.186938847101 time 31226.32
+EDP Link 817.532131425 router 5837.41226
+
+Num cycles per iteration : 29200 5 6
+Routing = DJ
+Watt Link 0.0178845025911 router 0.168113960538 time 41768.42
+EDP Link 747.007415714 router 7021.85451161
+
+Num cycles per iteration : 29200 5 6
+Routing = Multipath
+n split 1
+Watt Link 0.0174982501634 router 0.15666877385 time 42994.74
+EDP Link 752.33271623 router 6735.9331978
+
+Num cycles per iteration : 25800 0 8
+Routing = XY
+Watt Link 0.105512602649 router 1.00564495617 time 56489.47
+EDP Link 5960.35100197 router 56808.350582
+
+Num cycles per iteration : 25800 0 8
+Routing = DJ
+Watt Link 0.045459146309 router 0.830237187043 time 89126.32
+EDP Link 4051.60642086 router 73995.9852083
+
+Num cycles per iteration : 25800 0 8
+Routing = Multipath
+n split 1
+mkdir: cannot create directory `traffics': File exists
+Watt Link 0.045459146309 router 0.830237187043 time 89126.32
+EDP Link 4051.60642086 router 73995.9852083
+
+Num cycles per iteration : 51600 5 8
+Routing = XY
+Watt Link 0.0736019047134 router 0.633152832381 time 62989.47
+EDP Link 4636.14496889 router 39881.9613407
+
+Num cycles per iteration : 51600 5 8
+Routing = DJ
+Watt Link 0.0323712713306 router 0.373817010778 time 94994.74
+EDP Link 3075.10050352 router 35510.6497464
+
+Num cycles per iteration : 51600 5 8
+Routing = Multipath
+n split 1
+Watt Link 0.0321809269941 router 0.365085111089 time 95157.89
+EDP Link 3062.269111 router 34740.7288416
+
+Profiling : fm
+
+Num cycles per iteration : 18255 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0247990181503 router 0.270025047415 time 20984.210526
+EDP Link 520.387817703 router 5666.26244224
+
+Num cycles per iteration : 36510 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0104833913581 router 0.0991504342982 time 36789.473684
+EDP Link 385.67845049 router 3647.69229337
+Error: Cannot route
+
+Num cycles per iteration : 87360 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.00135137432901 router 0.347406254542 time 36672.846728
+EDP Link 49.5587436399 router 12740.3763252
+
+Num cycles per iteration : 174720 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.00132123208839 router 0.16871272759 time 84661.081006
+EDP Link 111.856936863 router 14283.4018972
+
+
