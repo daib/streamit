@@ -1,0 +1,351 @@
+Profiling : serpent
+
+Num cycles per iteration : 240 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0293710180552 router 0.295869797142 time 2541.00
+EDP Link 74.6317568784 router 751.805154538
+
+Num cycles per iteration : 480 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0107177709287 router 0.101163652771 time 4985.94
+EDP Link 53.4381627844 router 504.395902897
+
+Num cycles per iteration : 512 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0378937995531 router 0.343678215414 time 5437.00
+EDP Link 206.02858817 router 1868.57845721
+
+Num cycles per iteration : 1024 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0156159510915 router 0.165935614044 time 10509.33
+EDP Link 164.113183285 router 1743.87212674
+
+Num cycles per iteration : 512 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0708358085029 router 0.767156980134 time 7706.00
+EDP Link 545.860740324 router 5911.71168892
+
+Num cycles per iteration : 1024 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0317885472328 router 0.379701415983 time 10608.00
+EDP Link 337.212909045 router 4027.87262075
+Profiling : filterbank
+
+Num cycles per iteration : 72 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.125862534633 router 0.959769401701 time 851.00
+EDP Link 107.109016972 router 816.763760848
+
+Num cycles per iteration : 144 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0337716441316 router 0.23725416893 time 1671.88
+EDP Link 56.4621363908 router 396.66049995
+
+Num cycles per iteration : 216 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt# Link 0.000663984896994 router 1.43302433293 time 1000001.00
+EDP# Link 663.985560979 router 1433025.76596
+
+Num cycles per iteration : 432 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0766033875273 router 0.441884410429 time 4994.59
+EDP Link 382.60251331 router 2207.03145748
+
+Num cycles per iteration : 520 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+CPLEX Error  1217: No solution exists.
+
+
+Num cycles per iteration : 1040 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+CPLEX Error  1217: No solution exists.
+
+Profiling : dct
+
+Num cycles per iteration : 2048 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0165302603415 router 0.327366030257 time 32845.83
+EDP Link 542.950121033 router 10752.6089776
+
+Num cycles per iteration : 4096 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.00639332547151 router 0.107094713547 time 65668.42
+EDP Link 419.83958226 router 7032.74062898
+
+Num cycles per iteration : 4096 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt# Link 0.00225812134188 router 0.45906389182 time 1000000.00
+EDP# Link 2258.12134188 router 459063.89182
+
+Num cycles per iteration : 8192 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.021116660666 router 0.208062629093 time 82189.47
+EDP Link 1735.56714831 router 17100.5572119
+
+Num cycles per iteration : 4096 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.058473372873 router 0.972537835546 time 82456.25
+EDP Link 4821.49505196 router 80191.8229022
+
+Num cycles per iteration : 8192 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0406636289445 router 0.551356100971 time 85981.08
+EDP Link 3496.30273337 router 47406.193026
+Profiling : des
+
+Num cycles per iteration : 120 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.022857309158 router 0.270671787961 time 1340.00
+EDP Link 30.6287942718 router 362.700195868
+
+Num cycles per iteration : 240 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.00835840966987 router 0.0941349421732 time 2564.06
+EDP Link 21.4314638981 router 241.367639829
+
+Num cycles per iteration : 256 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0343942228468 router 0.39202383506 time 3007.00
+EDP Link 103.4234281 router 1178.81567202
+
+Num cycles per iteration : 512 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0138237207605 router 0.168937831228 time 5626.67
+EDP Link 77.7815148914 router 950.557426836
+
+Num cycles per iteration : 256 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0897287833315 router 0.785202372634 time 3057.00
+EDP Link 274.300890644 router 2400.36365314
+
+Num cycles per iteration : 512 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0309746016544 router 0.376074587787 time 5437.00
+EDP Link 168.408909195 router 2044.7175338
+Profiling : bitonic-sort
+
+Num cycles per iteration : 240 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0248363913789 router 0.264641711354 time 2571.00
+EDP Link 63.8543622351 router 680.393839892
+
+Num cycles per iteration : 480 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.00945870235032 router 0.0957485575769 time 4957.81
+EDP Link 46.8944490994 router 474.70315624
+
+Num cycles per iteration : 512 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0388545496469 router 0.361527366013 time 5499.00
+EDP Link 213.661168508 router 1988.03898571
+
+Num cycles per iteration : 1024 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0161033891426 router 0.158821427448 time 10618.67
+EDP Link 170.996575187 router 1686.472327
+
+Num cycles per iteration : 512 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0625420407142 router 0.732713958787 time 5551.00
+EDP Link 347.170868005 router 4067.29518523
+
+Num cycles per iteration : 1024 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0248085226696 router 0.501372281813 time 10716.00
+EDP Link 265.848128927 router 5372.7053719
+Profiling : tde
+
+Num cycles per iteration : 92160 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0299480535625 router 0.319417778392 time 92306.00
+EDP Link 2764.38503214 router 29484.1774522
+
+Num cycles per iteration : 184320 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0103038122683 router 0.116361631828 time 184414.06
+EDP Link 1900.16785388 router 21458.7209535
+
+Num cycles per iteration : 207360 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0356514510719 router 0.387036904336 time 207719.00
+EDP Link 7405.4837652 router 80394.9187318
+
+Num cycles per iteration : 414720 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.012820359123 router 0.17996044853 time 414907.81
+EDP Link 5319.26712715 router 74666.9955863
+
+Num cycles per iteration : 368640 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0398805725619 router 0.476315220409 time 368688.00
+EDP Link 14703.4885367 router 175611.705982
+
+Num cycles per iteration : 737280 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0143256375362 router 0.267867005256 time 737348.44
+EDP Link 10562.9864893 router 197511.318453
+Profiling : mpeg2
+
+Num cycles per iteration : 1575 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0354022816756 router 0.371714571192 time 15905.41
+EDP Link 563.087804986 router 5912.27265778
+
+Num cycles per iteration : 3150 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0130745368344 router 0.119138934399 time 31710.53
+EDP Link 414.600492522 router 3777.95875341
+
+Num cycles per iteration : 3825 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.037123889775 router 0.428628955396 time 38513.33
+EDP Link 1429.76461779 router 16507.9284067
+
+Num cycles per iteration : 7650 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0151738345912 router 0.169079999889 time 76733.33
+EDP Link 1164.33885705 router 12974.0714279
+
+Num cycles per iteration : 6975 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0371629081739 router 0.46415350169 time 7956.00
+EDP Link 295.668097431 router 3692.80525945
+
+Num cycles per iteration : 13950 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0173720526765 router 0.242250664883 time 15595.31
+EDP Link 270.922546827 router 3777.97421656
+Profiling : fft
+
+Num cycles per iteration : 2048 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0185219514093 router 0.213682977748 time 20710.00
+EDP Link 383.589613687 router 4425.37446915
+
+Num cycles per iteration : 4096 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.00745492628622 router 0.0779248861215 time 41365.62
+EDP Link 308.377647884 router 3223.41122785
+
+Num cycles per iteration : 4608 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0333625249103 router 0.304236637319 time 46482.00
+EDP Link 1550.75688288 router 14141.5273759
+
+Num cycles per iteration : 9216 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0147869339064 router 0.137132885342 time 92610.94
+EDP Link 1369.43184878 router 12700.0054164
+
+Num cycles per iteration : 8192 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0285181432722 router 0.328152489397 time 82670.00
+EDP Link 2357.59490432 router 27128.3662985
+
+Num cycles per iteration : 16384 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0131105306279 router 0.220023947956 time 165140.62
+EDP Link 2165.08115642 router 36334.8911803
+Profiling : beamformer
+
+Num cycles per iteration : 69 0 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0781769158331 router 0.736337406055 time 849.43
+EDP Link 66.4058176161 router 625.467082825
+
+Num cycles per iteration : 138 5 4
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0234910749441 router 0.179900954253 time 1693.33
+EDP Link 39.778141935 router 304.631682866
+
+Num cycles per iteration : 123 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.127878054036 router 0.951820369319 time 1661.33
+EDP Link 212.447647511 router 1581.28773416
+
+Num cycles per iteration : 246 5 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.0476295575907 router 0.253467031647 time 2960.00
+EDP Link 140.983490468 router 750.262413675
+
+Num cycles per iteration : 161 0 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+CPLEX Error  1217: No solution exists.
+
+
+Num cycles per iteration : 322 5 8
+Routing = MinMaxLoadFission
+Solving the problem ...
+CPLEX Error  1217: No solution exists.
+
+Profiling : dct
+
+Num cycles per iteration : 4096 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Finding vc values ...
+mkdir: cannot create directory `traffics': File exists
+Watt Link 0.0487522833107 router 0.459064428954 time 46400.000000
+EDP Link 2262.10594562 router 21300.5895035
+
+Profiling : filterbank
+
+Num cycles per iteration : 216 0 6
+Routing = MinMaxLoadFission
+Solving the problem ...
+Watt Link 0.239463604757 router 1.43302659047 time 2776.000000
+EDP Link 664.750966806 router 3978.08181514
+Profiling : filterbank
